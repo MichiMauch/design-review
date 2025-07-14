@@ -259,13 +259,16 @@ export default function ProjectPage() {
                 <div className="space-y-4">
                   {tasks.map((task) => (
                     <div key={task.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-medium text-gray-900">{task.title}</h3>
+                      <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
+                        <span>{new Date(task.created_at).toLocaleString('de-DE')}</span>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                           {getStatusIcon(task.status)}
                           {task.status === 'open' ? 'Offen' : 
                            task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
                         </span>
+                      </div>
+                      <div className="mb-2">
+                        <h3 className="font-medium text-gray-900">{task.title}</h3>
                       </div>
                       
                       {task.description && (
@@ -273,9 +276,8 @@ export default function ProjectPage() {
                       )}
                       
                       <div className="text-xs text-gray-500 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span>{new Date(task.created_at).toLocaleString('de-DE')}</span>
-                          {task.url && (
+                        {task.url && (
+                          <div className="flex items-center justify-end">
                             <a 
                               href={task.url} 
                               target="_blank" 
@@ -285,8 +287,8 @@ export default function ProjectPage() {
                               <ExternalLink className="h-3 w-3" />
                               Seite öffnen
                             </a>
-                          )}
-                        </div>
+                          </div>
+                        )}
                         {task.url && (
                           <div className="break-all text-gray-600 bg-gray-50 p-2 rounded border text-xs font-mono">
                             {task.url}
