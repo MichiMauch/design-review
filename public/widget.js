@@ -594,6 +594,10 @@
         const data = await response.json();
         
         if (data.success && data.screenshot) {
+          // If we have R2 filename, use that directly
+          if (data.r2Filename) {
+            return data.r2Filename;
+          }
           // If we have a selected area, crop the screenshot
           if (this.selectedArea && !data.screenshot.includes('svg')) {
             return this.cropScreenshot(data.screenshot, this.selectedArea);
@@ -634,7 +638,7 @@
         const data = await uploadResponse.json();
         console.log('Screenshot uploaded successfully:', data.url);
         
-        return data.url;
+        return data.filename;
       } catch (error) {
         console.error('Screenshot upload failed:', error);
         // Return the original data URL as fallback
