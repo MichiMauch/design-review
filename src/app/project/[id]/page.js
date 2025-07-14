@@ -272,18 +272,25 @@ export default function ProjectPage() {
                         <p className="text-gray-600 text-sm mb-3">{task.description}</p>
                       )}
                       
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{new Date(task.created_at).toLocaleString('de-DE')}</span>
+                      <div className="text-xs text-gray-500 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span>{new Date(task.created_at).toLocaleString('de-DE')}</span>
+                          {task.url && (
+                            <a 
+                              href={task.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Seite öffnen
+                            </a>
+                          )}
+                        </div>
                         {task.url && (
-                          <a 
-                            href={task.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            Seite öffnen
-                          </a>
+                          <div className="break-all text-gray-600 bg-gray-50 p-2 rounded border text-xs font-mono">
+                            {task.url}
+                          </div>
                         )}
                       </div>
                       
