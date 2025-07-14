@@ -607,6 +607,40 @@
       }
     }
 
+    async uploadScreenshot(screenshotDataUrl) {
+      try {
+        console.log('Uploading screenshot to server...');
+        
+        // Convert data URL to blob
+        const response = await fetch(screenshotDataUrl);
+        const blob = await response.blob();
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('screenshot', blob, 'screenshot.png');
+        formData.append('projectId', this.projectDbId);
+        
+        // Upload to server
+        const uploadResponse = await fetch(`${this.apiBase}/api/upload-screenshot`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.status}`);
+        }
+        
+        const data = await uploadResponse.json();
+        console.log('Screenshot uploaded successfully:', data.url);
+        
+        return data.url;
+      } catch (error) {
+        console.error('Screenshot upload failed:', error);
+        // Return the original data URL as fallback
+        return screenshotDataUrl;
+      }
+    }
+
     async cropScreenshot(screenshotUrl, area) {
       return new Promise((resolve) => {
         const img = new Image();

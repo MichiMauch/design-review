@@ -79,8 +79,9 @@ export default function ProjectPage() {
     loadProject();
     loadTasks();
 
-    // Check widget installation status every 30 seconds
-    const interval = setInterval(checkWidgetStatus, 30000);
+    // Check widget installation status immediately and then every 10 seconds
+    checkWidgetStatus();
+    const interval = setInterval(checkWidgetStatus, 10000);
     return () => clearInterval(interval);
   }, [params.id]);
 
