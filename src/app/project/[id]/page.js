@@ -41,6 +41,11 @@ export default function ProjectPage() {
     board: ''
   });
   const [showJiraSettings, setShowJiraSettings] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingTask, setDeletingTask] = useState(null);
+  const [showTaskDeleteConfirm, setShowTaskDeleteConfirm] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
   const [jiraConfig, setJiraConfig] = useState({
     serverUrl: '',
     username: '',
@@ -232,6 +237,70 @@ export default function ProjectPage() {
   const showToast = (message, type = 'success', link = null) => {
     setToast({ message, type, link });
     setTimeout(() => setToast(null), 8000); // Longer for links
+  };
+
+  // Delete project function
+  const deleteProject = async () => {
+    if (!project) return;
+    
+    setDeletingProject(true);
+    try {
+      const response = await fetch(`/api/projects/${params.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showToast('Projekt erfolgreich gelöscht!', 'success');
+        router.push('/projects');
+      } else {
+        showToast('Fehler beim Löschen des Projekts', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      showToast('Fehler beim Löschen des Projekts', 'error');
+    } finally {
+      setDeletingProject(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // Show task delete confirmation
+  const openTaskDeleteModal = (task) => {
+    setTaskToDelete(task);
+    setShowTaskDeleteConfirm(true);
+  };
+
+  // Also keep the old name for compatibility
+  const confirmDeleteTask = (task) => {
+    setTaskToDelete(task);
+    setShowTaskDeleteConfirm(true);
+  };
+
+  // Delete task function
+  const deleteTask = async () => {
+    if (!taskToDelete) return;
+    
+    setDeletingTask(taskToDelete.id);
+    try {
+      const response = await fetch(`/api/projects/${params.id}/tasks/${taskToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showToast('Task erfolgreich gelöscht!', 'success');
+        // Reload tasks after deletion
+        loadTasks();
+      } else {
+        showToast('Fehler beim Löschen der Task', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      showToast('Fehler beim Löschen der Task', 'error');
+    } finally {
+      setDeletingTask(null);
+      setTaskToDelete(null);
+      setShowTaskDeleteConfirm(false);
+    }
   };
 
   const loadJiraStatuses = async () => {
@@ -714,13 +783,14 @@ export default function ProjectPage() {
               </div>
             </div>
             
-            {/* Widget Status */}
-            <div className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-              project.widget_installed 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {project.widget_installed ? (
+            <div className="flex items-center gap-4">
+              {/* Widget Status */}
+              <div className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                project.widget_installed 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {project.widget_installed ? (
                 <>
                   <CheckCircle className="h-4 w-4" />
                   Widget installiert
@@ -731,6 +801,17 @@ export default function ProjectPage() {
                   Widget nicht installiert
                 </>
               )}
+            </div>
+              
+            {/* Delete Project Button */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2 text-sm"
+              title="Projekt löschen"
+            >
+              <X className="h-4 w-4" />
+              Löschen
+            </button>
             </div>
           </div>
         </div>
@@ -862,15 +943,29 @@ export default function ProjectPage() {
                         ) : (
                           <div className="flex items-start justify-between">
                             <h3 className="font-medium text-gray-900 flex-1">{task.title}</h3>
-                            {!task.jira_key && (
+                            <div className="flex items-center gap-1 ml-2">
+                              {!task.jira_key && (
+                                <button
+                                  onClick={() => startEditing(task)}
+                                  className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                                  title="Bearbeiten"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </button>
+                              )}
                               <button
-                                onClick={() => startEditing(task)}
-                                className="ml-2 p-1 text-gray-400 hover:text-gray-600 rounded"
-                                title="Bearbeiten"
+                                onClick={() => openTaskDeleteModal(task)}
+                                disabled={deletingTask === task.id}
+                                className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
+                                title="Task löschen"
                               >
-                                <Edit3 className="h-4 w-4" />
+                                {deletingTask === task.id ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                ) : (
+                                  <X className="h-4 w-4" />
+                                )}
                               </button>
-                            )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -961,11 +1056,25 @@ export default function ProjectPage() {
                           <ExternalLink className="h-3 w-3" />
                           {task.jira_key}
                         </a>
-                        {jiraStatuses[task.id] && (
-                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}>
-                            {jiraStatuses[task.id].name}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {jiraStatuses[task.id] && (
+                            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}>
+                              {jiraStatuses[task.id].name}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => confirmDeleteTask(task)}
+                            disabled={deletingTask === task.id}
+                            className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
+                            title="Task löschen"
+                          >
+                            {deletingTask === task.id ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-400"></div>
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <p className="text-sm text-gray-700 font-medium mb-1">{task.title}</p>
                       <p className="text-xs text-gray-500">{formatTime(task.created_at)}</p>
@@ -1200,6 +1309,95 @@ export default function ProjectPage() {
                 <button
                   onClick={() => setShowJiraModal(false)}
                   className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Projekt löschen</h3>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 mb-2">
+                  Sind Sie sicher, dass Sie das Projekt <strong>{project.name}</strong> löschen möchten?
+                </p>
+                <p className="text-sm text-red-600">
+                  Diese Aktion kann nicht rückgängig gemacht werden. Alle Tasks und Daten werden dauerhaft gelöscht.
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={deleteProject}
+                  disabled={deletingProject}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  {deletingProject ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Lösche...
+                    </>
+                  ) : (
+                    <>
+                      <X className="h-4 w-4" />
+                      Projekt löschen
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deletingProject}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Task Delete Confirmation Modal */}
+        {showTaskDeleteConfirm && taskToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Task löschen</h3>
+              
+              <p className="text-gray-600 mb-6">
+                Sind Sie sicher, dass Sie die Task <strong>&quot;{taskToDelete.title}&quot;</strong> löschen möchten? 
+                Diese Aktion kann nicht rückgängig gemacht werden.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={deleteTask}
+                  disabled={deletingTask === taskToDelete.id}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  {deletingTask === taskToDelete.id ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Lösche...
+                    </>
+                  ) : (
+                    <>
+                      <X className="h-4 w-4" />
+                      Task löschen
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTaskDeleteConfirm(false);
+                    setTaskToDelete(null);
+                  }}
+                  disabled={deletingTask === taskToDelete.id}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
                 >
                   Abbrechen
                 </button>

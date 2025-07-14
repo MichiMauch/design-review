@@ -107,3 +107,42 @@ export async function PUT(request, { params }) {
     }, { status: 500 }));
   }
 }
+
+export async function DELETE(request, { params }) {
+  try {
+    const resolvedParams = await params;
+    console.log('DELETE request received:', { 
+      taskId: resolvedParams.taskId, 
+      projectId: resolvedParams.id 
+    });
+
+    await initDatabase();
+    const db = getDb();
+
+    const result = await db.execute({
+      sql: 'DELETE FROM tasks WHERE id = ? AND project_id = ?',
+      args: [resolvedParams.taskId, resolvedParams.id]
+    });
+
+    console.log('Delete result:', {
+      rowsAffected: result.rowsAffected
+    });
+
+    if (result.rowsAffected === 0) {
+      return addCorsHeaders(new Response('Task nicht gefunden', { status: 404 }));
+    }
+
+    return addCorsHeaders(Response.json({
+      success: true,
+      message: 'Task erfolgreich gelöscht'
+    }));
+
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    return addCorsHeaders(Response.json({ 
+      success: false, 
+      error: 'Fehler beim Löschen der Task',
+      details: error.message 
+    }, { status: 500 }));
+  }
+}
