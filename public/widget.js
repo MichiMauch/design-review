@@ -72,11 +72,13 @@
     }
 
     getApiBase() {
-      // In development: localhost:3000, in production: actual domain
+      // Get API base from the script src URL
       const script = document.querySelector('script[src*="widget.js"]');
-      if (script && script.src.includes('localhost')) {
-        return 'http://localhost:3000';
+      if (script && script.src) {
+        const url = new URL(script.src);
+        return `${url.protocol}//${url.host}`;
       }
+      // Fallback to current origin
       return window.location.origin;
     }
 
@@ -88,16 +90,28 @@
 
     async registerWidgetUsage() {
       try {
+        console.log('Widget: Registering usage for project:', this.projectId, 'API Base:', this.apiBase);
+        
         // Find project by name
         const projectResponse = await fetch(`${this.apiBase}/api/projects/by-name/${this.projectId}`);
         if (projectResponse.ok) {
           const project = await projectResponse.json();
           this.projectDbId = project.id;
           
+          console.log('Widget: Found project ID:', project.id);
+          
           // Register widget usage
-          await fetch(`${this.apiBase}/api/projects/${project.id}/widget-status`, {
+          const statusResponse = await fetch(`${this.apiBase}/api/projects/${project.id}/widget-status`, {
             method: 'POST'
           });
+          
+          if (statusResponse.ok) {
+            console.log('Widget: Successfully registered installation');
+          } else {
+            console.error('Widget: Failed to register status:', statusResponse.status);
+          }
+        } else {
+          console.error('Widget: Project not found:', this.projectId);
         }
       } catch (error) {
         console.error('Failed to register widget usage:', error);
