@@ -1,8 +1,10 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
+
 const r2Client = new S3Client({
   region: 'auto',
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
   credentials: {
     accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID!,
     secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY!,
@@ -31,12 +33,12 @@ export async function uploadScreenshotToR2(
   
   return {
     filename: cleanFileName,
-    url: `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/${key}`
+    url: `https://pub-${accountId}.r2.dev/${key}`
   };
 }
 
 export function getScreenshotUrl(filename: string): string {
-  return `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/screenshots/${filename}`;
+  return `https://pub-${accountId}.r2.dev/screenshots/${filename}`;
 }
 
 export async function getScreenshotFromR2(key: string): Promise<Buffer> {
