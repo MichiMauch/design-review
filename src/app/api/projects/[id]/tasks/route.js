@@ -81,7 +81,7 @@ export async function POST(request, { params }) {
       url,
       status: 'open',
       selected_area,
-      created_at: new Date().toISOString()
+      created_at: germanTime
     }));
 
   } catch (error) {
