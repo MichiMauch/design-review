@@ -41,7 +41,7 @@ export async function POST(request) {
     
     // Upload to Cloudflare R2
     const fileName = `screenshot-${Date.now()}.png`;
-    const r2Url = await uploadScreenshotToR2(imageBufferNode, fileName, 'image/png');
+    const r2Result = await uploadScreenshotToR2(imageBufferNode, fileName, 'image/png');
     
     // Also keep base64 for immediate display if needed
     const base64Image = imageBufferNode.toString('base64');
@@ -50,7 +50,8 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       screenshot: dataUrl,
-      r2Url: r2Url,
+      r2Url: r2Result.url,
+      r2Filename: r2Result.filename,
       selectedArea: selectedArea || null
     });
 

@@ -2,12 +2,13 @@ import { getDb, initDatabase } from '../../../../../lib/db.js';
 
 export async function GET(request, { params }) {
   try {
+    const resolvedParams = await params;
     await initDatabase();
     const db = getDb();
 
     const result = await db.execute({
       sql: 'SELECT * FROM projects WHERE id = ?',
-      args: [params.id]
+      args: [resolvedParams.id]
     });
 
     if (result.rows.length === 0) {

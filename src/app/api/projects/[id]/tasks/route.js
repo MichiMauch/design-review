@@ -13,12 +13,13 @@ export async function OPTIONS() {
 
 export async function GET(request, { params }) {
   try {
+    const resolvedParams = await params;
     await initDatabase();
     const db = getDb();
 
     const result = await db.execute({
       sql: 'SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
-      args: [params.id]
+      args: [resolvedParams.id]
     });
 
     return addCorsHeaders(Response.json(result.rows));
@@ -31,6 +32,7 @@ export async function GET(request, { params }) {
 
 export async function POST(request, { params }) {
   try {
+    const resolvedParams = await params;
     const { title, description, screenshot, url, selected_area } = await request.json();
 
     if (!title || !url) {
@@ -46,7 +48,7 @@ export async function POST(request, { params }) {
         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
       `,
       args: [
-        params.id,
+        resolvedParams.id,
         title,
         description || null,
         screenshot || null,
@@ -59,7 +61,7 @@ export async function POST(request, { params }) {
 
     return addCorsHeaders(Response.json({
       id: taskId,
-      project_id: Number(params.id),
+      project_id: Number(resolvedParams.id),
       title,
       description,
       screenshot,

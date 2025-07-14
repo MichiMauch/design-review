@@ -15,7 +15,7 @@ export async function uploadScreenshotToR2(
   file: Buffer,
   fileName: string,
   contentType: string = 'image/png'
-): Promise<string> {
+): Promise<{ filename: string; url: string }> {
   const key = `screenshots/${Date.now()}-${fileName}`;
   
   const command = new PutObjectCommand({
@@ -27,7 +27,14 @@ export async function uploadScreenshotToR2(
 
   await r2Client.send(command);
   
-  return `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/${key}`;
+  return {
+    filename: key,
+    url: `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/${key}`
+  };
+}
+
+export function getScreenshotUrl(filename: string): string {
+  return `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/${filename}`;
 }
 
 export async function getScreenshotFromR2(key: string): Promise<Buffer> {

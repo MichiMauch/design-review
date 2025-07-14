@@ -31,11 +31,11 @@ export async function POST(request) {
     const filename = `${projectId || 'unknown'}-${timestamp}.png`;
 
     // Upload to Cloudflare R2
-    const url = await uploadScreenshotToR2(buffer, filename, 'image/png');
+    const result = await uploadScreenshotToR2(buffer, filename, 'image/png');
 
     return addCorsHeaders(NextResponse.json({ 
-      url: url,
-      filename: filename
+      url: result.url,
+      filename: result.filename
     }));
 
   } catch (error) {

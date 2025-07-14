@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { getScreenshotUrl } from '../../../lib/cloudflare-r2.ts';
 import { 
   Copy, 
   CheckCircle, 
@@ -289,7 +290,7 @@ export default function ProjectPage() {
                       {task.screenshot && (
                         <div className="mt-3">
                           <img 
-                            src={task.screenshot} 
+                            src={task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot)} 
                             alt="Task Screenshot" 
                             className="max-w-full h-auto rounded border"
                             style={{ maxHeight: '200px' }}
