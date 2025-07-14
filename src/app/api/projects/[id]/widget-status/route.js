@@ -1,5 +1,16 @@
 import { getDb, initDatabase } from '../../../../../../lib/db.js';
 
+function addCorsHeaders(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
+export async function OPTIONS() {
+  return addCorsHeaders(new Response(null, { status: 200 }));
+}
+
 export async function GET(request, { params }) {
   try {
     await initDatabase();
@@ -11,19 +22,19 @@ export async function GET(request, { params }) {
     });
 
     if (result.rows.length === 0) {
-      return new Response('Projekt nicht gefunden', { status: 404 });
+      return addCorsHeaders(new Response('Projekt nicht gefunden', { status: 404 }));
     }
 
     const project = result.rows[0];
 
-    return Response.json({
+    return addCorsHeaders(Response.json({
       installed: Boolean(project.widget_installed),
       last_ping: project.widget_last_ping
-    });
+    }));
 
   } catch (error) {
     console.error('Error checking widget status:', error);
-    return new Response('Fehler beim Prüfen des Widget-Status', { status: 500 });
+    return addCorsHeaders(new Response('Fehler beim Prüfen des Widget-Status', { status: 500 }));
   }
 }
 
@@ -42,10 +53,10 @@ export async function POST(request, { params }) {
       args: [params.id]
     });
 
-    return Response.json({ success: true });
+    return addCorsHeaders(Response.json({ success: true }));
 
   } catch (error) {
     console.error('Error updating widget status:', error);
-    return new Response('Fehler beim Aktualisieren des Widget-Status', { status: 500 });
+    return addCorsHeaders(new Response('Fehler beim Aktualisieren des Widget-Status', { status: 500 }));
   }
 }

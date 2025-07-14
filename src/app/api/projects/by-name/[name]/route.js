@@ -1,5 +1,16 @@
 import { getDb, initDatabase } from '../../../../../../lib/db.js';
 
+function addCorsHeaders(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
+export async function OPTIONS() {
+  return addCorsHeaders(new Response(null, { status: 200 }));
+}
+
 export async function GET(request, { params }) {
   try {
     await initDatabase();
@@ -11,13 +22,13 @@ export async function GET(request, { params }) {
     });
 
     if (result.rows.length === 0) {
-      return new Response('Projekt nicht gefunden', { status: 404 });
+      return addCorsHeaders(new Response('Projekt nicht gefunden', { status: 404 }));
     }
 
-    return Response.json(result.rows[0]);
+    return addCorsHeaders(Response.json(result.rows[0]));
 
   } catch (error) {
     console.error('Error fetching project by name:', error);
-    return new Response('Fehler beim Laden des Projekts', { status: 500 });
+    return addCorsHeaders(new Response('Fehler beim Laden des Projekts', { status: 500 }));
   }
 }

@@ -1,5 +1,16 @@
 import { getDb, initDatabase } from '../../../../../../lib/db.js';
 
+function addCorsHeaders(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
+export async function OPTIONS() {
+  return addCorsHeaders(new Response(null, { status: 200 }));
+}
+
 export async function GET(request, { params }) {
   try {
     await initDatabase();
@@ -10,11 +21,11 @@ export async function GET(request, { params }) {
       args: [params.id]
     });
 
-    return Response.json(result.rows);
+    return addCorsHeaders(Response.json(result.rows));
 
   } catch (error) {
     console.error('Error fetching tasks:', error);
-    return new Response('Fehler beim Laden der Tasks', { status: 500 });
+    return addCorsHeaders(new Response('Fehler beim Laden der Tasks', { status: 500 }));
   }
 }
 
@@ -23,7 +34,7 @@ export async function POST(request, { params }) {
     const { title, description, screenshot, url, selected_area } = await request.json();
 
     if (!title || !url) {
-      return new Response('Titel und URL sind erforderlich', { status: 400 });
+      return addCorsHeaders(new Response('Titel und URL sind erforderlich', { status: 400 }));
     }
 
     await initDatabase();
@@ -46,7 +57,7 @@ export async function POST(request, { params }) {
 
     const taskId = Number(result.lastInsertRowid);
 
-    return Response.json({
+    return addCorsHeaders(Response.json({
       id: taskId,
       project_id: Number(params.id),
       title,
@@ -56,10 +67,10 @@ export async function POST(request, { params }) {
       status: 'open',
       selected_area,
       created_at: new Date().toISOString()
-    });
+    }));
 
   } catch (error) {
     console.error('Error creating task:', error);
-    return new Response('Fehler beim Erstellen der Task', { status: 500 });
+    return addCorsHeaders(new Response('Fehler beim Erstellen der Task', { status: 500 }));
   }
 }
