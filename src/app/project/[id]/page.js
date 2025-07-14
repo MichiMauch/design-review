@@ -29,15 +29,6 @@ export default function ProjectPage() {
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget.js" data-project-id="${project.name}" defer></script>` :
     '';
 
-  useEffect(() => {
-    loadProject();
-    loadTasks();
-
-    // Check widget installation status every 30 seconds
-    const interval = setInterval(checkWidgetStatus, 30000);
-    return () => clearInterval(interval);
-  }, [params.id, checkWidgetStatus, loadProject, loadTasks]);
-
   const loadProject = async () => {
     try {
       const response = await fetch(`/api/projects/${params.id}`);
@@ -83,6 +74,15 @@ export default function ProjectPage() {
       console.error('Error checking widget status:', error);
     }
   };
+
+  useEffect(() => {
+    loadProject();
+    loadTasks();
+
+    // Check widget installation status every 30 seconds
+    const interval = setInterval(checkWidgetStatus, 30000);
+    return () => clearInterval(interval);
+  }, [params.id]);
 
   const copySnippet = async () => {
     try {
