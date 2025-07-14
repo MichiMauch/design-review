@@ -54,11 +54,6 @@ export async function POST(request, { params }) {
       second: '2-digit'
     }).format(now).replace(' ', 'T') + '+02:00'; // Add CEST timezone offset
 
-    console.log('🕐 Task creation time debug:');
-    console.log('  - Current local time:', new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }));
-    console.log('  - German time string:', germanTime);
-    console.log('  - Parsed back:', new Date(germanTime).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }));
-
     const result = await db.execute({
       sql: `
         INSERT INTO tasks (project_id, title, description, screenshot, url, selected_area, created_at)

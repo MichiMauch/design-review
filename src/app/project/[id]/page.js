@@ -143,32 +143,6 @@ export default function ProjectPage() {
     }
   };
 
-
-  const saveJiraSettings = async () => {
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          key: `jira_config_project_${params.id}`,
-          value: jiraConfig
-        })
-      });
-
-      if (response.ok) {
-        showToast('JIRA-Einstellungen gespeichert!', 'success');
-        setShowJiraSettings(false);
-      } else {
-        showToast('Fehler beim Speichern der JIRA-Einstellungen', 'error');
-      }
-    } catch (error) {
-      console.error('Error saving JIRA settings:', error);
-      showToast('Fehler beim Speichern der JIRA-Einstellungen', 'error');
-    }
-  };
-
   const copySnippet = async () => {
     try {
       await navigator.clipboard.writeText(snippetCode);
@@ -761,65 +735,64 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Widget Installation - only show if not installed */}
-          {!project.widget_installed && (
-            <div className="lg:col-span-2">
+        <div className="grid gap-6 lg:grid-cols-4">
+          {/* Main Content Area */}
+          <div className="lg:col-span-3">
+            {/* Widget Installation - only show if not installed */}
+            {!project.widget_installed && (
               <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Code className="h-5 w-5 text-blue-600" />
-                Widget Installation
-              </h2>
-              
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between gap-4">
-                  <code className="text-sm text-gray-800 break-all flex-1 font-mono">
-                    {snippetCode}
-                  </code>
-                  <button
-                    onClick={copySnippet}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    {copied ? (
-                      <>
-                        <CheckCircle className="h-4 w-4" />
-                        Kopiert!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Kopieren
-                      </>
-                    )}
-                  </button>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Code className="h-5 w-5 text-blue-600" />
+                  Widget Installation
+                </h2>
+                
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <code className="text-sm text-gray-800 break-all flex-1 font-mono">
+                      {snippetCode}
+                    </code>
+                    <button
+                      onClick={copySnippet}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      {copied ? (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          Kopiert!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Kopieren
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-3 text-sm text-gray-600">
-                <p>
-                  ✅ Fügen Sie diesen Code vor dem schließenden <code>&lt;/body&gt;</code> Tag ein
-                </p>
-                <p>
-                  ✅ Das Widget erscheint als Button am rechten Bildschirmrand (mittig)
-                </p>
-                <p>
-                  ✅ Nutzer können Screenshots machen und Kommentare hinterlassen
-                </p>
-              </div>
-
-              {project.widget_last_ping && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800">
-                    ✓ Letzter Widget-Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE')}
+                <div className="space-y-3 text-sm text-gray-600">
+                  <p>
+                    ✅ Fügen Sie diesen Code vor dem schließenden <code>&lt;/body&gt;</code> Tag ein
+                  </p>
+                  <p>
+                    ✅ Das Widget erscheint als Button am rechten Bildschirmrand (mittig)
+                  </p>
+                  <p>
+                    ✅ Nutzer können Screenshots machen und Kommentare hinterlassen
                   </p>
                 </div>
-              )}
-              </div>
-            </div>
-          )}
 
-          {/* Tasks */}
-          <div className={project.widget_installed ? "lg:col-span-2" : "lg:col-span-2"}>
+                {project.widget_last_ping && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      ✓ Letzter Widget-Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tasks */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-green-600" />
@@ -831,7 +804,10 @@ export default function ProjectPage() {
                   <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                   <p>Noch keine Tasks vorhanden</p>
                   <p className="text-sm mt-2">
-                    Tasks werden automatisch erstellt, wenn Nutzer Feedback über das Widget senden.
+                    {project.widget_installed 
+                      ? "Tasks werden automatisch erstellt, wenn Nutzer Feedback über das Widget senden."
+                      : "Installieren Sie zuerst das Widget, damit Nutzer Feedback senden können."
+                    }
                   </p>
                 </div>
               ) : (
@@ -961,18 +937,17 @@ export default function ProjectPage() {
                       ))}
                     </div>
                   )}
-
                 </div>
               )}
             </div>
           </div>
-
+          
           {/* Sidebar */}
-          <div className="space-y-6">
-            {/* JIRA Tasks - compact display at top */}
-            {tasks.filter(task => task.jira_key).length > 0 && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">JIRA Tasks ({tasks.filter(task => task.jira_key).length})</h3>
+          <div className="lg:col-span-1 space-y-6">
+            {/* JIRA Tasks */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">JIRA Tasks ({tasks.filter(task => task.jira_key).length})</h3>
+              {tasks.filter(task => task.jira_key).length > 0 ? (
                 <div className="space-y-2">
                   {tasks.filter(task => task.jira_key).map((task) => (
                     <div key={task.id} className="bg-gray-50 rounded p-3 border border-gray-100">
@@ -997,8 +972,13 @@ export default function ProjectPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  <div className="text-sm">Noch keine JIRA Tasks erstellt</div>
+                  <div className="text-xs mt-1">Tasks können über den &quot;JIRA-Task&quot; Button erstellt werden</div>
+                </div>
+              )}
+            </div>
 
             {/* Project Stats */}
             <div className="bg-white rounded-lg shadow-lg p-6">
@@ -1023,28 +1003,40 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Widget Status - only show when installed */}
-            {project.widget_installed && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Code className="h-4 w-4 text-green-600" />
-                  Widget Status
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-700 font-medium">Widget installiert</span>
-                  </div>
-                  {project.widget_last_ping && (
-                    <div className="text-xs text-gray-600">
-                      Letzter Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE')}
+            {/* Widget Status */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Code className="h-4 w-4 text-gray-600" />
+                Widget Status
+              </h3>
+              <div className="space-y-3">
+                {project.widget_installed ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700 font-medium">Widget installiert</span>
                     </div>
-                  )}
-                </div>
+                    {project.widget_last_ping && (
+                      <div className="text-xs text-gray-600">
+                        Letzter Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE')}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-700 font-medium">Widget nicht installiert</span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Installieren Sie das Widget mit dem Code-Snippet oben
+                    </div>
+                  </>
+                )}
               </div>
-            )}
+            </div>
 
-            {/* JIRA Settings */}
+            {/* JIRA Integration */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900">JIRA Integration</h3>
@@ -1056,7 +1048,7 @@ export default function ProjectPage() {
                   <Settings className="h-4 w-4" />
                 </button>
               </div>
-              
+                
               {showJiraSettings ? (
                 <div className="space-y-4">
                   <div>
@@ -1128,37 +1120,93 @@ export default function ProjectPage() {
                   
                   <div className="flex gap-2">
                     <button
-                      onClick={saveJiraSettings}
-                      className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                      onClick={saveJiraConfig}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
                     >
+                      <Save className="h-3 w-3" />
                       Speichern
                     </button>
                     <button
-                      onClick={() => setShowJiraSettings(false)}
-                      className="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
+                      onClick={testJiraConnection}
+                      className="flex items-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
                     >
-                      Abbrechen
+                      <CheckCircle className="h-3 w-3" />
+                      Testen
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="text-center">
-                  <p className="text-gray-600 text-sm mb-4">
-                    Konfigurieren Sie JIRA um Tasks automatisch zu erstellen.
-                  </p>
-                  <div className="text-xs text-gray-500">
-                    {jiraConfig.serverUrl ? (
-                      <span className="text-green-600">✓ Konfiguriert</span>
-                    ) : (
-                      <span className="text-gray-400">Nicht konfiguriert</span>
-                    )}
-                  </div>
+                <div className="text-sm text-gray-600">
+                  <p>JIRA-Integration konfiguriert</p>
+                  <p className="text-xs mt-1">Klicken Sie auf das Einstellungs-Icon zum Bearbeiten</p>
                 </div>
               )}
             </div>
-
           </div>
         </div>
+
+        {/* JIRA Modal */}
+        {showJiraModal && selectedTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">JIRA-Task erstellen</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Titel
+                  </label>
+                  <input
+                    type="text"
+                    value={jiraTaskData.title}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, title: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Task-Titel"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Beschreibung
+                  </label>
+                  <textarea
+                    value={jiraTaskData.description}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                    rows="4"
+                    placeholder="Beschreibung des Tasks"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={createJiraTask}
+                  disabled={!jiraTaskData.title || creatingJira}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  {creatingJira ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Erstelle...
+                    </>
+                  ) : (
+                    <>
+                      <JiraIcon className="h-4 w-4" />
+                      Erstellen
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowJiraModal(false)}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
