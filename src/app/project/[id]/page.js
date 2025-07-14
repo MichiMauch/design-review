@@ -197,6 +197,64 @@ export default function ProjectPage() {
     }
   };
 
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) {
+      return 'Gerade eben';
+    } else if (diffMins < 60) {
+      return `vor ${diffMins} Min`;
+    } else if (diffHours < 24) {
+      return `vor ${diffHours} Std`;
+    } else if (diffDays < 7) {
+      return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
+    } else {
+      // For older dates, show in German timezone
+      return date.toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'Europe/Berlin'
+      });
+    }
+  };
+
+  const getJiraStatusColor = (status) => {
+    if (!status) return 'bg-gray-100 text-gray-700';
+    
+    const statusName = status.name?.toLowerCase() || '';
+    const category = status.category?.toLowerCase() || '';
+    
+    // Status-spezifische Farben
+    if (statusName.includes('done') || statusName.includes('resolved') || statusName.includes('closed') || category === 'done') {
+      return 'bg-green-100 text-green-800 border-green-200';
+    }
+    if (statusName.includes('progress') || statusName.includes('development') || statusName.includes('review') || category === 'in progress') {
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    }
+    if (statusName.includes('testing') || statusName.includes('qa')) {
+      return 'bg-purple-100 text-purple-800 border-purple-200';
+    }
+    if (statusName.includes('blocked') || statusName.includes('impediment')) {
+      return 'bg-red-100 text-red-800 border-red-200';
+    }
+    if (statusName.includes('ready') || statusName.includes('todo') || statusName.includes('backlog')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    }
+    
+    // Fallback nach Kategorie
+    switch (category) {
+      case 'done': return 'bg-green-100 text-green-800 border-green-200';
+      case 'in progress': return 'bg-blue-100 text-blue-800 border-blue-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
   const showToast = (message, type = 'success', link = null) => {
     setToast({ message, type, link });
     setTimeout(() => setToast(null), 8000); // Longer for links
@@ -664,12 +722,19 @@ export default function ProjectPage() {
               <div className="flex items-center gap-4 mt-2 text-gray-600">
                 <div className="flex items-center gap-1">
                   <Globe className="h-4 w-4" />
-                  <span className="text-sm">{project.domain}</span>
+                  <a 
+                    href={project.domain.startsWith('http') ? project.domain : `https://${project.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {project.domain}
+                  </a>
                 </div>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
                   <span className="text-sm">
-                    Erstellt am {new Date(project.created_at).toLocaleDateString('de-DE')}
+                    Erstellt am {formatTime(project.created_at)}
                   </span>
                 </div>
               </div>
@@ -778,7 +843,7 @@ export default function ProjectPage() {
                       {tasks.filter(task => !task.jira_key).map((task) => (
                     <div key={task.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
-                        <span>{new Date(task.created_at).toLocaleString('de-DE')}</span>
+                        <span>{formatTime(task.created_at)}</span>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                           {getStatusIcon(task.status)}
                           {task.status === 'open' ? 'Offen' : task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
@@ -922,17 +987,13 @@ export default function ProjectPage() {
                           {task.jira_key}
                         </a>
                         {jiraStatuses[task.id] && (
-                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                            jiraStatuses[task.id].category === 'Done' ? 'bg-green-100 text-green-700' :
-                            jiraStatuses[task.id].category === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
+                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}>
                             {jiraStatuses[task.id].name}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-700 font-medium mb-1">{task.title}</p>
-                      <p className="text-xs text-gray-500">{new Date(task.created_at).toLocaleDateString('de-DE')}</p>
+                      <p className="text-xs text-gray-500">{formatTime(task.created_at)}</p>
                     </div>
                   ))}
                 </div>

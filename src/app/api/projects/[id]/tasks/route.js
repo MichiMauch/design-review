@@ -42,7 +42,7 @@ export async function POST(request, { params }) {
     await initDatabase();
     const db = getDb();
 
-    // Get current German time
+    // Get current German time with proper timezone info
     const now = new Date();
     const germanTime = new Intl.DateTimeFormat('sv-SE', {
       timeZone: 'Europe/Berlin',
@@ -52,7 +52,12 @@ export async function POST(request, { params }) {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
-    }).format(now).replace(' ', 'T');
+    }).format(now).replace(' ', 'T') + '+02:00'; // Add CEST timezone offset
+
+    console.log('🕐 Task creation time debug:');
+    console.log('  - Current local time:', new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }));
+    console.log('  - German time string:', germanTime);
+    console.log('  - Parsed back:', new Date(germanTime).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }));
 
     const result = await db.execute({
       sql: `

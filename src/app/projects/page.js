@@ -43,6 +43,33 @@ export default function ProjectsPage() {
     };
   };
 
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) {
+      return 'Gerade eben';
+    } else if (diffMins < 60) {
+      return `vor ${diffMins} Min`;
+    } else if (diffHours < 24) {
+      return `vor ${diffHours} Std`;
+    } else if (diffDays < 7) {
+      return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
+    } else {
+      // For older dates, show in German timezone
+      return date.toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'Europe/Berlin'
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -100,69 +127,79 @@ export default function ProjectsPage() {
             {projects.map((project) => {
               const stats = getProjectStats(project);
               return (
-                <Link key={project.id} href={`/project/${project.id}`}>
-                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 hover:shadow-xl transition-shadow cursor-pointer">
-                    <div className="p-6">
-                      {/* Project Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <div key={project.id} className="bg-white rounded-lg shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
+                  <div className="p-6">
+                    {/* Project Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <Link href={`/project/${project.id}`}>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-1 hover:text-blue-600 cursor-pointer">
                             {project.name}
                           </h3>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Globe className="h-4 w-4" />
-                            <span className="truncate">{project.domain}</span>
-                          </div>
-                        </div>
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          project.widget_installed 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {project.widget_installed ? (
-                            <>
-                              <CheckCircle className="h-3 w-3" />
-                              Installiert
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="h-3 w-3" />
-                              Nicht installiert
-                            </>
-                          )}
+                        </Link>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Globe className="h-4 w-4" />
+                          <a 
+                            href={project.domain.startsWith('http') ? project.domain : `https://${project.domain}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {project.domain}
+                          </a>
                         </div>
                       </div>
-
-                      {/* Stats */}
-                      <div className="grid grid-cols-3 gap-4 mb-4">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-900">{stats.totalTasks}</div>
-                          <div className="text-xs text-gray-600">Gesamt</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-red-600">{stats.openTasks}</div>
-                          <div className="text-xs text-gray-600">Offen</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">{stats.jiraTasks}</div>
-                          <div className="text-xs text-gray-600">JIRA</div>
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(project.created_at).toLocaleDateString('de-DE')}
-                        </div>
-                        <div className="flex items-center gap-1 text-blue-600 text-sm font-medium">
-                          Öffnen
-                          <ExternalLink className="h-3 w-3" />
-                        </div>
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        project.widget_installed 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {project.widget_installed ? (
+                          <>
+                            <CheckCircle className="h-3 w-3" />
+                            Installiert
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="h-3 w-3" />
+                            Nicht installiert
+                          </>
+                        )}
                       </div>
                     </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-900">{stats.totalTasks}</div>
+                        <div className="text-xs text-gray-600">Gesamt</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">{stats.openTasks}</div>
+                        <div className="text-xs text-gray-600">Offen</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{stats.jiraTasks}</div>
+                        <div className="text-xs text-gray-600">JIRA</div>
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <Calendar className="h-3 w-3" />
+                        {formatTime(project.created_at)}
+                      </div>
+                      <Link 
+                        href={`/project/${project.id}`}
+                        className="flex items-center gap-1 text-blue-600 text-sm font-medium hover:text-blue-800"
+                      >
+                        Öffnen
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
