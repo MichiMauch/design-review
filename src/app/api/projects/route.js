@@ -26,7 +26,7 @@ export async function POST(request) {
     const result = await db.execute({
       sql: `
         INSERT INTO projects (name, domain, widget_installed, created_at)
-        VALUES (?, ?, FALSE, datetime('now'))
+        VALUES (?, ?, FALSE, datetime('now', 'localtime'))
       `,
       args: [name, domain]
     });
@@ -53,17 +53,32 @@ export async function GET() {
     await initDatabase();
     const db = getDb();
 
-    const result = await db.execute(`
-      SELECT 
-        p.*,
-        COUNT(t.id) as task_count
-      FROM projects p
-      LEFT JOIN tasks t ON p.id = t.project_id
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
+    // Get all projects
+    const projectsResult = await db.execute(`
+      SELECT * FROM projects ORDER BY created_at DESC
     `);
 
-    return Response.json(result.rows);
+    // Get all tasks for all projects
+    const tasksResult = await db.execute(`
+      SELECT * FROM tasks ORDER BY created_at DESC
+    `);
+
+    // Group tasks by project_id
+    const tasksByProject = {};
+    tasksResult.rows.forEach(task => {
+      if (!tasksByProject[task.project_id]) {
+        tasksByProject[task.project_id] = [];
+      }
+      tasksByProject[task.project_id].push(task);
+    });
+
+    // Add tasks to projects
+    const projectsWithTasks = projectsResult.rows.map(project => ({
+      ...project,
+      tasks: tasksByProject[project.id] || []
+    }));
+
+    return Response.json(projectsWithTasks);
 
   } catch (error) {
     console.error('Error fetching projects:', error);

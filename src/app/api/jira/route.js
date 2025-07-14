@@ -69,37 +69,61 @@ async function createJiraTicket({ feedback, jiraConfig }) {
       project: {
         key: projectKey
       },
-      summary: `Website Feedback: ${feedback.text.substring(0, 100)}${feedback.text.length > 100 ? '...' : ''}`,
+      summary: feedback.title || `Website Feedback: ${feedback.text?.replace(/\r?\n/g, ' ').substring(0, 100)}${feedback.text?.length > 100 ? '...' : ''}`,
       description: {
         type: "doc",
         version: 1,
         content: [
           {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "Discover" }]
+          },
+          ...(feedback.description ? [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: feedback.description }]
+            }
+          ] : [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "" }]
+            }
+          ]),
+          {
             type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: `Feedback von der Website:\n\n${feedback.text}\n\n`
-              }
-            ]
+            content: [{ type: "text", text: `URL: ${feedback.url}` }]
           },
           {
             type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: `URL: ${feedback.url}\n`
-              }
-            ]
+            content: [{ type: "text", text: `Erstellt am: ${new Date(feedback.created_at).toLocaleString('de-DE')}` }]
+          },
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "Define" }]
           },
           {
             type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: `Erstellt am: ${new Date(feedback.created_at).toLocaleString('de-DE')}\n`
-              }
-            ]
+            content: [{ type: "text", text: "" }]
+          },
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "Design" }]
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "" }]
+          },
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "Deliver" }]
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "" }]
           }
         ]
       },
@@ -173,9 +197,10 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   }
 
   // Screenshot als Attachment hinzufügen falls vorhanden
+  let attachmentInfo = null;
   if (feedback.screenshot && responseData.key) {
     try {
-      await uploadScreenshotToJira({
+      attachmentInfo = await uploadScreenshotToJira({
         serverUrl,
         username,
         apiToken,
@@ -183,6 +208,18 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         screenshot: feedback.screenshot,
         feedbackId: feedback.id
       });
+      
+      // Add image to description if attachment was successful
+      if (attachmentInfo && attachmentInfo.length > 0) {
+        await addImageToDescription({
+          serverUrl,
+          username,
+          apiToken,
+          issueKey: responseData.key,
+          attachment: attachmentInfo[0],
+          originalDescription: issueData.fields.description
+        });
+      }
     } catch (error) {
       console.warn('Screenshot upload failed:', error);
       // Ticket wurde erstellt, nur Screenshot-Upload fehlgeschlagen
@@ -216,14 +253,41 @@ async function createJiraTicket({ feedback, jiraConfig }) {
 }
 
 async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey, screenshot, feedbackId }) {
-  // Screenshot von Data URL zu File konvertieren
-  const base64Data = screenshot.replace(/^data:image\/[a-z]+;base64,/, '');
-  const buffer = Buffer.from(base64Data, 'base64');
+  let buffer;
+  let filename = `feedback-${feedbackId}-screenshot.png`;
+  
+  if (screenshot.startsWith('data:image')) {
+    // Base64 Data URL
+    const base64Data = screenshot.replace(/^data:image\/[a-z]+;base64,/, '');
+    buffer = Buffer.from(base64Data, 'base64');
+  } else if (screenshot.startsWith('http')) {
+    // URL - download the image first
+    try {
+      const imageResponse = await fetch(screenshot);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download image: ${imageResponse.status}`);
+      }
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      
+      // Extract filename from URL if possible
+      const urlParts = screenshot.split('/');
+      const lastPart = urlParts[urlParts.length - 1];
+      if (lastPart && lastPart.includes('.')) {
+        filename = lastPart;
+      }
+    } catch (error) {
+      console.error('Error downloading screenshot:', error);
+      throw new Error(`Screenshot download failed: ${error.message}`);
+    }
+  } else {
+    throw new Error('Invalid screenshot format - must be data URL or HTTP URL');
+  }
   
   // FormData für File Upload erstellen
   const formData = new FormData();
   const blob = new Blob([buffer], { type: 'image/png' });
-  formData.append('file', blob, `feedback-${feedbackId}-screenshot.png`);
+  formData.append('file', blob, filename);
 
   const response = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}/attachments`, {
     method: 'POST',
@@ -240,6 +304,122 @@ async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey,
   }
 
   return await response.json();
+}
+
+async function addImageToDescription({ serverUrl, username, apiToken, issueKey, attachment, originalDescription }) {
+  try {
+    console.log('Adding image to description:', { issueKey, attachment });
+    
+    // Insert the image right after the Discover section
+    const discoverIndex = originalDescription.content.findIndex(
+      item => item.type === "heading" && item.content?.[0]?.text === "Discover"
+    );
+    
+    let insertIndex = discoverIndex + 2; // After Discover heading and its paragraph
+    if (discoverIndex === -1) {
+      insertIndex = originalDescription.content.length; // Fallback to end
+    }
+
+    const imageContent = [
+      {
+        type: "paragraph",
+        content: [
+          {
+            type: "text",
+            text: "Screenshot:"
+          }
+        ]
+      },
+      {
+        type: "mediaGroup",
+        content: [
+          {
+            type: "media",
+            attrs: {
+              id: attachment.id,
+              type: "file",
+              collection: attachment.collection || "MediaServicesSample",
+              width: 400,
+              height: 300,
+              url: attachment.content || attachment.self
+            }
+          }
+        ]
+      }
+    ];
+
+    // Create updated description with image inserted at the right position
+    const updatedContent = [...originalDescription.content];
+    updatedContent.splice(insertIndex, 0, ...imageContent);
+    
+    const updatedDescription = {
+      ...originalDescription,
+      content: updatedContent
+    };
+
+    console.log('Updated description structure:', JSON.stringify(updatedDescription, null, 2));
+
+    const response = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          description: updatedDescription
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.warn('Failed to add image to description:', errorData);
+      
+      // Try a simpler approach - just mention the attachment
+      const simpleUpdatedDescription = {
+        ...originalDescription,
+        content: [
+          ...originalDescription.content,
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: `Screenshot: ${attachment.filename} (siehe Anhang)`
+              }
+            ]
+          }
+        ]
+      };
+
+      const retryResponse = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            description: simpleUpdatedDescription
+          }
+        })
+      });
+
+      if (!retryResponse.ok) {
+        const retryErrorData = await retryResponse.json();
+        console.warn('Retry also failed:', retryErrorData);
+      } else {
+        console.log('Simple text reference added successfully');
+      }
+    } else {
+      console.log('Image added to description successfully');
+    }
+  } catch (error) {
+    console.warn('Error adding image to description:', error);
+  }
 }
 
 async function addIssueToSprint({ serverUrl, username, apiToken, sprintId, issueKey }) {

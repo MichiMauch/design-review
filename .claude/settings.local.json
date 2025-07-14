@@ -14,7 +14,12 @@
       "Bash(git push:*)",
       "Bash(kill:*)",
       "Bash(git commit:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(grep:*)",
+      "Bash(awk:*)",
+      "Bash(npx next build:*)",
+      "Bash(timeout 10 npm run dev)"
     ],
     "deny": []
   }

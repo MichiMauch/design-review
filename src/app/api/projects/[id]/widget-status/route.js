@@ -47,7 +47,7 @@ export async function POST(request, { params }) {
     await db.execute({
       sql: `
         UPDATE projects 
-        SET widget_installed = TRUE, widget_last_ping = datetime('now')
+        SET widget_installed = TRUE, widget_last_ping = datetime('now', 'localtime')
         WHERE id = ?
       `,
       args: [params.id]

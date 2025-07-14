@@ -19,7 +19,7 @@ export async function POST(request) {
     const result = await db.execute({
       sql: `
         INSERT INTO feedback (text, url, screenshot, user_agent, project_id, selected_area, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
       `,
       args: [
         data.text,

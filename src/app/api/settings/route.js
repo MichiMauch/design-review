@@ -82,10 +82,10 @@ export async function POST(request) {
     await db.execute({
       sql: `
         INSERT INTO settings (key, value, updated_at) 
-        VALUES (?, ?, datetime('now'))
+        VALUES (?, ?, datetime('now', 'localtime'))
         ON CONFLICT(key) DO UPDATE SET 
           value = excluded.value,
-          updated_at = datetime('now')
+          updated_at = datetime('now', 'localtime')
       `,
       args: [key, JSON.stringify(value)]
     });

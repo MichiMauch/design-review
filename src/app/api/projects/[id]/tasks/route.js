@@ -42,10 +42,22 @@ export async function POST(request, { params }) {
     await initDatabase();
     const db = getDb();
 
+    // Get current German time
+    const now = new Date();
+    const germanTime = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Berlin',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(now).replace(' ', 'T');
+
     const result = await db.execute({
       sql: `
         INSERT INTO tasks (project_id, title, description, screenshot, url, selected_area, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       args: [
         resolvedParams.id,
@@ -53,7 +65,8 @@ export async function POST(request, { params }) {
         description || null,
         screenshot || null,
         url,
-        selected_area ? JSON.stringify(selected_area) : null
+        selected_area ? JSON.stringify(selected_area) : null,
+        germanTime
       ]
     });
 

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Globe } from 'lucide-react';
+import { Plus, Globe, FolderOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function HomePage() {
   const [projectName, setProjectName] = useState('');
@@ -53,9 +54,16 @@ export default function HomePage() {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Website Review Tool
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-6">
             Erstellen Sie ein neues Projekt, um mit dem Feedback-System zu beginnen.
           </p>
+          <Link 
+            href="/projects"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
+          >
+            <FolderOpen className="h-4 w-4" />
+            Alle Projekte anzeigen
+          </Link>
         </div>
 
         {/* Project Creation Form */}

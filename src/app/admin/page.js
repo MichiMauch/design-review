@@ -218,6 +218,7 @@ export default function AdminDashboard() {
                       </h4>
                       {item.screenshot ? (
                         <div className="bg-gray-50 rounded-lg p-4">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.screenshot}
                             alt="Feedback Screenshot"
