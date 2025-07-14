@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getScreenshotUrl } from '../../../lib/cloudflare-r2.ts';
+import { getScreenshotUrl } from '../../../lib/cloudflare-r2';
 import { 
   Copy, 
   CheckCircle, 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { uploadScreenshotToR2 } from '../../../lib/cloudflare-r2.ts';
+import { uploadScreenshotToR2 } from '../../../lib/cloudflare-r2';
 
 function addCorsHeaders(response) {
   response.headers.set('Access-Control-Allow-Origin', '*');
