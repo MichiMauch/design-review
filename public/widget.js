@@ -421,7 +421,8 @@
         // Trigger feedback update event for admin dashboard
         this.triggerFeedbackUpdate();
       } catch (error) {
-        console.error('Task creation failed:', error);
+        console.error('Task creation failed:', error.message || error);
+        console.error('Full error:', error);
         alert('Fehler beim Erstellen der Task. Bitte versuchen Sie es erneut.');
         
         if (modal) {
@@ -638,6 +639,36 @@
         console.error('Screenshot upload failed:', error);
         // Return the original data URL as fallback
         return screenshotDataUrl;
+      }
+    }
+
+    async createTask(taskData) {
+      try {
+        console.log('Creating task with data:', taskData);
+        
+        if (!this.projectDbId) {
+          throw new Error('Project ID not found. Widget not properly initialized.');
+        }
+        
+        const response = await fetch(`${this.apiBase}/api/projects/${this.projectDbId}/tasks`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(taskData)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Task creation failed: ${response.status} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('Task created successfully:', result);
+        return result;
+      } catch (error) {
+        console.error('Error in createTask:', error);
+        throw error;
       }
     }
 
