@@ -30,6 +30,7 @@
       this.isOpen = false;
       this.isSelecting = false;
       this.isDragging = false;
+      this.isSubmitting = false; // Add submission flag
       this.selectedArea = null;
       this.selectionOverlay = null;
       this.selectionBox = null;
@@ -239,6 +240,29 @@
       this.isOpen = false;
       this.clearSelection();
       this.resetForm();
+      
+      // Reset submission state
+      this.isSubmitting = false;
+      
+      // Reset loading and success states
+      const loading = document.querySelector('.feedback-widget-loading');
+      const submit = document.querySelector('.feedback-widget-submit');
+      
+      if (loading) {
+        loading.style.display = 'none';
+        loading.innerHTML = `
+          <div class="spinner-border spinner-border-sm me-2" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          Sende Feedback...
+        `;
+      }
+      
+      if (submit) {
+        submit.style.display = 'block';
+        submit.disabled = false;
+        submit.style.opacity = '1';
+      }
     }
 
     resetForm() {
@@ -443,6 +467,13 @@
         return;
       }
 
+      // Prevent multiple submissions
+      if (this.isSubmitting) {
+        console.log('⏳ Already submitting, ignoring duplicate request');
+        return;
+      }
+
+      this.isSubmitting = true;
       this.showLoading(true);
 
       try {
@@ -474,6 +505,7 @@
         this.showError('Fehler beim Senden des Feedbacks. Bitte versuchen Sie es erneut.');
       } finally {
         this.showLoading(false);
+        this.isSubmitting = false;
       }
     }
 
@@ -496,8 +528,97 @@
       return this.generatePlaceholderScreenshot();
     }
 
-    async tryClientScreenshot() {
-      // Load html2canvas
+    async createScreenshot() {
+      console.log('🖼️ Creating screenshot...');
+      
+      try {
+        // Try modern browser screenshot API first
+        const nativeResult = await this.tryNativeScreenshot();
+        if (nativeResult) {
+          console.log('✅ Native screenshot successful');
+          return nativeResult;
+        }
+      } catch (error) {
+        console.log('❌ Native screenshot failed:', error.message);
+      }
+
+      try {
+        // Fallback to simplified html2canvas
+        const simpleResult = await this.trySimpleScreenshot();
+        if (simpleResult) {
+          console.log('✅ Simple screenshot successful');
+          return simpleResult;
+        }
+      } catch (error) {
+        console.log('❌ Simple screenshot failed:', error.message);
+      }
+
+      // Return placeholder
+      console.log('📝 Using placeholder screenshot');
+      return this.generatePlaceholderScreenshot();
+    }
+
+    async tryNativeScreenshot() {
+      // Check if browser supports getDisplayMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        throw new Error('getDisplayMedia not supported');
+      }
+
+      // Only try for selected areas - native API is better for this
+      if (!this.selectedArea) {
+        throw new Error('No selected area for native capture');
+      }
+
+      try {
+        // Request screen capture
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            mediaSource: 'screen',
+            width: { ideal: this.selectedArea.width },
+            height: { ideal: this.selectedArea.height }
+          }
+        });
+
+        // Create video element to capture frame
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        
+        // Wait for video to load
+        await new Promise(resolve => {
+          video.onloadedmetadata = resolve;
+        });
+
+        // Create canvas and capture frame
+        const canvas = document.createElement('canvas');
+        canvas.width = this.selectedArea.width;
+        canvas.height = this.selectedArea.height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Stop the stream
+        stream.getTracks().forEach(track => track.stop());
+        
+        const dataUrl = canvas.toDataURL('image/png');
+        
+        // Upload to R2
+        const uploadResult = await this.uploadScreenshotToR2(dataUrl);
+        if (uploadResult.success) {
+          console.log('📤 Native screenshot uploaded to R2:', uploadResult.filename);
+          return uploadResult.filename;
+        }
+        
+        return dataUrl;
+        
+      } catch (error) {
+        throw new Error('Native capture failed: ' + error.message);
+      }
+    }
+
+    async trySimpleScreenshot() {
+      // Load html2canvas if needed
       if (!window.html2canvas) {
         await this.loadHtml2Canvas();
       }
@@ -510,68 +631,63 @@
         let canvas;
         
         if (this.selectedArea) {
-          console.log('📏 Creating screenshot for selected area:', {
-            x: this.selectedArea.x,
-            y: this.selectedArea.y,
-            width: this.selectedArea.width,
-            height: this.selectedArea.height,
-            pageScroll: { x: window.pageXOffset, y: window.pageYOffset },
-            viewport: { width: window.innerWidth, height: window.innerHeight }
-          });
-
-          // Use html2canvas with direct cropping - much simpler approach
-          const options = {
+          // For selected areas, take full page screenshot then crop manually
+          console.log('📐 Taking full page screenshot for cropping...');
+          
+          const fullOptions = {
             useCORS: false,
             allowTaint: true,
-            scale: 1,
+            scale: 0.5, // Lower scale for performance
             backgroundColor: '#ffffff',
             logging: false,
-            // Crop directly in html2canvas
-            x: this.selectedArea.x,
-            y: this.selectedArea.y,
-            width: this.selectedArea.width,
-            height: this.selectedArea.height,
-            // Make sure we capture the full document, not just viewport
-            scrollX: 0,
-            scrollY: 0,
             ignoreElements: (element) => {
-              // Ignore widget elements and problematic CSS
               const classList = element.classList || [];
-              if (classList.contains('feedback-widget-button') || 
-                  classList.contains('feedback-widget-overlay')) {
-                return true;
-              }
-
-              // Check for problematic CSS
-              try {
-                const style = window.getComputedStyle(element);
-                const colorProps = ['color', 'backgroundColor', 'borderColor'];
-                for (let prop of colorProps) {
-                  const value = style[prop];
-                  if (value && (value.includes('oklab') || value.includes('oklch') || 
-                              value.includes('color-mix') || value.includes('lch'))) {
-                    return true;
-                  }
-                }
-              } catch {
-                // Ignore style check errors
-              }
-
-              return false;
+              return classList.contains('feedback-widget-button') || 
+                     classList.contains('feedback-widget-overlay');
             }
           };
 
-          console.log('🎯 Html2canvas options:', options);
+          const fullCanvas = await window.html2canvas(document.documentElement, fullOptions);
           
-          // Create screenshot with cropping
-          canvas = await window.html2canvas(document.body, options);
+          // Manual cropping with scaling consideration
+          const scale = 0.5;
+          const cropX = this.selectedArea.x * scale;
+          const cropY = this.selectedArea.y * scale;
+          const cropWidth = this.selectedArea.width * scale;
+          const cropHeight = this.selectedArea.height * scale;
+          
+          // Create cropped canvas
+          canvas = document.createElement('canvas');
+          canvas.width = cropWidth;
+          canvas.height = cropHeight;
+          
+          const ctx = canvas.getContext('2d');
+          
+          // Ensure we don't crop outside bounds
+          const safeX = Math.max(0, Math.min(cropX, fullCanvas.width - cropWidth));
+          const safeY = Math.max(0, Math.min(cropY, fullCanvas.height - cropHeight));
+          const safeWidth = Math.min(cropWidth, fullCanvas.width - safeX);
+          const safeHeight = Math.min(cropHeight, fullCanvas.height - safeY);
+          
+          console.log('✂️ Cropping with parameters:', {
+            sourceX: safeX, sourceY: safeY, 
+            sourceWidth: safeWidth, sourceHeight: safeHeight,
+            destWidth: canvas.width, destHeight: canvas.height,
+            fullCanvasSize: { width: fullCanvas.width, height: fullCanvas.height }
+          });
+          
+          ctx.drawImage(
+            fullCanvas,
+            safeX, safeY, safeWidth, safeHeight,
+            0, 0, canvas.width, canvas.height
+          );
           
         } else {
-          // Full page screenshot if no area selected
+          // Full page screenshot
           const options = {
             useCORS: false,
             allowTaint: true,
-            scale: 0.5,
+            scale: 0.3,
             backgroundColor: '#ffffff',
             logging: false,
             ignoreElements: (element) => {
@@ -581,53 +697,27 @@
             }
           };
           
-          canvas = await window.html2canvas(document.body, options);
+          canvas = await window.html2canvas(document.documentElement, options);
         }
         
         const dataUrl = canvas.toDataURL('image/png');
         
-        // Check if canvas is empty (all white)
-        const ctx = canvas.getContext('2d');
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-        let hasContent = false;
-        
-        // Check if there's any non-white pixel
-        for (let i = 0; i < pixels.length; i += 4) {
-          const r = pixels[i];
-          const g = pixels[i + 1];
-          const b = pixels[i + 2];
-          const a = pixels[i + 3];
-          
-          if (a > 0 && (r < 250 || g < 250 || b < 250)) {
-            hasContent = true;
-            break;
-          }
+        // Quick validation
+        if (canvas.width < 10 || canvas.height < 10) {
+          throw new Error('Canvas too small');
         }
         
-        if (!hasContent) {
-          console.warn('⚠️ Screenshot appears to be empty/white, trying fallback');
-          throw new Error('Empty screenshot detected');
-        }
-        
-        console.log('✅ Screenshot created successfully:', {
-          width: canvas.width,
-          height: canvas.height,
-          hasContent: hasContent
-        });
-        
-        // Upload client-side screenshot to R2
+        // Upload to R2
         try {
           const uploadResult = await this.uploadScreenshotToR2(dataUrl);
           if (uploadResult.success) {
-            console.log('📤 Client screenshot uploaded to R2:', uploadResult.filename);
-            return uploadResult.filename; // Return filename instead of base64
+            console.log('📤 Simple screenshot uploaded to R2:', uploadResult.filename);
+            return uploadResult.filename;
           }
         } catch (uploadError) {
-          console.log('⚠️ R2 upload failed, using base64 fallback:', uploadError.message);
+          console.log('⚠️ R2 upload failed, using base64:', uploadError.message);
         }
         
-        // Fallback to base64 if R2 upload fails
         return dataUrl;
 
       } finally {
