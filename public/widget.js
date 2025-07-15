@@ -162,15 +162,15 @@
             button.style.transform = 'translateY(-50%) scale(1)';
         });
         
-        button.addEventListener('click', startSelectionMode);
+        button.addEventListener('click', startNewSelectionMode);
         
         document.body.appendChild(button);
         console.log('Widget: Feedback button created');
     }
     
-    // Start element selection mode
-    function startSelectionMode() {
-        console.log('Widget: Starting selection mode');
+    // Start new hybrid selection mode
+    async function startNewSelectionMode() {
+        console.log('Widget: Starting new hybrid selection mode');
         
         if (isSelecting) return;
         
@@ -181,6 +181,43 @@
         }
         
         isSelecting = true;
+        
+        // Use HybridScreenshot if available, otherwise fallback to old system
+        if (window.HybridScreenshot) {
+            try {
+                const hybridScreenshot = new window.HybridScreenshot();
+                const screenshotData = await hybridScreenshot.selectAndCaptureArea();
+                
+                // Set fake selection data for the modal
+                currentSelectionData = {
+                    type: 'area',
+                    selectedArea: hybridScreenshot.selectedArea,
+                    element: null,
+                    selector: null
+                };
+                
+                // Show modal directly with screenshot
+                showFeedbackModalDirect(screenshotData);
+                
+            } catch (error) {
+                console.error('Widget: Hybrid screenshot failed:', error);
+                // Reset and fallback to old system
+                isSelecting = false;
+                const button = document.getElementById('feedback-widget-button');
+                if (button) {
+                    button.style.display = 'flex';
+                }
+                startOldSelectionMode();
+            }
+        } else {
+            console.warn('Widget: HybridScreenshot not available, using old system');
+            startOldSelectionMode();
+        }
+    }
+    
+    // Old selection mode as fallback
+    function startOldSelectionMode() {
+        console.log('Widget: Starting old selection mode');
         showElementSelectionOverlay();
     }
     
@@ -953,6 +990,130 @@
         }
     }
     
+    // Show feedback modal directly with screenshot (new method)
+    function showFeedbackModalDirect(screenshotData) {
+        console.log('Widget: Showing feedback modal directly');
+        
+        removeHighlight();
+        
+        if (overlay) {
+            // Clean up escape handler
+            if (overlay._escapeHandler) {
+                document.removeEventListener('keydown', overlay._escapeHandler);
+            }
+            overlay.remove();
+            overlay = null;
+        }
+        
+        // Create modal
+        modal = document.createElement('div');
+        modal.id = 'feedback-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            min-width: 400px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        `;
+        
+        const area = currentSelectionData?.selectedArea;
+        const hasScreenshot = screenshotData && screenshotData !== null;
+        
+        modalContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
+                Feedback senden
+            </h2>
+            
+            ${hasScreenshot ? `
+                <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                    <div style="background: #f3f4f6; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 500; color: #374151;">
+                        🔲 Screenshot des ausgewählten Bereichs
+                    </div>
+                    <img src="${screenshotData}" alt="Screenshot des ausgewählten Bereichs" style="width: 100%; height: auto; display: block; max-height: 300px; object-fit: contain;" />
+                </div>
+            ` : `
+                <div style="margin-bottom: 20px; padding: 20px; text-align: center; border: 1px solid #fbbf24; border-radius: 8px; background: #fef3c7;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px;">
+                        ⚠️ Screenshot konnte nicht erstellt werden, aber Koordinaten sind verfügbar.
+                    </p>
+                </div>
+            `}
+            
+            ${area ? `
+                <div style="margin-bottom: 20px; padding: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 12px; color: #1e40af;">
+                    <strong>Bereich-Info:</strong> ${Math.round(area.width)} × ${Math.round(area.height)} px bei (${Math.round(area.x)}, ${Math.round(area.y)})
+                    ${currentSelectionData.selector ? `<br><strong>CSS Selector:</strong> ${currentSelectionData.selector}` : ''}
+                </div>
+            ` : ''}
+            
+            <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
+                <div>
+                    <label for="feedback-title" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                        Titel *
+                    </label>
+                    <input 
+                        type="text" 
+                        id="feedback-title" 
+                        required
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; box-sizing: border-box;"
+                        placeholder="Kurze Beschreibung des Problems oder Vorschlags"
+                    />
+                </div>
+                
+                <div>
+                    <label for="feedback-description" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                        Beschreibung
+                    </label>
+                    <textarea 
+                        id="feedback-description" 
+                        rows="4"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;"
+                        placeholder="Detaillierte Beschreibung..."
+                    ></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                    <button 
+                        type="button" 
+                        id="cancel-feedback"
+                        style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; cursor: pointer;"
+                    >
+                        Abbrechen
+                    </button>
+                    <button 
+                        type="submit" 
+                        id="submit-feedback"
+                        style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
+                    >
+                        📨 Feedback senden
+                    </button>
+                </div>
+            </form>
+        `;
+        
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        
+        setupModalEvents(screenshotData);
+    }
+
     // Initialize widget when script loads
     init();
 })();
