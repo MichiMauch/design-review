@@ -439,18 +439,7 @@
       console.log('🖼️ Creating screenshot...');
       
       try {
-        // Try server-side screenshot first
-        const serverResult = await this.tryServerScreenshot();
-        if (serverResult.success) {
-          console.log('✅ Server-side screenshot successful');
-          return serverResult.screenshot;
-        }
-      } catch (error) {
-        console.log('❌ Server-side failed:', error.message);
-      }
-
-      try {
-        // Try client-side screenshot
+        // Use client-side screenshot with R2 upload
         const clientResult = await this.tryClientScreenshot();
         if (clientResult) {
           console.log('✅ Client-side screenshot successful');
@@ -463,36 +452,6 @@
       // Return placeholder
       console.log('📝 Using placeholder screenshot');
       return this.generatePlaceholderScreenshot();
-    }
-
-    async tryServerScreenshot() {
-      const response = await fetch(`${this.apiBase}/api/screenshot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: window.location.href,
-          selectedArea: this.selectedArea
-        }),
-        signal: AbortSignal.timeout(10000) // Reduced to 10 seconds
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server screenshot failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.fallback) {
-        throw new Error('Server returned fallback instruction');
-      }
-
-      // For R2 uploads, only store the filename, not the full URL or base64
-      if (data.r2Filename) {
-        console.log('📸 Screenshot uploaded to R2:', data.r2Filename);
-        return { success: true, screenshot: data.r2Filename, isR2Url: true };
-      } else {
-        console.log('📸 Using base64 screenshot as fallback');
-        return { success: true, screenshot: data.screenshot, isR2Url: false };
-      }
     }
 
     async tryClientScreenshot() {
@@ -547,7 +506,21 @@
         }
 
         const canvas = await window.html2canvas(document.body, options);
-        return canvas.toDataURL('image/png');
+        const dataUrl = canvas.toDataURL('image/png');
+        
+        // Upload client-side screenshot to R2 as well
+        try {
+          const uploadResult = await this.uploadScreenshotToR2(dataUrl);
+          if (uploadResult.success) {
+            console.log('📤 Client screenshot uploaded to R2:', uploadResult.filename);
+            return uploadResult.filename; // Return filename instead of base64
+          }
+        } catch (uploadError) {
+          console.log('⚠️ R2 upload failed, using base64 fallback:', uploadError.message);
+        }
+        
+        // Fallback to base64 if R2 upload fails
+        return dataUrl;
 
       } finally {
         // Restore widget elements
@@ -629,6 +602,38 @@
       const result = await response.json();
       console.log('✅ Task created successfully:', result);
       return result;
+    }
+
+    async uploadScreenshotToR2(base64Data) {
+      try {
+        // Convert base64 to blob
+        const response = await fetch(base64Data);
+        const blob = await response.blob();
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('screenshot', blob, `screenshot-${Date.now()}.png`);
+        
+        // Upload to R2 via upload API
+        const uploadResponse = await fetch(`${this.apiBase}/api/upload-screenshot`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.status}`);
+        }
+        
+        const result = await uploadResponse.json();
+        return {
+          success: true,
+          filename: result.filename,
+          url: result.url
+        };
+      } catch (error) {
+        console.error('R2 upload error:', error);
+        return { success: false, error: error.message };
+      }
     }
 
     showLoading(show) {
