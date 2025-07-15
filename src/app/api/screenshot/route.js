@@ -14,7 +14,7 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
-    const { url, width = 1920, height = 1080, quality = 90 } = await request.json();
+    const { url, width = 1920, height = 1080 } = await request.json();
 
     if (!url) {
       return addCorsHeaders(NextResponse.json(

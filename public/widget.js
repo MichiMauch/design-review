@@ -426,7 +426,7 @@
             const currentY = e.clientY - rect.top;
             
             redrawAnnotations();
-            drawShape(startX, startY, currentX, currentY, currentTool, true);
+            drawShape(startX, startY, currentX, currentY, currentTool);
         });
         
         canvas.addEventListener('mouseup', (e) => {
@@ -455,7 +455,7 @@
         document.getElementById('annotation-submit').addEventListener('click', submitAnnotatedFeedback);
         
         // Draw shape function
-        function drawShape(x1, y1, x2, y2, tool, isPreview = false) {
+        function drawShape(x1, y1, x2, y2, tool) {
             ctx.strokeStyle = '#ff0000';
             ctx.lineWidth = 3;
             ctx.beginPath();
