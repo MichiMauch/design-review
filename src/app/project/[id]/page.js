@@ -798,7 +798,10 @@ export default function ProjectPage() {
                     ✅ Das Widget erscheint als Button am rechten Bildschirmrand (mittig)
                   </p>
                   <p>
-                    ✅ Nutzer können Screenshots machen und Kommentare hinterlassen
+                    ✅ Nutzer können Elemente auswählen und Feedback hinterlassen
+                  </p>
+                  <p>
+                    ✅ Keine Browser-Berechtigungen erforderlich (DOM-basiert)
                   </p>
                 </div>
 
@@ -960,6 +963,31 @@ export default function ProjectPage() {
                           </div>
                         )}
                       </div>
+                      
+                      {/* Selected Area Information */}
+                      {task.selected_area && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+                            <span className="text-sm font-medium text-blue-800">Ausgewählter Bereich</span>
+                          </div>
+                          {(() => {
+                            try {
+                              const areaData = typeof task.selected_area === 'string' 
+                                ? JSON.parse(task.selected_area) 
+                                : task.selected_area;
+                              return (
+                                <div className="text-xs text-blue-700 space-y-1">
+                                  <div>Position: x={Math.round(areaData.x)}, y={Math.round(areaData.y)}</div>
+                                  <div>Größe: {Math.round(areaData.width)} × {Math.round(areaData.height)} px</div>
+                                </div>
+                              );
+                            } catch {
+                              return <div className="text-xs text-blue-700">Bereichs-Daten verfügbar</div>;
+                            }
+                          })()}
+                        </div>
+                      )}
                       
                       {task.screenshot && (
                         <div className="mt-3">
