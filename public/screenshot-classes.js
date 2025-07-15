@@ -354,11 +354,19 @@ class FallbackScreenshot {
           logging: false,
           backgroundColor: '#ffffff',
           removeContainer: true,
-          width: window.innerWidth,
-          height: window.innerHeight,
+          // Capture the full document, not just the viewport
+          width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+          height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
           ignoreElements: (element) => {
-            // Skip problematic elements
-            if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image')) {
+            // Only skip widget elements and specific problematic images
+            if (element.classList && element.classList.contains('widget')) {
+              return true;
+            }
+            if (element.id && element.id.includes('feedback')) {
+              return true;
+            }
+            // Only skip specific broken Next.js images, not all images
+            if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image') && element.src.includes('backend-economiesuisse-ch-main.netnode.app')) {
               return true;
             }
             if (element.tagName === 'IFRAME') {
@@ -435,8 +443,15 @@ class FallbackScreenshot {
             width: area.width,
             height: area.height,
             filter: (node) => {
-              // Skip problematic elements
-              if (node.tagName === 'IMG' && node.src && node.src.includes('_next/image')) {
+              // Only skip widget elements and specific problematic images
+              if (node.classList && node.classList.contains('widget')) {
+                return false;
+              }
+              if (node.id && node.id.includes('feedback')) {
+                return false;
+              }
+              // Only skip specific broken Next.js images, not all images
+              if (node.tagName === 'IMG' && node.src && node.src.includes('_next/image') && node.src.includes('backend-economiesuisse-ch-main.netnode.app')) {
                 return false;
               }
               if (node.tagName === 'IFRAME') {
@@ -1017,16 +1032,19 @@ class RobustScreenshot {
       removeContainer: true,
       foreignObjectRendering: true, // Better for modern CSS
       ignoreElements: (element) => {
-        // Skip problematic elements
-        if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image')) {
+        // Only skip widget elements and problematic Next.js images
+        if (element.classList && element.classList.contains('widget')) {
           return true;
         }
+        if (element.id && element.id.includes('feedback')) {
+          return true;
+        }
+        // Only skip specific broken Next.js images, not all images
+        if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image') && element.src.includes('backend-economiesuisse-ch-main.netnode.app')) {
+          return true;
+        }
+        // Skip videos and iframes as they often cause issues
         if (element.tagName === 'IFRAME' || element.tagName === 'VIDEO') {
-          return true;
-        }
-        // Skip elements with oklab/oklch colors
-        const computedStyle = window.getComputedStyle(element);
-        if (computedStyle.color && (computedStyle.color.includes('oklab') || computedStyle.color.includes('oklch'))) {
           return true;
         }
         return false;
@@ -1055,11 +1073,15 @@ class RobustScreenshot {
       foreignObjectRendering: false,
       imageTimeout: 5000,
       ignoreElements: (element) => {
-        // More aggressive filtering
-        if (element.tagName === 'IMG' || element.tagName === 'VIDEO' || element.tagName === 'IFRAME') {
+        // Only exclude widget elements and problematic Next.js images
+        if (element.classList && element.classList.contains('widget')) {
           return true;
         }
-        if (element.classList.contains('widget') || element.id.includes('feedback')) {
+        if (element.id && element.id.includes('feedback')) {
+          return true;
+        }
+        // Only exclude Next.js images that cause errors, not all images
+        if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image') && element.src.includes('backend-economiesuisse-ch-main.netnode.app')) {
           return true;
         }
         return false;
@@ -1085,11 +1107,15 @@ class RobustScreenshot {
         transformOrigin: 'top left'
       },
       filter: (node) => {
-        // Conservative filtering
-        if (node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'IFRAME') {
+        // Only exclude widget elements and problematic Next.js images
+        if (node.classList && node.classList.contains('widget')) {
           return false;
         }
-        if (node.classList && node.classList.contains('widget')) {
+        if (node.id && node.id.includes('feedback')) {
+          return false;
+        }
+        // Only exclude specific problematic Next.js images, not all images
+        if (node.tagName === 'IMG' && node.src && node.src.includes('_next/image') && node.src.includes('backend-economiesuisse-ch-main.netnode.app')) {
           return false;
         }
         return true;
