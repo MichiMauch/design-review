@@ -240,7 +240,7 @@
           <div style="margin-bottom: 16px;">
             <strong style="color: #374151;">Screenshot:</strong>
             <div style="margin-top: 8px;">
-              <img src="${feedback.screenshot}" alt="Feedback Screenshot" style="max-width: 100%; border-radius: 6px; border: 1px solid #e5e7eb;">
+              <img src="${feedback.screenshot_display || feedback.screenshot}" alt="Feedback Screenshot" style="max-width: 100%; border-radius: 6px; border: 1px solid #e5e7eb;">
             </div>
           </div>
         ` : ''}

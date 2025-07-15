@@ -18,11 +18,33 @@ export async function GET(request, { params }) {
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT *, COALESCE(screenshot_url, screenshot) as screenshot_display FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
+      sql: 'SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
       args: [resolvedParams.id]
     });
 
-    return addCorsHeaders(Response.json(result.rows));
+    // Process screenshots to ensure proper URLs
+    const processedRows = result.rows.map(row => {
+      let screenshotDisplay = null;
+      
+      if (row.screenshot_url) {
+        // Use the R2 URL
+        screenshotDisplay = row.screenshot_url;
+      } else if (row.screenshot && row.screenshot.startsWith('data:')) {
+        // Use base64 data as fallback
+        screenshotDisplay = row.screenshot;
+      } else if (row.screenshot && !row.screenshot.startsWith('data:')) {
+        // Construct R2 URL from filename
+        const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
+        screenshotDisplay = `https://pub-${accountId}.r2.dev/screenshots/${row.screenshot}`;
+      }
+      
+      return {
+        ...row,
+        screenshot_display: screenshotDisplay
+      };
+    });
+
+    return addCorsHeaders(Response.json(processedRows));
 
   } catch (error) {
     console.error('Error fetching tasks:', error);
@@ -75,13 +97,30 @@ export async function POST(request, { params }) {
       second: '2-digit'
     }).format(now).replace(' ', 'T') + '+02:00'; // Add CEST timezone offset
 
-    // Determine if screenshot is a URL or base64 data
-    const isScreenshotUrl = screenshot && (screenshot.startsWith('http') || screenshot.startsWith('https'));
-    const screenshotUrl = isScreenshotUrl ? screenshot : null;
-    const screenshotBlob = !isScreenshotUrl ? screenshot : null;
-
-    console.log('Screenshot type:', isScreenshotUrl ? 'URL' : 'Base64/Blob');
-    console.log('Screenshot URL:', screenshotUrl);
+    // Determine screenshot type and storage strategy
+    let screenshotUrl = null;
+    let screenshotBlob = null;
+    
+    if (screenshot) {
+      // Check if it's a filename (R2), URL, or base64 data
+      if (screenshot.startsWith('data:')) {
+        // Base64 data - store as blob (fallback)
+        screenshotBlob = screenshot;
+        console.log('Screenshot type: Base64 blob (fallback)');
+      } else if (screenshot.startsWith('http')) {
+        // Full URL - extract filename and store URL
+        screenshotUrl = screenshot;
+        console.log('Screenshot type: Full URL');
+      } else if (screenshot.includes('.png') || screenshot.includes('.jpg') || screenshot.includes('.jpeg')) {
+        // Filename only - construct R2 URL
+        screenshotUrl = `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/screenshots/${screenshot}`;
+        console.log('Screenshot type: Filename -> R2 URL:', screenshotUrl);
+      } else {
+        // Unknown format - treat as blob
+        screenshotBlob = screenshot;
+        console.log('Screenshot type: Unknown format -> blob');
+      }
+    }
 
     const result = await db.execute({
       sql: `
@@ -92,8 +131,8 @@ export async function POST(request, { params }) {
         projectId, // Now using the resolved numeric project ID
         title,
         description || null,
-        screenshotBlob || null, // Legacy screenshot field for base64 data
-        screenshotUrl || null,  // New field for R2 URLs
+        screenshotBlob || null, // Only base64 fallbacks
+        screenshotUrl || null,  // R2 URLs and external URLs
         url,
         selected_area ? JSON.stringify(selected_area) : null,
         title_en || null,

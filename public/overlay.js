@@ -1185,9 +1185,9 @@
       const modal = document.createElement('div');
       modal.className = 'dr-modal';
       
-      const screenshotImg = comment.screenshot ? 
+      const screenshotImg = (comment.screenshot_display || comment.screenshot) ? 
         `<div style="margin-bottom: 16px;">
-          <img src="${comment.screenshot}" alt="Screenshot" style="max-width: 100%; border: 1px solid #e5e7eb; border-radius: 4px;">
+          <img src="${comment.screenshot_display || comment.screenshot}" alt="Screenshot" style="max-width: 100%; border: 1px solid #e5e7eb; border-radius: 4px;">
         </div>` : '';
       
       modal.innerHTML = `
