@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
 import { uploadScreenshotToR2 } from '../../../lib/cloudflare-r2';
 
+function addCorsHeaders(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
+export async function OPTIONS() {
+  return addCorsHeaders(new Response(null, { status: 200 }));
+}
+
 export async function POST(request) {
   try {
     const { url, selectedArea } = await request.json();
 
     if (!url) {
-      return NextResponse.json(
+      return addCorsHeaders(NextResponse.json(
         { success: false, error: 'URL is required' },
         { status: 400 }
-      );
+      ));
     }
 
     // Use NodeHive API with correct parameters
@@ -47,23 +58,23 @@ export async function POST(request) {
     const base64Image = imageBufferNode.toString('base64');
     const dataUrl = `data:image/png;base64,${base64Image}`;
 
-    return NextResponse.json({
+    return addCorsHeaders(NextResponse.json({
       success: true,
       screenshot: dataUrl,
       r2Url: r2Result.url,
       r2Filename: r2Result.filename,
       selectedArea: selectedArea || null
-    });
+    }));
 
   } catch (error) {
     console.error('Screenshot API error:', error);
     
     // Return a fallback placeholder
-    return NextResponse.json({
+    return addCorsHeaders(NextResponse.json({
       success: true,
       screenshot: createPlaceholderImage(),
       error: error.message
-    });
+    }));
   }
 }
 
