@@ -604,16 +604,24 @@
         const originalStyle = el.getAttribute('style');
         const computedStyle = window.getComputedStyle(el);
         
+        // Handle SVG elements differently (they don't have settable className)
+        const isSVG = el instanceof SVGElement;
+        
         // Store original data for restoration
         hiddenElements.push({
           element: el,
           originalStyle: originalStyle,
-          originalClass: el.className,
+          originalClass: isSVG ? el.getAttribute('class') : el.className,
+          isSVG: isSVG,
           type: 'element-style'
         });
         
         // Remove all classes that might contain problematic CSS
-        el.className = '';
+        if (isSVG) {
+          el.removeAttribute('class');
+        } else {
+          el.className = '';
+        }
         
         // Set safe inline styles based on element type
         let safeStyle = 'background: white !important; color: black !important; border: none !important;';
@@ -624,6 +632,8 @@
           safeStyle = 'background: #f5f5f5 !important; color: black !important; font-weight: bold !important; padding: 8px !important; margin: 10px 0 !important;';
         } else if (['P', 'DIV', 'SPAN', 'A'].includes(el.tagName)) {
           safeStyle = 'background: transparent !important; color: black !important; text-decoration: none !important; margin: 4px !important; padding: 4px !important;';
+        } else if (isSVG) {
+          safeStyle = 'fill: black !important; stroke: black !important;';
         }
         
         // Add widget hiding
@@ -641,13 +651,22 @@
     }
 
     restoreProblematicElements(hiddenElements) {
-      hiddenElements.forEach(({element, originalDisplay, originalVisibility, wasHidden, originalStyle, originalClass, type}) => {
+      hiddenElements.forEach(({element, originalDisplay, originalVisibility, wasHidden, originalStyle, originalClass, isSVG, type}) => {
         if (type === 'temporary') {
           // Remove our temporary safe stylesheet
           element.remove();
         } else if (type === 'element-style') {
           // Restore original classes and styles
-          element.className = originalClass || '';
+          if (isSVG) {
+            if (originalClass) {
+              element.setAttribute('class', originalClass);
+            } else {
+              element.removeAttribute('class');
+            }
+          } else {
+            element.className = originalClass || '';
+          }
+          
           if (originalStyle) {
             element.setAttribute('style', originalStyle);
           } else {
