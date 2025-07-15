@@ -108,6 +108,7 @@
         overlay.addEventListener('mousedown', (e) => {
             if (e.target !== overlay) return;
             
+            // Use clientX/clientY since we're taking viewport screenshots
             startX = e.clientX;
             startY = e.clientY;
             
@@ -140,14 +141,31 @@
                 const height = Math.abs(e.clientY - startY);
                 
                 if (width > 10 && height > 10) {
+                    // Use viewport-relative coordinates and add scroll offset
+                    const left = Math.min(e.clientX, startX);
+                    const top = Math.min(e.clientY, startY);
+                    
+                    // Add scroll offset to get absolute coordinates from page top
+                    const absoluteX = left + window.scrollX;
+                    const absoluteY = top + window.scrollY;
+                    
+                    // Ensure coordinates are within bounds
+                    const clampedLeft = Math.max(0, absoluteX);
+                    const clampedTop = Math.max(0, absoluteY);
+                    const clampedWidth = Math.min(width, window.innerWidth - left);
+                    const clampedHeight = Math.min(height, window.innerHeight - top);
+                    
                     selectionArea = {
-                        x: Math.min(e.clientX, startX),
-                        y: Math.min(e.clientY, startY),
-                        width: width,
-                        height: height
+                        x: clampedLeft,
+                        y: clampedTop,
+                        width: clampedWidth,
+                        height: clampedHeight
                     };
                     
-                    console.log('Widget: Area selected:', selectionArea);
+                    console.log('Widget: Area selected (viewport coordinates):', {x: left, y: top, width, height});
+                    console.log('Widget: Area selected (absolute coordinates):', selectionArea);
+                    console.log('Widget: Viewport size:', window.innerWidth, 'x', window.innerHeight);
+                    console.log('Widget: Scroll position:', window.scrollX, 'x', window.scrollY);
                     removeSelectionOverlay();
                     createScreenshotAndAnnotate();
                 } else {
@@ -189,45 +207,81 @@
             // Show loading modal
             showLoadingModal();
             
-            // Use our own backend to create screenshot
+            // Use our Playwright-based backend to create screenshot
             const screenshotUrl = `${baseUrl}/api/screenshot`;
             
-            console.log('Widget: Requesting screenshot from:', screenshotUrl);
+            console.log('Widget: Requesting Playwright screenshot from:', screenshotUrl);
             
-            const response = await fetch(screenshotUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    url: window.location.href,
-                    width: 1920,
-                    height: 1080,
-                    quality: 90
-                })
-            });
+            // Add timeout for the entire request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
             
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Screenshot API returned ${response.status}: ${errorText}`);
+            try {
+                // Calculate responsive dimensions for high-quality screenshot
+                const actualViewportWidth = window.innerWidth;
+                const actualViewportHeight = window.innerHeight;
+                const screenshotWidth = Math.min(actualViewportWidth * 2, 1920);
+                const screenshotHeight = Math.min(actualViewportHeight * 2, 1080);
+                
+                console.log('Widget: Viewport dimensions:', actualViewportWidth, 'x', actualViewportHeight);
+                console.log('Widget: Screenshot dimensions:', screenshotWidth, 'x', screenshotHeight);
+                
+                const response = await fetch(screenshotUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: window.location.href,
+                        width: screenshotWidth, // High-res width for better quality
+                        height: screenshotHeight, // High-res height for better quality
+                        quality: 90,
+                        fullPage: false, // Focus on viewport
+                        waitTime: 3000, // Wait for dynamic content
+                        selectionArea: selectionArea, // Send selected area for cropping
+                        actualViewportWidth: actualViewportWidth, // Send actual viewport size for coordinate mapping
+                        actualViewportHeight: actualViewportHeight,
+                        scrollX: window.scrollX, // Send current scroll position
+                        scrollY: window.scrollY
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Screenshot API returned ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (!result.success || !result.screenshot) {
+                    throw new Error('Screenshot API did not return valid data');
+                }
+                
+                console.log(`Widget: Screenshot created successfully using ${result.source}`);
+                
+                // Close loading modal and show annotation interface
+                closeLoadingModal();
+                showAnnotationInterface(result.screenshot);
+                
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                throw fetchError;
             }
-            
-            const result = await response.json();
-            
-            if (!result.success || !result.screenshot) {
-                throw new Error('Screenshot API did not return valid data');
-            }
-            
-            console.log('Widget: Screenshot created successfully, showing annotation interface');
-            
-            // Close loading modal and show annotation interface
-            closeLoadingModal();
-            showAnnotationInterface(result.screenshot);
             
         } catch (error) {
             console.error('Widget: Screenshot creation failed:', error);
             closeLoadingModal();
-            showFeedbackModal(null); // Show feedback modal without screenshot
+            
+            // Show user-friendly error message
+            if (error.name === 'AbortError') {
+                showErrorModal('Screenshot-Erstellung dauert zu lange. Bitte versuchen Sie es erneut.');
+            } else {
+                // Still show annotation interface but with placeholder
+                showAnnotationInterface(createClientPlaceholder());
+            }
         }
     }
     
@@ -540,62 +594,68 @@
         }
     }
     
-    // Show simple feedback modal (fallback)
-    function showFeedbackModal(screenshot = null) {
-        modal = document.createElement('div');
-        modal.id = 'feedback-modal';
-        modal.innerHTML = `
+    // Create client-side placeholder when screenshot fails
+    function createClientPlaceholder() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = 800;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a simple placeholder
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(50, 50, canvas.width - 100, canvas.height - 100);
+        
+        ctx.fillStyle = '#64748b';
+        ctx.font = '24px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Screenshot nicht verfügbar', canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.font = '16px Arial, sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('Sie können trotzdem Feedback hinterlassen', canvas.width / 2, canvas.height / 2 + 20);
+        
+        return canvas.toDataURL('image/png');
+    }
+    
+    // Show error modal with custom message
+    function showErrorModal(message) {
+        const errorModal = document.createElement('div');
+        errorModal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
                         background: rgba(0,0,0,0.5); z-index: 10001; 
                         display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 30px; border-radius: 12px; 
-                            max-width: 500px; width: 90%; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
-                    <h3 style="margin: 0 0 20px 0; color: #333; font-family: Arial, sans-serif;">
-                        📝 Feedback senden
+                <div style="background: white; padding: 40px; border-radius: 12px; 
+                            max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
+                    <div style="font-size: 48px; margin-bottom: 20px;">⏰</div>
+                    <h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">
+                        Screenshot-Problem
                     </h3>
-                    
-                    <div style="margin-bottom: 20px; font-family: Arial, sans-serif;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555;">
-                            Beschreiben Sie Ihr Feedback:
-                        </label>
-                        <textarea id="feedback-text" placeholder="Was möchten Sie zu diesem Bereich mitteilen?"
-                                style="width: 100%; height: 120px; padding: 12px; border: 1px solid #ddd; 
-                                       border-radius: 6px; font-family: Arial, sans-serif; resize: vertical;
-                                       box-sizing: border-box;"></textarea>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button id="feedback-cancel" style="padding: 12px 24px; border: 1px solid #ddd; 
-                                background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer;
-                                font-family: Arial, sans-serif;">
+                    <p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">
+                        ${message}
+                    </p>
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button onclick="this.closest('div').parentElement.remove()" 
+                                style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; 
+                                       color: #666; border-radius: 6px; cursor: pointer;
+                                       font-family: Arial, sans-serif;">
                             Abbrechen
                         </button>
-                        <button id="feedback-submit" style="padding: 12px 24px; background: #007bff; 
-                                color: white; border: none; border-radius: 6px; cursor: pointer;
-                                font-family: Arial, sans-serif;">
-                            📤 Feedback senden
+                        <button onclick="this.closest('div').parentElement.remove(); 
+                                         window.feedbackWidget.createScreenshotAndAnnotate();" 
+                                style="padding: 12px 24px; background: #007bff; color: white; 
+                                       border: none; border-radius: 6px; cursor: pointer;
+                                       font-family: Arial, sans-serif;">
+                            Erneut versuchen
                         </button>
                     </div>
                 </div>
             </div>
         `;
         
-        document.body.appendChild(modal);
-        
-        // Event listeners
-        document.getElementById('feedback-cancel').addEventListener('click', () => {
-            modal.remove();
-            modal = null;
-        });
-        
-        document.getElementById('feedback-submit').addEventListener('click', () => {
-            const text = document.getElementById('feedback-text').value.trim();
-            if (text) {
-                submitFeedback(text, screenshot);
-            } else {
-                alert('Bitte geben Sie Ihr Feedback ein.');
-            }
-        });
+        document.body.appendChild(errorModal);
     }
     
     // Submit feedback function
@@ -722,7 +782,11 @@
         console.log('Widget: Initialized successfully');
     }
     
-    // Start the widget
+    // Start the widget and expose global reference for error modal
+    window.feedbackWidget = {
+        createScreenshotAndAnnotate: createScreenshotAndAnnotate
+    };
+    
     initWidget();
     
 })();
