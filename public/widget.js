@@ -1,7 +1,7 @@
 (function() {
     'use strict';
     
-    console.log('Widget: Loading feedback widget - DOM-based version 8.0');
+    console.log('Widget: Loading feedback widget - DOM-based version 8.1');
     
     // Configuration
     const config = {
@@ -15,6 +15,8 @@
     let modal = null;
     let selectedElement = null;
     let selectedArea = null;
+    let highlightBox = null;
+    let instructions = null;
     
     // Initialize widget when DOM is ready
     if (document.readyState === 'loading') {
@@ -71,7 +73,9 @@
             button.style.boxShadow = '0 4px 16px rgba(102, 126, 234, 0.4)';
         });
         
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             console.log('Widget: Feedback button clicked');
             startSelectionMode();
         });
@@ -95,6 +99,7 @@
     function showElementSelectionOverlay() {
         console.log('Widget: Showing element selection overlay');
         
+        // Create overlay
         overlay = document.createElement('div');
         overlay.id = 'feedback-selection-overlay';
         overlay.style.cssText = `
@@ -108,7 +113,9 @@
             cursor: crosshair;
         `;
         
-        const instructions = document.createElement('div');
+        // Create instructions
+        instructions = document.createElement('div');
+        instructions.id = 'feedback-instructions';
         instructions.style.cssText = `
             position: fixed;
             top: 20px;
@@ -122,6 +129,7 @@
             font-size: 14px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             z-index: 100001;
+            pointer-events: none;
         `;
         instructions.innerHTML = `
             <div style="text-align: center;">
@@ -131,66 +139,160 @@
             </div>
         `;
         
-        let highlightedElement = null;
-        let highlightBox = null;
+        // Add event listeners
+        setupOverlayEvents();
         
-        function highlightElement(element) {
-            if (highlightedElement === element) return;
-            
-            if (highlightBox) {
-                highlightBox.remove();
-                highlightBox = null;
-            }
-            
-            highlightedElement = element;
-            
-            if (element && element !== overlay && element !== instructions) {
-                const rect = element.getBoundingClientRect();
-                highlightBox = document.createElement('div');
-                highlightBox.style.cssText = `
-                    position: fixed;
-                    top: ${rect.top}px;
-                    left: ${rect.left}px;
-                    width: ${rect.width}px;
-                    height: ${rect.height}px;
-                    border: 2px solid #3b82f6;
-                    background: rgba(59, 130, 246, 0.1);
-                    pointer-events: none;
-                    z-index: 100002;
-                    border-radius: 4px;
-                `;
-                document.body.appendChild(highlightBox);
-            }
-        }
+        // Add to DOM
+        document.body.appendChild(overlay);
+        document.body.appendChild(instructions);
         
+        // Setup ESC handler
+        document.addEventListener('keydown', handleEscapeKey);
+    }
+    
+    function setupOverlayEvents() {
+        if (!overlay) return;
+        
+        let isDrawing = false;
+        let startX = 0;
+        let startY = 0;
+        let selectionBox = null;
+        
+        // Mouse move for highlighting elements
         overlay.addEventListener('mousemove', (e) => {
+            if (isDrawing) return;
+            
+            // Temporarily hide overlay to get element below
+            overlay.style.pointerEvents = 'none';
             const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
-            if (elementBelow && elementBelow !== overlay) {
+            overlay.style.pointerEvents = 'auto';
+            
+            if (elementBelow && elementBelow !== overlay && elementBelow !== instructions) {
                 highlightElement(elementBelow);
+            } else {
+                removeHighlight();
             }
         });
         
+        // Click to select element
         overlay.addEventListener('click', (e) => {
+            if (isDrawing) return;
+            
             e.preventDefault();
             e.stopPropagation();
             
+            overlay.style.pointerEvents = 'none';
             const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+            overlay.style.pointerEvents = 'auto';
+            
             if (elementBelow && elementBelow !== overlay && elementBelow !== instructions) {
+                console.log('Widget: Element clicked:', elementBelow);
                 selectElement(elementBelow, e.clientX, e.clientY);
             }
         });
         
-        const escHandler = (e) => {
-            if (e.key === 'Escape') {
-                console.log('Widget: Cancelled via ESC key');
-                resetWidget();
-                document.removeEventListener('keydown', escHandler);
-            }
-        };
-        document.addEventListener('keydown', escHandler);
+        // Mouse down for area selection
+        overlay.addEventListener('mousedown', (e) => {
+            if (e.target !== overlay) return;
+            
+            console.log('Widget: Starting area selection');
+            isDrawing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            // Remove element highlight during drawing
+            removeHighlight();
+            
+            // Create selection box
+            selectionBox = document.createElement('div');
+            selectionBox.style.cssText = `
+                position: fixed;
+                border: 2px solid #ef4444;
+                background: rgba(239, 68, 68, 0.1);
+                pointer-events: none;
+                z-index: 100003;
+                border-radius: 4px;
+            `;
+            document.body.appendChild(selectionBox);
+            
+            e.preventDefault();
+        });
         
-        document.body.appendChild(overlay);
-        document.body.appendChild(instructions);
+        // Mouse move during drawing
+        document.addEventListener('mousemove', (e) => {
+            if (!isDrawing || !selectionBox) return;
+            
+            const currentX = e.clientX;
+            const currentY = e.clientY;
+            
+            const left = Math.min(startX, currentX);
+            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+            
+            selectionBox.style.left = left + 'px';
+            selectionBox.style.top = top + 'px';
+            selectionBox.style.width = width + 'px';
+            selectionBox.style.height = height + 'px';
+        });
+        
+        // Mouse up to complete area selection
+        document.addEventListener('mouseup', (e) => {
+            if (!isDrawing || !selectionBox) return;
+            
+            console.log('Widget: Finishing area selection');
+            isDrawing = false;
+            
+            const currentX = e.clientX;
+            const currentY = e.clientY;
+            
+            const left = Math.min(startX, currentX);
+            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+            
+            // Remove selection box
+            if (selectionBox) {
+                selectionBox.remove();
+                selectionBox = null;
+            }
+            
+            if (width > 20 && height > 20) {
+                selectArea(left, top, width, height);
+            } else {
+                console.log('Widget: Area too small, ignoring');
+            }
+        });
+    }
+    
+    function highlightElement(element) {
+        if (!element) return;
+        
+        // Remove previous highlight
+        removeHighlight();
+        
+        const rect = element.getBoundingClientRect();
+        highlightBox = document.createElement('div');
+        highlightBox.style.cssText = `
+            position: fixed;
+            top: ${rect.top}px;
+            left: ${rect.left}px;
+            width: ${rect.width}px;
+            height: ${rect.height}px;
+            border: 2px solid #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            pointer-events: none;
+            z-index: 100002;
+            border-radius: 4px;
+        `;
+        document.body.appendChild(highlightBox);
+    }
+    
+    function removeHighlight() {
+        if (highlightBox) {
+            highlightBox.remove();
+            highlightBox = null;
+        }
     }
     
     function selectElement(element, clickX, clickY) {
@@ -213,6 +315,22 @@
             clickPosition: {
                 x: clickX,
                 y: clickY
+            }
+        };
+        
+        removeOverlayAndShowModal();
+    }
+    
+    function selectArea(left, top, width, height) {
+        console.log('Widget: Area selected:', { left, top, width, height });
+        
+        selectedArea = {
+            type: 'area',
+            rect: {
+                top: top + window.scrollY,
+                left: left + window.scrollX,
+                width: width,
+                height: height
             }
         };
         
@@ -242,18 +360,32 @@
     }
     
     function removeOverlayAndShowModal() {
+        console.log('Widget: Removing overlay and showing modal');
+        
+        // Remove event listeners
+        document.removeEventListener('keydown', handleEscapeKey);
+        
+        // Remove overlay elements
         if (overlay) {
             overlay.remove();
             overlay = null;
         }
         
-        const highlights = document.querySelectorAll('[style*="border: 2px solid #3b82f6"]');
-        highlights.forEach(el => el.remove());
+        if (instructions) {
+            instructions.remove();
+            instructions = null;
+        }
         
-        const instructions = document.querySelector('[style*="transform: translateX(-50%)"]');
-        if (instructions) instructions.remove();
+        removeHighlight();
         
         showFeedbackModal();
+    }
+    
+    function handleEscapeKey(e) {
+        if (e.key === 'Escape') {
+            console.log('Widget: Cancelled via ESC key');
+            resetWidget();
+        }
     }
     
     function showFeedbackModal() {
@@ -302,6 +434,17 @@
                     </div>
                 </div>
             `;
+        } else if (selectedArea && selectedArea.type === 'area') {
+            selectedElementInfo = `
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">📐 Ausgewählter Bereich</label>
+                    <div style="border: 2px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #f9fafb; text-align: center;">
+                        <div style="font-size: 13px; color: #6b7280;">
+                            Bereich: ${Math.round(selectedArea.rect.width)} × ${Math.round(selectedArea.rect.height)} px
+                        </div>
+                    </div>
+                </div>
+            `;
         }
         
         modalContent.innerHTML = `
@@ -334,7 +477,7 @@
                     <option value="improvement">💡 Verbesserungsvorschlag</option>
                     <option value="feature">✨ Feature-Wunsch</option>
                     <option value="design">🎨 Design-Feedback</option>
-                    <option value="other">�� Sonstiges</option>
+                    <option value="other">📝 Sonstiges</option>
                 </select>
             </div>
             
@@ -369,11 +512,13 @@
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
         
+        // Focus on textarea
         const textarea = document.getElementById('feedback-text');
         if (textarea) {
             setTimeout(() => textarea.focus(), 100);
         }
         
+        // Add event listeners
         document.getElementById('feedback-cancel').addEventListener('click', () => {
             modal.remove();
             resetWidget();
@@ -383,14 +528,15 @@
             submitFeedback();
         });
         
-        const escHandler = (e) => {
+        // ESC key to close modal
+        const modalEscHandler = (e) => {
             if (e.key === 'Escape') {
                 modal.remove();
                 resetWidget();
-                document.removeEventListener('keydown', escHandler);
+                document.removeEventListener('keydown', modalEscHandler);
             }
         };
-        document.addEventListener('keydown', escHandler);
+        document.addEventListener('keydown', modalEscHandler);
     }
     
     function submitFeedback() {
@@ -512,9 +658,18 @@
         selectedElement = null;
         selectedArea = null;
         
+        // Remove event listeners
+        document.removeEventListener('keydown', handleEscapeKey);
+        
+        // Remove overlay elements
         if (overlay) {
             overlay.remove();
             overlay = null;
+        }
+        
+        if (instructions) {
+            instructions.remove();
+            instructions = null;
         }
         
         if (modal) {
@@ -522,13 +677,9 @@
             modal = null;
         }
         
-        const highlights = document.querySelectorAll('[style*="border: 2px solid"]');
-        highlights.forEach(el => {
-            if (el.id !== 'feedback-widget-button') {
-                el.remove();
-            }
-        });
+        removeHighlight();
         
+        // Show feedback button again
         const button = document.getElementById('feedback-widget-button');
         if (button) {
             button.style.display = 'flex';
