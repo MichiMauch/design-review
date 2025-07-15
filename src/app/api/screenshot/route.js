@@ -15,6 +15,9 @@ export async function OPTIONS() {
   return addCorsHeaders(new Response(null, { status: 200 }));
 }
 
+// Check if we're running on Vercel
+const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+
 // Playwright configuration for Vercel serverless
 const PLAYWRIGHT_CONFIG = {
   headless: true,
@@ -103,6 +106,12 @@ async function cropScreenshot(imageBuffer, selectionArea, viewportWidth, viewpor
 }
 
 async function createScreenshotWithPlaywright(url, options = {}) {
+  // Skip Playwright on Vercel due to missing browser binaries
+  if (isVercel) {
+    console.log('Playwright: Skipping on Vercel environment, browser binaries not available');
+    throw new Error('Playwright not available on Vercel serverless');
+  }
+
   const { 
     width = 1920, 
     height = 1080, 
@@ -220,16 +229,19 @@ async function createScreenshotWithFallback(url, options = {}) {
   const targetWidth = actualViewportWidth || width;
   const targetHeight = actualViewportHeight || height;
   
+  console.log('Fallback: Starting screenshot with multiple services...');
+  console.log('Fallback: Target dimensions:', { targetWidth, targetHeight });
+  
+  // Service 1: NodeHive API
   try {
-    console.log('Fallback: Using NodeHive API...');
-    console.log('Fallback: Target dimensions:', { targetWidth, targetHeight });
+    console.log('Fallback: Trying NodeHive API...');
     
     const nodeHiveUrl = new URL(NODEHIVE_API_URL);
     nodeHiveUrl.searchParams.set('url', url);
     nodeHiveUrl.searchParams.set('resX', targetWidth.toString());
     nodeHiveUrl.searchParams.set('resY', targetHeight.toString());
     nodeHiveUrl.searchParams.set('outFormat', 'jpeg');
-    nodeHiveUrl.searchParams.set('waitTime', '2000');
+    nodeHiveUrl.searchParams.set('waitTime', '3000');
     nodeHiveUrl.searchParams.set('isFullPage', 'false');
     
     const response = await fetch(nodeHiveUrl.toString(), {
@@ -238,33 +250,100 @@ async function createScreenshotWithFallback(url, options = {}) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'image/jpeg,image/*,*/*',
       },
+      signal: AbortSignal.timeout(20000) // 20 seconds
+    });
+    
+    if (response.ok) {
+      const contentType = response.headers.get('content-type');
+      console.log('Fallback: NodeHive response content type:', contentType);
+      
+      if (contentType && contentType.includes('image')) {
+        const imageBuffer = await response.arrayBuffer();
+        console.log('Fallback: NodeHive image buffer size:', imageBuffer.byteLength);
+        
+        if (imageBuffer.byteLength > 0) {
+          console.log('Fallback: NodeHive screenshot successful');
+          return Buffer.from(imageBuffer);
+        }
+      }
+    }
+    
+    throw new Error(`NodeHive failed: ${response.status}`);
+    
+  } catch (nodeHiveError) {
+    console.warn('Fallback: NodeHive failed:', nodeHiveError.message);
+  }
+  
+  // Service 2: Screenshot.rocks API
+  try {
+    console.log('Fallback: Trying Screenshot.rocks API...');
+    
+    const screenshotRocksUrl = `https://api.screenshot.rocks/screenshot?url=${encodeURIComponent(url)}&width=${targetWidth}&height=${targetHeight}&quality=85`;
+    
+    const response = await fetch(screenshotRocksUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'image/*,*/*',
+      },
       signal: AbortSignal.timeout(15000)
     });
     
-    if (!response.ok) {
-      throw new Error(`NodeHive API error: ${response.status}`);
+    if (response.ok) {
+      const imageBuffer = await response.arrayBuffer();
+      console.log('Fallback: Screenshot.rocks buffer size:', imageBuffer.byteLength);
+      
+      if (imageBuffer.byteLength > 0) {
+        console.log('Fallback: Screenshot.rocks successful');
+        return Buffer.from(imageBuffer);
+      }
     }
     
-    const contentType = response.headers.get('content-type');
-    console.log('Fallback: Response content type:', contentType);
+    throw new Error(`Screenshot.rocks failed: ${response.status}`);
     
-    if (!contentType || !contentType.includes('image')) {
-      throw new Error(`Invalid content type: ${contentType}`);
-    }
-    
-    const imageBuffer = await response.arrayBuffer();
-    console.log('Fallback: Image buffer size:', imageBuffer.byteLength);
-    
-    if (imageBuffer.byteLength === 0) {
-      throw new Error('Empty image buffer received');
-    }
-    
-    return Buffer.from(imageBuffer);
-    
-  } catch (error) {
-    console.error('Fallback API error:', error);
-    throw error;
+  } catch (screenshotRocksError) {
+    console.warn('Fallback: Screenshot.rocks failed:', screenshotRocksError.message);
   }
+  
+  // Service 3: htmlcsstoimage.com (if API key available)
+  if (process.env.HTMLCSS_API_KEY && process.env.HTMLCSS_USER_ID) {
+    try {
+      console.log('Fallback: Trying htmlcsstoimage.com...');
+      
+      const response = await fetch('https://hcti.io/v1/image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Basic ' + Buffer.from(process.env.HTMLCSS_USER_ID + ':' + process.env.HTMLCSS_API_KEY).toString('base64')
+        },
+        body: JSON.stringify({
+          url: url,
+          viewport_width: targetWidth,
+          viewport_height: targetHeight,
+          device_scale: 1
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Download the image from the returned URL
+        const imageResponse = await fetch(data.url);
+        if (imageResponse.ok) {
+          const imageBuffer = await imageResponse.arrayBuffer();
+          console.log('Fallback: htmlcsstoimage successful');
+          return Buffer.from(imageBuffer);
+        }
+      }
+      
+    } catch (htmlcssError) {
+      console.warn('Fallback: htmlcsstoimage failed:', htmlcssError.message);
+    }
+  }
+  
+  // All services failed
+  console.error('Fallback: All screenshot services failed');
+  throw new Error('All fallback screenshot services unavailable');
 }
 
 function createPlaceholderImage() {
@@ -276,10 +355,13 @@ function createPlaceholderImage() {
       <circle cx="960" cy="400" r="80" fill="#e2e8f0"/>
       <rect x="810" y="500" width="300" height="40" fill="#e2e8f0" rx="20"/>
       <text x="960" y="580" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#64748b">
-        Screenshot nicht verfügbar
+        Screenshot wird geladen...
       </text>
       <text x="960" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#94a3b8">
-        Service temporär nicht erreichbar
+        Fallback-Service wird verwendet
+      </text>
+      <text x="960" y="650" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#cbd5e1">
+        Vercel serverless environment - Playwright unavailable
       </text>
     </svg>
   `;

@@ -3,5 +3,13 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "functions": {
+    "src/app/api/screenshot/route.js": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
