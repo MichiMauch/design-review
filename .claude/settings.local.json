@@ -20,7 +20,8 @@
       "Bash(awk:*)",
       "Bash(npx next build:*)",
       "Bash(timeout 10 npm run dev)",
-      "WebFetch(domain:frontend-economiesuisse-ch.vercel.app)"
+      "WebFetch(domain:frontend-economiesuisse-ch.vercel.app)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

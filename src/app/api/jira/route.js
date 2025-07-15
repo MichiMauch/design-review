@@ -59,8 +59,12 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   // Prepare labels
   let labels = [];
   if (defaultLabels) {
-    const customLabels = defaultLabels.split(',').map(label => label.trim()).filter(Boolean);
-    labels = customLabels;
+    if (Array.isArray(defaultLabels)) {
+      labels = defaultLabels;
+    } else if (typeof defaultLabels === 'string') {
+      const customLabels = defaultLabels.split(',').map(label => label.trim()).filter(Boolean);
+      labels = customLabels;
+    }
   }
 
   // JIRA Issue erstellen
@@ -94,10 +98,12 @@ async function createJiraTicket({ feedback, jiraConfig }) {
             type: "paragraph",
             content: [{ type: "text", text: `URL: ${feedback.url}` }]
           },
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: `Erstellt am: ${new Date(feedback.created_at).toLocaleString('de-DE')}` }]
-          },
+          ...(feedback.translation ? [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: `English Translation: ${feedback.translation}` }]
+            }
+          ] : []),
           {
             type: "heading",
             attrs: { level: 1 },
@@ -148,6 +154,11 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   // Due Date hinzufügen falls berechnet
   if (dueDate) {
     issueData.fields.duedate = dueDate;
+  }
+
+  // Sprint hinzufügen falls ausgewählt
+  if (selectedSprint && selectedSprint.trim()) {
+    issueData.fields.customfield_10020 = parseInt(selectedSprint.trim()); // Standard Sprint field
   }
 
   // Bereich-Informationen hinzufügen falls vorhanden
@@ -322,15 +333,6 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
 
     const imageContent = [
       {
-        type: "paragraph",
-        content: [
-          {
-            type: "text",
-            text: "Screenshot:"
-          }
-        ]
-      },
-      {
         type: "mediaGroup",
         content: [
           {
@@ -387,7 +389,7 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
             content: [
               {
                 type: "text",
-                text: `Screenshot: ${attachment.filename} (siehe Anhang)`
+                text: `Anhang: ${attachment.filename}`
               }
             ]
           }

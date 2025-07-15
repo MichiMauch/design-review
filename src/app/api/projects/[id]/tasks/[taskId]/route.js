@@ -11,6 +11,10 @@ export async function OPTIONS() {
   return addCorsHeaders(new Response(null, { status: 200 }));
 }
 
+export async function PATCH(request, { params }) {
+  return PUT(request, { params });
+}
+
 export async function PUT(request, { params }) {
   try {
     const resolvedParams = await params;

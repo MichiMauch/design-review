@@ -35,12 +35,7 @@ export default function ProjectPage() {
   const [creatingJira, setCreatingJira] = useState(null);
   const [showJiraModal, setShowJiraModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [jiraTaskForm, setJiraTaskForm] = useState({
-    assignee: '',
-    sprint: '',
-    board: ''
-  });
-  const [showJiraSettings, setShowJiraSettings] = useState(false);
+  const [jiraConfigOpen, setJiraConfigOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingTask, setDeletingTask] = useState(null);
@@ -51,23 +46,55 @@ export default function ProjectPage() {
     username: '',
     apiToken: '',
     projectKey: '',
-    issueType: 'Task',
-    defaultAssignee: '',
-    selectedSprint: '',
-    selectedBoardId: ''
+    issueType: 'Task'
   });
-  const [jiraData, setJiraData] = useState({
-    projects: [],
-    users: [],
-    boards: [],
-    sprints: []
+  const [jiraTaskData, setJiraTaskData] = useState({
+    title: '',
+    description: '',
+    assignee: '',
+    sprint: '',
+    labels: ''
   });
+  const [jiraUsers, setJiraUsers] = useState([]);
+  const [jiraSprintsOptions, setJiraSprintsOptions] = useState([]);
+  const [loadingJiraData, setLoadingJiraData] = useState(false);
   const [jiraStatuses, setJiraStatuses] = useState({});
+  const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget.js" data-project-id="${project.name}" defer></script>` :
     '';
+
+  // Load JIRA config from localStorage on component mount
+  useEffect(() => {
+    const savedJiraConfig = localStorage.getItem('jiraConfig');
+    if (savedJiraConfig) {
+      try {
+        setJiraConfig(JSON.parse(savedJiraConfig));
+      } catch (error) {
+        console.error('Error loading JIRA config from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Load project and tasks when component mounts or params change
+  useEffect(() => {
+    if (params.id) {
+      loadProject();
+      loadTasks();
+      checkWidgetStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
+
+  // Load JIRA statuses when tasks or jiraConfig changes
+  useEffect(() => {
+    if (tasks.length > 0 && jiraConfig.serverUrl) {
+      loadJiraStatuses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, jiraConfig]);
 
   const loadProject = async () => {
     try {
@@ -270,11 +297,6 @@ export default function ProjectPage() {
     setShowTaskDeleteConfirm(true);
   };
 
-  // Also keep the old name for compatibility
-  const confirmDeleteTask = (task) => {
-    setTaskToDelete(task);
-    setShowTaskDeleteConfirm(true);
-  };
 
   // Delete task function
   const deleteTask = async () => {
@@ -303,6 +325,49 @@ export default function ProjectPage() {
     }
   };
 
+  const saveJiraConfig = async () => {
+    try {
+      // Save JIRA config to localStorage
+      localStorage.setItem('jiraConfig', JSON.stringify(jiraConfig));
+      showToast('JIRA-Konfiguration gespeichert!', 'success');
+      setJiraConfigOpen(false);
+    } catch (error) {
+      console.error('Error saving JIRA config:', error);
+      showToast('Fehler beim Speichern der JIRA-Konfiguration', 'error');
+    }
+  };
+
+  const testJiraConnection = async () => {
+    try {
+      showToast('Teste JIRA-Verbindung...', 'info');
+      
+      // Test the JIRA connection
+      const response = await fetch('/api/jira', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'testConnection',
+          serverUrl: jiraConfig.serverUrl,
+          username: jiraConfig.username,
+          apiToken: jiraConfig.apiToken,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('JIRA-Verbindung erfolgreich!', 'success');
+      } else {
+        showToast(`JIRA-Verbindung fehlgeschlagen: ${result.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error testing JIRA connection:', error);
+      showToast('Fehler beim Testen der JIRA-Verbindung', 'error');
+    }
+  };
+
   const loadJiraStatuses = async () => {
     const tasksWithJira = tasks.filter(task => task.jira_key);
     if (tasksWithJira.length === 0 || !jiraConfig.serverUrl || !jiraConfig.username || !jiraConfig.apiToken) {
@@ -325,7 +390,7 @@ export default function ProjectPage() {
         console.log(`JIRA status response for ${task.jira_key}:`, data);
         
         if (data.success) {
-          return { taskId: task.id, status: data.status };
+          return { taskId: task.id, status: data.status, sprint: data.sprint };
         } else {
           console.warn(`JIRA status failed for ${task.jira_key}:`, data.error);
         }
@@ -337,47 +402,18 @@ export default function ProjectPage() {
 
     const results = await Promise.all(statusPromises);
     const statusMap = {};
+    const sprintMap = {};
     results.filter(Boolean).forEach(result => {
       statusMap[result.taskId] = result.status;
+      if (result.sprint) {
+        sprintMap[result.taskId] = result.sprint;
+      }
     });
     
     console.log('Final JIRA status map:', statusMap);
+    console.log('Final JIRA sprint map:', sprintMap);
     setJiraStatuses(statusMap);
-  };
-
-  const updateTaskJiraKey = async (taskId, jiraKey) => {
-    try {
-      console.log('Updating task JIRA key:', { taskId, jiraKey, projectId: params.id });
-      
-      const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          jira_key: jiraKey
-        })
-      });
-
-      console.log('Update response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to update task JIRA key in database. Status:', response.status, 'Response:', errorText);
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          console.error('Parsed error data:', errorData);
-        } catch {
-          console.error('Could not parse error response as JSON');
-        }
-      } else {
-        const successData = await response.json();
-        console.log('JIRA key update successful:', successData);
-      }
-    } catch (error) {
-      console.error('Error updating task JIRA key:', error);
-    }
+    setJiraTaskSprints(sprintMap);
   };
 
   const startEditing = (task) => {
@@ -428,92 +464,109 @@ export default function ProjectPage() {
 
   const openJiraModal = async (task) => {
     try {
-      // Get project-specific JIRA settings
-      const settingsResponse = await fetch(`/api/settings?key=jira_config_project_${params.id}`);
-      const settingsData = await settingsResponse.json();
-      
-      if (!settingsData.success || !settingsData.setting) {
+      // Check if JIRA is configured in localStorage
+      if (!jiraConfig.serverUrl || !jiraConfig.username || !jiraConfig.apiToken || !jiraConfig.projectKey) {
         showToast('Bitte konfigurieren Sie zuerst die JIRA-Einstellungen für dieses Projekt.', 'error');
+        setJiraConfigOpen(true);
         return;
       }
 
       setSelectedTask(task);
-      setJiraTaskForm({ assignee: '', sprint: '', board: '' });
-      setShowJiraModal(true);
+      setJiraTaskData({
+        title: task.title,
+        description: task.description || '',
+        assignee: '',
+        sprint: '',
+        labels: ''
+      });
       
-      // Load JIRA data for modal
-      const config = settingsData.setting.value;
-      await loadJiraDataForModal(config);
+      // Load JIRA users and sprints before showing modal
+      setLoadingJiraData(true);
+      await Promise.all([
+        loadJiraUsers(),
+        loadJiraSprints()
+      ]);
+      setLoadingJiraData(false);
+      
+      setShowJiraModal(true);
       
     } catch (error) {
       console.error('Error opening JIRA modal:', error);
+      setLoadingJiraData(false);
       showToast('Fehler beim Laden der JIRA-Daten', 'error');
     }
   };
 
-  const loadJiraDataForModal = async (config) => {
+  const loadJiraUsers = async () => {
     try {
-      // Load users and boards
-      const [usersResponse, boardsResponse] = await Promise.all([
-        fetch(`/api/jira?action=getUsers&serverUrl=${encodeURIComponent(config.serverUrl)}&username=${encodeURIComponent(config.username)}&apiToken=${encodeURIComponent(config.apiToken)}&projectKey=${encodeURIComponent(config.projectKey)}`),
-        fetch(`/api/jira?action=getBoards&serverUrl=${encodeURIComponent(config.serverUrl)}&username=${encodeURIComponent(config.username)}&apiToken=${encodeURIComponent(config.apiToken)}&projectKey=${encodeURIComponent(config.projectKey)}`)
-      ]);
+      const params = new URLSearchParams({
+        action: 'getUsers',
+        serverUrl: jiraConfig.serverUrl,
+        username: jiraConfig.username,
+        apiToken: jiraConfig.apiToken,
+        projectKey: jiraConfig.projectKey
+      });
 
-      const [usersData, boardsData] = await Promise.all([
-        usersResponse.json(),
-        boardsResponse.json()
-      ]);
+      const response = await fetch(`/api/jira?${params}`, {
+        method: 'GET',
+      });
 
-      if (usersData.success) {
-        setJiraData(prev => ({ ...prev, users: usersData.users }));
+      const result = await response.json();
+      if (result.success && result.users) {
+        setJiraUsers(result.users);
       }
+    } catch (error) {
+      console.error('Error loading JIRA users:', error);
+    }
+  };
 
-      if (boardsData.success) {
-        setJiraData(prev => ({ ...prev, boards: boardsData.boards }));
+  const loadJiraSprints = async () => {
+    try {
+      // First get boards for the project
+      const boardsParams = new URLSearchParams({
+        action: 'getBoards',
+        serverUrl: jiraConfig.serverUrl,
+        username: jiraConfig.username,
+        apiToken: jiraConfig.apiToken,
+        projectKey: jiraConfig.projectKey
+      });
+
+      const boardsResponse = await fetch(`/api/jira?${boardsParams}`, {
+        method: 'GET',
+      });
+
+      const boardsResult = await boardsResponse.json();
+      if (boardsResult.success && boardsResult.boards && boardsResult.boards.length > 0) {
+        const boardId = boardsResult.boards[0].id; // Use first board
         
-        // Auto-select first board and load its sprints
-        if (boardsData.boards.length > 0) {
-          const firstBoard = boardsData.boards[0];
-          setJiraTaskForm(prev => ({ ...prev, board: firstBoard.id }));
-          await loadSprintsForBoard(config, firstBoard.id);
+        // Now get sprints for this board
+        const sprintsParams = new URLSearchParams({
+          action: 'getSprints',
+          serverUrl: jiraConfig.serverUrl,
+          username: jiraConfig.username,
+          apiToken: jiraConfig.apiToken,
+          boardId: boardId
+        });
+
+        const sprintsResponse = await fetch(`/api/jira?${sprintsParams}`, {
+          method: 'GET',
+        });
+
+        const sprintsResult = await sprintsResponse.json();
+        if (sprintsResult.success && sprintsResult.sprints) {
+          setJiraSprintsOptions(sprintsResult.sprints);
         }
       }
     } catch (error) {
-      console.error('Error loading JIRA data:', error);
+      console.error('Error loading JIRA sprints:', error);
     }
   };
 
-  const loadSprintsForBoard = async (config, boardId) => {
-    try {
-      const response = await fetch(`/api/jira?action=getSprints&serverUrl=${encodeURIComponent(config.serverUrl)}&username=${encodeURIComponent(config.username)}&apiToken=${encodeURIComponent(config.apiToken)}&boardId=${encodeURIComponent(boardId)}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setJiraData(prev => ({ ...prev, sprints: data.sprints }));
-      }
-    } catch (error) {
-      console.error('Error loading sprints:', error);
-    }
-  };
-
-  const createJiraTaskWithOptions = async () => {
+  const createJiraTask = async () => {
     if (!selectedTask) return;
     
     setCreatingJira(selectedTask.id);
     try {
-      // Get project-specific JIRA settings
-      const settingsResponse = await fetch(`/api/settings?key=jira_config_project_${params.id}`);
-      const settingsData = await settingsResponse.json();
-      const jiraConfig = settingsData.setting.value;
-
-      // Add selected options to config
-      const configWithOptions = {
-        ...jiraConfig,
-        defaultAssignee: jiraTaskForm.assignee,
-        selectedSprint: jiraTaskForm.sprint,
-        selectedBoardId: jiraTaskForm.board
-      };
-
       const response = await fetch('/api/jira', {
         method: 'POST',
         headers: {
@@ -522,54 +575,48 @@ export default function ProjectPage() {
         body: JSON.stringify({
           action: 'createTicket',
           feedback: {
-            title: selectedTask.title.replace(/\r?\n/g, ' '),
-            description: selectedTask.description || '',
+            title: jiraTaskData.title || selectedTask.title,
+            description: jiraTaskData.description || selectedTask.description || '',
             url: selectedTask.url,
             screenshot: selectedTask.screenshot ? (
               selectedTask.screenshot.startsWith('http') 
                 ? selectedTask.screenshot 
                 : getScreenshotUrl(selectedTask.screenshot)
-            ) : null,
-            created_at: selectedTask.created_at,
-            selected_area: selectedTask.selected_area,
-            id: selectedTask.id
+            ) : null
           },
-          jiraConfig: configWithOptions
+          jiraConfig: {
+            ...jiraConfig,
+            defaultAssignee: jiraTaskData.assignee,
+            selectedSprint: jiraTaskData.sprint,
+            defaultLabels: jiraTaskData.labels ? jiraTaskData.labels.split(',').map(l => l.trim()) : []
+          }
         })
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.ticket) {
-          // Update task in local state with JIRA key only
-          setTasks(tasks.map(task => 
-            task.id === selectedTask.id 
-              ? { 
-                  ...task, 
-                  jira_key: result.ticket.key
-                }
-              : task
-          ));
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update task with JIRA key
+        const updateResponse = await fetch(`/api/projects/${params.id}/tasks/${selectedTask.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            jira_key: result.jiraKey || result.ticket?.key,
+            jira_url: result.jiraUrl || result.ticket?.url
+          })
+        });
 
-          // Update in database (only JIRA key)
-          await updateTaskJiraKey(selectedTask.id, result.ticket.key);
-
-          showToast(
-            'JIRA-Task erfolgreich erstellt!', 
-            'success',
-            {
-              url: result.ticket.url,
-              text: `${result.ticket.key} öffnen →`
-            }
-          );
+        if (updateResponse.ok) {
+          showToast(`JIRA-Task erfolgreich erstellt: ${result.jiraKey || result.ticket?.key}`, 'success');
           setShowJiraModal(false);
+          loadTasks(); // Refresh tasks
         } else {
-          showToast('JIRA-Task wurde erstellt, aber Antwort ist unvollständig.', 'warning');
+          showToast('Task erstellt, aber Update fehlgeschlagen', 'error');
         }
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to create JIRA task:', response.status, errorData);
-        showToast('Fehler beim Erstellen des JIRA-Tasks: ' + (errorData.error || 'Unbekannter Fehler'), 'error');
+        showToast(`Fehler beim Erstellen: ${result.error}`, 'error');
       }
     } catch (error) {
       console.error('Error creating JIRA task:', error);
@@ -639,114 +686,6 @@ export default function ProjectPage() {
         </div>
       )}
 
-      {/* JIRA Task Creation Modal */}
-      {showJiraModal && selectedTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">JIRA-Task erstellen</h3>
-            
-            <div className="mb-4">
-              <h4 className="font-medium text-gray-900 mb-2">{selectedTask.title}</h4>
-              {selectedTask.description && (
-                <p className="text-sm text-gray-600 mb-2">{selectedTask.description}</p>
-              )}
-              <p className="text-xs text-gray-500">{selectedTask.url}</p>
-            </div>
-
-            <div className="space-y-4">
-              {/* Assignee Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Zuweisen an
-                </label>
-                <select
-                  value={jiraTaskForm.assignee}
-                  onChange={(e) => setJiraTaskForm({ ...jiraTaskForm, assignee: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Nicht zuweisen</option>
-                  {jiraData.users.map(user => (
-                    <option key={user.accountId} value={user.accountId}>
-                      {user.displayName} ({user.emailAddress})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Board Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Board
-                </label>
-                <select
-                  value={jiraTaskForm.board}
-                  onChange={async (e) => {
-                    const boardId = e.target.value;
-                    setJiraTaskForm({ ...jiraTaskForm, board: boardId, sprint: '' });
-                    if (boardId) {
-                      const settingsResponse = await fetch(`/api/settings?key=jira_config_project_${params.id}`);
-                      const settingsData = await settingsResponse.json();
-                      await loadSprintsForBoard(settingsData.setting.value, boardId);
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Board auswählen</option>
-                  {jiraData.boards.map(board => (
-                    <option key={board.id} value={board.id}>
-                      {board.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sprint Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sprint
-                </label>
-                <select
-                  value={jiraTaskForm.sprint}
-                  onChange={(e) => setJiraTaskForm({ ...jiraTaskForm, sprint: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  disabled={!jiraTaskForm.board}
-                >
-                  <option value="">Kein Sprint (Backlog)</option>
-                  {jiraData.sprints.map(sprint => (
-                    <option key={sprint.id} value={sprint.id}>
-                      {sprint.name} ({sprint.state})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={createJiraTaskWithOptions}
-                disabled={creatingJira === selectedTask.id}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded font-medium"
-              >
-                {creatingJira === selectedTask.id ? (
-                  <>
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Erstelle...
-                  </>
-                ) : (
-                  'JIRA-Task erstellen'
-                )}
-              </button>
-              <button
-                onClick={() => setShowJiraModal(false)}
-                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded font-medium"
-                disabled={creatingJira === selectedTask.id}
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
@@ -992,7 +931,7 @@ export default function ProjectPage() {
                           {!task.jira_key && (
                             <button
                               onClick={() => openJiraModal(task)}
-                              disabled={creatingJira === task.id}
+                              disabled={creatingJira === task.id || loadingJiraData}
                               className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
                               title="JIRA-Task erstellen"
                             >
@@ -1000,6 +939,11 @@ export default function ProjectPage() {
                                 <>
                                   <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                   Erstelle...
+                                </>
+                              ) : loadingJiraData ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  Lade...
                                 </>
                               ) : (
                                 <>
@@ -1046,36 +990,41 @@ export default function ProjectPage() {
                 <div className="space-y-2">
                   {tasks.filter(task => task.jira_key).map((task) => (
                     <div key={task.id} className="bg-gray-50 rounded p-3 border border-gray-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <a
-                          href={`${jiraConfig.serverUrl}/browse/${task.jira_key}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          {task.jira_key}
-                        </a>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="w-full max-w-xs">
+                          <div className="mb-1">
+                            <a
+                              href={`${jiraConfig.serverUrl}/browse/${task.jira_key}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              {task.jira_key}
+                            </a>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2">
                           {jiraStatuses[task.id] && (
                             <span className={`inline-flex px-2 py-1 rounded text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}>
                               {jiraStatuses[task.id].name}
                             </span>
                           )}
-                          <button
-                            onClick={() => confirmDeleteTask(task)}
-                            disabled={deletingTask === task.id}
-                            className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                            title="Task löschen"
-                          >
-                            {deletingTask === task.id ? (
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-400"></div>
-                            ) : (
-                              <X className="h-3 w-3" />
-                            )}
-                          </button>
                         </div>
                       </div>
+                      {jiraTaskSprints[task.id] && (
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="w-full max-w-xs">
+                            <div className="mb-1">
+                              <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300">
+                                {jiraTaskSprints[task.id].name}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                          </div>
+                        </div>
+                      )}
                       <p className="text-sm text-gray-700 font-medium mb-1">{task.title}</p>
                       <p className="text-xs text-gray-500">{formatTime(task.created_at)}</p>
                     </div>
@@ -1150,7 +1099,7 @@ export default function ProjectPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900">JIRA Integration</h3>
                 <button
-                  onClick={() => setShowJiraSettings(!showJiraSettings)}
+                  onClick={() => setJiraConfigOpen(!jiraConfigOpen)}
                   className="p-1 text-gray-400 hover:text-gray-600 rounded"
                   title="JIRA-Einstellungen"
                 >
@@ -1158,7 +1107,7 @@ export default function ProjectPage() {
                 </button>
               </div>
                 
-              {showJiraSettings ? (
+              {jiraConfigOpen ? (
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1254,69 +1203,6 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* JIRA Modal */}
-        {showJiraModal && selectedTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">JIRA-Task erstellen</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Titel
-                  </label>
-                  <input
-                    type="text"
-                    value={jiraTaskData.title}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Task-Titel"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Beschreibung
-                  </label>
-                  <textarea
-                    value={jiraTaskData.description}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                    rows="4"
-                    placeholder="Beschreibung des Tasks"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={createJiraTask}
-                  disabled={!jiraTaskData.title || creatingJira}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg"
-                >
-                  {creatingJira ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Erstelle...
-                    </>
-                  ) : (
-                    <>
-                      <JiraIcon className="h-4 w-4" />
-                      Erstellen
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowJiraModal(false)}
-                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1398,6 +1284,118 @@ export default function ProjectPage() {
                   }}
                   disabled={deletingTask === taskToDelete.id}
                   className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* JIRA Modal */}
+        {showJiraModal && selectedTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">JIRA-Task erstellen</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Titel
+                  </label>
+                  <input
+                    type="text"
+                    value={jiraTaskData.title}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, title: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Task-Titel"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Beschreibung
+                  </label>
+                  <textarea
+                    value={jiraTaskData.description}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                    rows="4"
+                    placeholder="Beschreibung des Tasks"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Zugewiesen an
+                  </label>
+                  <select
+                    value={jiraTaskData.assignee}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, assignee: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Nicht zugewiesen</option>
+                    {jiraUsers.map(user => (
+                      <option key={user.accountId} value={user.accountId}>
+                        {user.displayName} ({user.emailAddress})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sprint
+                  </label>
+                  <select
+                    value={jiraTaskData.sprint}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, sprint: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Kein Sprint</option>
+                    {jiraSprintsOptions.map(sprint => (
+                      <option key={sprint.id} value={sprint.id}>
+                        {sprint.name} ({sprint.state})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Labels (kommagetrennt)
+                  </label>
+                  <input
+                    type="text"
+                    value={jiraTaskData.labels}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, labels: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="label1, label2, label3"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={createJiraTask}
+                  disabled={!jiraTaskData.title || creatingJira}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  {creatingJira ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Erstelle...
+                    </>
+                  ) : (
+                    <>
+                      <JiraIcon className="h-4 w-4" />
+                      Erstellen
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowJiraModal(false)}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
                 >
                   Abbrechen
                 </button>
