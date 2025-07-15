@@ -1,15 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getDb, initDatabase } from '../../../../lib/db.js';
 
+// Add CORS headers
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders(),
+  });
+}
+
 export async function POST(request) {
   try {
     const data = await request.json();
     
     // Validate required fields
-    if (!data.text || !data.url || !data.projectId) {
+    if (!data.text || !data.url || !data.project_id) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
 
@@ -25,9 +42,9 @@ export async function POST(request) {
         data.text,
         data.url,
         data.screenshot || null,
-        data.userAgent || '',
-        data.projectId,
-        data.selectedArea ? JSON.stringify(data.selectedArea) : null
+        data.user_agent || '',
+        data.project_id,
+        data.selected_area ? JSON.stringify(data.selected_area) : null
       ]
     });
 
@@ -35,6 +52,8 @@ export async function POST(request) {
       success: true,
       id: Number(result.lastInsertRowid),
       message: 'Feedback saved successfully'
+    }, {
+      headers: corsHeaders()
     });
 
   } catch (error) {
@@ -53,7 +72,7 @@ export async function POST(request) {
     
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
@@ -78,6 +97,8 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       feedback: result.rows
+    }, {
+      headers: corsHeaders()
     });
 
   } catch (error) {
@@ -90,6 +111,8 @@ export async function GET(request) {
         return NextResponse.json({
           success: true,
           feedback: []
+        }, {
+          headers: corsHeaders()
         });
       } catch (initError) {
         console.error('Database initialization failed:', initError);
@@ -98,7 +121,7 @@ export async function GET(request) {
     
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

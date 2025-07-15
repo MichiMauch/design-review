@@ -305,7 +305,35 @@
                 allowTaint: false,
                 scale: 1,
                 logging: false,
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                ignoreElements: (element) => {
+                    // Skip elements that might cause issues
+                    if (element.style && element.style.color && element.style.color.includes('oklab')) {
+                        return true;
+                    }
+                    if (element.style && element.style.backgroundColor && element.style.backgroundColor.includes('oklab')) {
+                        return true;
+                    }
+                    return false;
+                },
+                onclone: (clonedDoc) => {
+                    // Remove problematic CSS that html2canvas can't handle
+                    const elements = clonedDoc.querySelectorAll('*');
+                    elements.forEach(el => {
+                        if (el.style) {
+                            // Replace oklab colors with fallback
+                            if (el.style.color && el.style.color.includes('oklab')) {
+                                el.style.color = '#000000';
+                            }
+                            if (el.style.backgroundColor && el.style.backgroundColor.includes('oklab')) {
+                                el.style.backgroundColor = '#ffffff';
+                            }
+                            // Remove CSS features that might cause issues
+                            el.style.colorScheme = '';
+                            el.style.accentColor = '';
+                        }
+                    });
+                }
             });
             
             // Restore widget elements
