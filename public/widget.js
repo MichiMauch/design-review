@@ -473,7 +473,7 @@
           url: window.location.href,
           selectedArea: this.selectedArea
         }),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(10000) // Reduced to 10 seconds
       });
 
       if (!response.ok) {

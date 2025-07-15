@@ -42,6 +42,27 @@ export async function POST(request, { params }) {
     await initDatabase();
     const db = getDb();
 
+    // Handle both numeric IDs and project names
+    let projectId = resolvedParams.id;
+    
+    // If the ID is not numeric, treat it as a project name and find the actual ID
+    if (isNaN(Number(projectId))) {
+      // Decode URL-encoded project name
+      const projectName = decodeURIComponent(projectId);
+      
+      const projectResult = await db.execute({
+        sql: 'SELECT id FROM projects WHERE name = ?',
+        args: [projectName]
+      });
+
+      if (projectResult.rows.length === 0) {
+        console.error('Project not found:', projectName);
+        return addCorsHeaders(new Response(`Project '${projectName}' nicht gefunden`, { status: 404 }));
+      }
+
+      projectId = projectResult.rows[0].id;
+    }
+
     // Get current German time with proper timezone info
     const now = new Date();
     const germanTime = new Intl.DateTimeFormat('sv-SE', {
@@ -60,7 +81,7 @@ export async function POST(request, { params }) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       args: [
-        resolvedParams.id,
+        projectId, // Now using the resolved numeric project ID
         title,
         description || null,
         screenshot || null,
@@ -76,7 +97,7 @@ export async function POST(request, { params }) {
 
     return addCorsHeaders(Response.json({
       id: taskId,
-      project_id: Number(resolvedParams.id),
+      project_id: Number(projectId),
       title,
       description,
       screenshot,
@@ -90,6 +111,11 @@ export async function POST(request, { params }) {
 
   } catch (error) {
     console.error('Error creating task:', error);
-    return addCorsHeaders(new Response('Fehler beim Erstellen der Task', { status: 500 }));
+    console.error('Error details:', {
+      projectId: resolvedParams?.id,
+      error: error.message,
+      stack: error.stack
+    });
+    return addCorsHeaders(new Response(`Fehler beim Erstellen der Task: ${error.message}`, { status: 500 }));
   }
 }

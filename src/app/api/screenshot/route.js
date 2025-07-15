@@ -34,7 +34,7 @@ export async function POST(request) {
       nodeHiveUrl.searchParams.set('resX', '1280');
       nodeHiveUrl.searchParams.set('resY', '900');
       nodeHiveUrl.searchParams.set('outFormat', 'png');
-      nodeHiveUrl.searchParams.set('waitTime', '2000');
+      nodeHiveUrl.searchParams.set('waitTime', '1000'); // Reduced wait time
       nodeHiveUrl.searchParams.set('isFullPage', 'false'); // Faster rendering
       
       console.log('Trying NodeHive screenshot:', nodeHiveUrl.toString());
@@ -44,7 +44,7 @@ export async function POST(request) {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         },
-        signal: AbortSignal.timeout(15000) // 15 second timeout
+        signal: AbortSignal.timeout(8000) // Reduced to 8 seconds
       });
 
       if (response.ok) {
@@ -59,12 +59,12 @@ export async function POST(request) {
     // Option 2: Try screenshot.rocks API (fallback)
     if (!imageBuffer) {
       try {
-        const screenshotUrl = `https://api.screenshot.rocks/screenshot?url=${encodeURIComponent(url)}&width=1280&height=900`;
+        const screenshotUrl = `https://api.screenshot.rocks/screenshot?url=${encodeURIComponent(url)}&width=1280&height=900&quality=80`;
         console.log('Trying screenshot.rocks:', screenshotUrl);
         
         const response = await fetch(screenshotUrl, {
           method: 'GET',
-          signal: AbortSignal.timeout(10000) // 10 second timeout
+          signal: AbortSignal.timeout(6000) // Reduced to 6 seconds
         });
 
         if (response.ok) {
