@@ -485,7 +485,11 @@
         throw new Error('Server returned fallback instruction');
       }
 
-      return { success: true, screenshot: data.screenshot };
+      // Prefer R2 URL over base64 for storage efficiency
+      const screenshotToUse = data.r2Url || data.screenshot;
+      console.log('📸 Screenshot stored at:', data.r2Url ? 'R2 URL' : 'Base64');
+      
+      return { success: true, screenshot: screenshotToUse, isR2Url: !!data.r2Url };
     }
 
     async tryClientScreenshot() {

@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
+      sql: 'SELECT *, COALESCE(screenshot_url, screenshot) as screenshot_display FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
       args: [resolvedParams.id]
     });
 
@@ -75,16 +75,25 @@ export async function POST(request, { params }) {
       second: '2-digit'
     }).format(now).replace(' ', 'T') + '+02:00'; // Add CEST timezone offset
 
+    // Determine if screenshot is a URL or base64 data
+    const isScreenshotUrl = screenshot && (screenshot.startsWith('http') || screenshot.startsWith('https'));
+    const screenshotUrl = isScreenshotUrl ? screenshot : null;
+    const screenshotBlob = !isScreenshotUrl ? screenshot : null;
+
+    console.log('Screenshot type:', isScreenshotUrl ? 'URL' : 'Base64/Blob');
+    console.log('Screenshot URL:', screenshotUrl);
+
     const result = await db.execute({
       sql: `
-        INSERT INTO tasks (project_id, title, description, screenshot, url, selected_area, title_en, description_en, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (project_id, title, description, screenshot, screenshot_url, url, selected_area, title_en, description_en, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       args: [
         projectId, // Now using the resolved numeric project ID
         title,
         description || null,
-        screenshot || null,
+        screenshotBlob || null, // Legacy screenshot field for base64 data
+        screenshotUrl || null,  // New field for R2 URLs
         url,
         selected_area ? JSON.stringify(selected_area) : null,
         title_en || null,
@@ -100,7 +109,8 @@ export async function POST(request, { params }) {
       project_id: Number(projectId),
       title,
       description,
-      screenshot,
+      screenshot: screenshotBlob,
+      screenshot_url: screenshotUrl,
       url,
       status: 'open',
       selected_area,
