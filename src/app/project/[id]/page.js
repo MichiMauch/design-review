@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getScreenshotUrl } from '../../../lib/cloudflare-r2';
 import { 
   Copy, 
   CheckCircle, 
@@ -65,6 +64,15 @@ export default function ProjectPage() {
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget.js" data-project-id="${project.name}" defer></script>` :
     '';
+
+  // Helper function to get screenshot URL
+  const getScreenshotUrl = (screenshot) => {
+    if (!screenshot) return null;
+    if (screenshot.startsWith('http')) return screenshot;
+    if (screenshot.startsWith('data:')) return screenshot;
+    // Assume it's a filename that needs to be served from the uploads endpoint
+    return `/api/uploads/${screenshot}`;
+  };
 
   // Load JIRA config from localStorage on component mount
   useEffect(() => {

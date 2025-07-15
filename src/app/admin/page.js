@@ -13,7 +13,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadFeedback();
   }, []);
-
   const loadFeedback = async () => {
     try {
       const response = await fetch('/api/feedback');

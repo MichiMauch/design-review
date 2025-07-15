@@ -1,8 +1,11 @@
-// Feedback Widget with Visual Area Screenshots
+// Feedback Widget with Real DOM Screenshots using dom-to-image
 (function() {
     'use strict';
     
-    console.log('Widget: Loading visual feedback widget');
+    console.log('Widget: Loading DOM screenshot feedback widget');
+    
+    // Load dom-to-image library
+    let domtoimage = null;
     
     // Configuration
     const script = document.currentScript || document.querySelector('script[data-project-id]');
@@ -19,9 +22,39 @@
     let currentHighlightedElement = null;
     let currentSelectionData = null;
     
+    // Load dom-to-image library dynamically
+    function loadDomToImage() {
+        return new Promise((resolve, reject) => {
+            if (window.domtoimage) {
+                domtoimage = window.domtoimage;
+                resolve();
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/dom-to-image-more@2.8.0/dist/dom-to-image-more.min.js';
+            script.onload = () => {
+                domtoimage = window.domtoimage;
+                console.log('Widget: dom-to-image loaded');
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('Widget: Failed to load dom-to-image');
+                reject(new Error('Failed to load dom-to-image'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+    
     // Initialize widget
-    function init() {
+    async function init() {
         console.log('Widget: Initializing');
+        
+        try {
+            await loadDomToImage();
+        } catch (error) {
+            console.error('Widget: Failed to load dom-to-image:', error);
+        }
         
         // Ensure DOM is ready
         if (document.readyState === 'loading') {
@@ -156,7 +189,7 @@
             z-index: 100001;
             pointer-events: none;
         `;
-        banner.textContent = 'Klicken Sie auf ein Element oder ziehen Sie einen Bereich auf. ESC zum Abbrechen.';
+        banner.textContent = '�� Klicken Sie auf ein Element oder ziehen Sie einen Bereich für einen echten Screenshot. ESC zum Abbrechen.';
         
         document.body.appendChild(overlay);
         document.body.appendChild(banner);
@@ -375,77 +408,84 @@
         return element.tagName.toLowerCase();
     }
     
-    // Create visual screenshot of selected area
-    function createVisualScreenshot() {
-        return new Promise((resolve, reject) => {
-            if (!currentSelectionData || !currentSelectionData.selectedArea) {
-                reject('No area selected');
-                return;
+    // Create real DOM screenshot of selected area
+    async function createRealScreenshot() {
+        if (!domtoimage) {
+            console.error('Widget: dom-to-image not loaded');
+            return null;
+        }
+        
+        if (!currentSelectionData || !currentSelectionData.selectedArea) {
+            console.error('Widget: No area selected');
+            return null;
+        }
+        
+        try {
+            let targetElement = null;
+            let screenshotData = null;
+            
+            if (currentSelectionData.type === 'element' && currentSelectionData.element) {
+                // Screenshot the specific element
+                targetElement = currentSelectionData.element;
+                console.log('Widget: Creating screenshot of element:', targetElement);
+                
+                screenshotData = await domtoimage.toPng(targetElement, {
+                    quality: 0.95,
+                    bgcolor: '#ffffff',
+                    style: {
+                        transform: 'scale(1)',
+                        transformOrigin: 'top left'
+                    }
+                });
+            } else {
+                // Screenshot area from document body
+                const area = currentSelectionData.selectedArea;
+                console.log('Widget: Creating screenshot of area:', area);
+                
+                // Create a temporary container that covers the selected area
+                const tempContainer = document.createElement('div');
+                tempContainer.style.cssText = `
+                    position: absolute;
+                    left: ${area.x}px;
+                    top: ${area.y}px;
+                    width: ${area.width}px;
+                    height: ${area.height}px;
+                    overflow: hidden;
+                    pointer-events: none;
+                    z-index: -1;
+                `;
+                
+                // Clone the body content into the container
+                const bodyClone = document.body.cloneNode(true);
+                
+                // Remove widget elements from the clone
+                const widgetElements = bodyClone.querySelectorAll('#feedback-widget-button, #feedback-selection-overlay, #feedback-modal');
+                widgetElements.forEach(el => el.remove());
+                
+                tempContainer.appendChild(bodyClone);
+                document.body.appendChild(tempContainer);
+                
+                try {
+                    screenshotData = await domtoimage.toPng(tempContainer, {
+                        quality: 0.95,
+                        bgcolor: '#ffffff',
+                        style: {
+                            transform: 'scale(1)',
+                            transformOrigin: 'top left'
+                        }
+                    });
+                } finally {
+                    tempContainer.remove();
+                }
             }
             
-            try {
-                const area = currentSelectionData.selectedArea;
-                
-                // Create canvas for the visual representation
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Set canvas size - minimum 400x300 for readability
-                const minWidth = 400;
-                const minHeight = 300;
-                canvas.width = Math.max(area.width, minWidth);
-                canvas.height = Math.max(area.height, minHeight);
-                
-                // Background
-                ctx.fillStyle = '#f8fafc';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Main border
-                ctx.strokeStyle = '#2563eb';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-                
-                // Title area
-                ctx.fillStyle = '#2563eb';
-                ctx.fillRect(2, 2, canvas.width - 4, 50);
-                
-                // Title text
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('Ausgewählter Bereich', canvas.width / 2, 30);
-                
-                // Info text
-                ctx.fillStyle = '#1e40af';
-                ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'center';
-                
-                const centerX = canvas.width / 2;
-                const centerY = (canvas.height + 50) / 2;
-                
-                // Area info
-                ctx.fillText(`Größe: ${Math.round(area.width)} × ${Math.round(area.height)} px`, centerX, centerY - 40);
-                ctx.fillText(`Position: ${Math.round(area.x)} px von links, ${Math.round(area.y)} px von oben`, centerX, centerY - 10);
-                ctx.fillText(`URL: ${window.location.href}`, centerX, centerY + 20);
-                
-                // Element info if available
-                if (currentSelectionData.type === 'element' && currentSelectionData.selector) {
-                    ctx.fillText(`CSS Selector: ${currentSelectionData.selector}`, centerX, centerY + 50);
-                }
-                
-                // Timestamp
-                ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.fillStyle = '#6b7280';
-                ctx.fillText(`Erstellt am: ${new Date().toLocaleString('de-DE')}`, centerX, canvas.height - 20);
-                
-                // Convert to base64
-                const dataURL = canvas.toDataURL('image/png', 0.9);
-                resolve(dataURL);
-                
-            } catch (error) {
-                reject(error);
-            }
-        });
+            console.log('Widget: Screenshot created successfully');
+            return screenshotData;
+            
+        } catch (error) {
+            console.error('Widget: Failed to create screenshot:', error);
+            return null;
+        }
     }
     
     // Show feedback modal
@@ -494,15 +534,119 @@
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         `;
         
-        // Create preview of selected area
-        createVisualScreenshot().then(screenshotData => {
+        // Show loading state first
+        modalContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
+                Feedback senden
+            </h2>
+            
+            <div style="margin-bottom: 20px; padding: 40px; text-align: center; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
+                <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p style="margin: 16px 0 0 0; color: #6b7280; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    📸 Erstelle echten Screenshot...
+                </p>
+            </div>
+            
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+        
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        
+        // Create screenshot and update modal
+        createRealScreenshot().then(screenshotData => {
+            const area = currentSelectionData?.selectedArea;
+            const hasScreenshot = screenshotData && screenshotData !== null;
+            
             modalContent.innerHTML = `
                 <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
                     Feedback senden
                 </h2>
                 
-                <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                    <img src="${screenshotData}" alt="Ausgewählter Bereich" style="width: 100%; height: auto; display: block;" />
+                ${hasScreenshot ? `
+                    <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #f3f4f6; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 500; color: #374151;">
+                            📸 Echter Screenshot des ausgewählten Bereichs
+                        </div>
+                        <img src="${screenshotData}" alt="Screenshot des ausgewählten Bereichs" style="width: 100%; height: auto; display: block; max-height: 300px; object-fit: contain;" />
+                    </div>
+                ` : `
+                    <div style="margin-bottom: 20px; padding: 20px; text-align: center; border: 1px solid #fbbf24; border-radius: 8px; background: #fef3c7;">
+                        <p style="margin: 0; color: #92400e; font-size: 14px;">
+                            ⚠️ Screenshot konnte nicht erstellt werden, aber Koordinaten sind verfügbar.
+                        </p>
+                    </div>
+                `}
+                
+                ${area ? `
+                    <div style="margin-bottom: 20px; padding: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 12px; color: #1e40af;">
+                        <strong>Bereich-Info:</strong> ${Math.round(area.width)} × ${Math.round(area.height)} px bei (${Math.round(area.x)}, ${Math.round(area.y)})
+                        ${currentSelectionData.selector ? `<br><strong>CSS Selector:</strong> ${currentSelectionData.selector}` : ''}
+                    </div>
+                ` : ''}
+                
+                <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <label for="feedback-title" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                            Titel *
+                        </label>
+                        <input 
+                            type="text" 
+                            id="feedback-title" 
+                            required
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; box-sizing: border-box;"
+                            placeholder="Kurze Beschreibung des Problems oder Vorschlags"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label for="feedback-description" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                            Beschreibung
+                        </label>
+                        <textarea 
+                            id="feedback-description" 
+                            rows="4"
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;"
+                            placeholder="Detaillierte Beschreibung..."
+                        ></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                        <button 
+                            type="button" 
+                            id="cancel-feedback"
+                            style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; cursor: pointer;"
+                        >
+                            Abbrechen
+                        </button>
+                        <button 
+                            type="submit" 
+                            id="submit-feedback"
+                            style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
+                        >
+                            📸 Mit Screenshot senden
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            setupModalEvents(screenshotData);
+        }).catch(error => {
+            console.error('Widget: Screenshot creation failed:', error);
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
+                    Feedback senden
+                </h2>
+                
+                <div style="margin-bottom: 20px; padding: 20px; text-align: center; border: 1px solid #ef4444; border-radius: 8px; background: #fef2f2;">
+                    <p style="margin: 0; color: #dc2626; font-size: 14px;">
+                        ❌ Screenshot konnte nicht erstellt werden.
+                    </p>
                 </div>
                 
                 <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
@@ -550,74 +694,18 @@
                 </form>
             `;
             
-            setupModalEvents();
-        }).catch(error => {
-            console.error('Widget: Failed to create screenshot:', error);
-            modalContent.innerHTML = `
-                <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
-                    Feedback senden
-                </h2>
-                
-                <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
-                    <div>
-                        <label for="feedback-title" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
-                            Titel *
-                        </label>
-                        <input 
-                            type="text" 
-                            id="feedback-title" 
-                            required
-                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; box-sizing: border-box;"
-                            placeholder="Kurze Beschreibung des Problems oder Vorschlags"
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="feedback-description" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
-                            Beschreibung
-                        </label>
-                        <textarea 
-                            id="feedback-description" 
-                            rows="4"
-                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;"
-                            placeholder="Detaillierte Beschreibung..."
-                        ></textarea>
-                    </div>
-                    
-                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
-                        <button 
-                            type="button" 
-                            id="cancel-feedback"
-                            style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; cursor: pointer;"
-                        >
-                            Abbrechen
-                        </button>
-                        <button 
-                            type="submit" 
-                            id="submit-feedback"
-                            style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
-                        >
-                            Senden
-                        </button>
-                    </div>
-                </form>
-            `;
-            
-            setupModalEvents();
+            setupModalEvents(null);
         });
-        
-        modal.appendChild(modalContent);
-        document.body.appendChild(modal);
     }
     
     // Setup modal events
-    function setupModalEvents() {
+    function setupModalEvents(screenshotData) {
         if (!modal) return;
         
         const form = modal.querySelector('#feedback-form');
         const cancelBtn = modal.querySelector('#cancel-feedback');
         
-        form.addEventListener('submit', submitFeedback);
+        form.addEventListener('submit', (e) => submitFeedback(e, screenshotData));
         cancelBtn.addEventListener('click', closeModal);
         
         // Close on overlay click
@@ -647,7 +735,7 @@
     }
     
     // Submit feedback
-    function submitFeedback(e) {
+    function submitFeedback(e, screenshotData) {
         e.preventDefault();
         
         if (isSubmitting) {
@@ -677,30 +765,16 @@
         titleEl.disabled = true;
         descriptionEl.disabled = true;
         
-        // Create screenshot and submit
-        createVisualScreenshot()
-            .then(screenshotData => {
-                const requestData = {
-                    title: title,
-                    description: description,
-                    url: window.location.href,
-                    selected_area: currentSelectionData?.selectedArea || null,
-                    screenshot: screenshotData
-                };
-                
-                console.log('Widget: Submitting feedback with screenshot');
-                submitToAPI(requestData);
-            })
-            .catch(error => {
-                console.error('Widget: Failed to create screenshot:', error);
-                const requestData = {
-                    title: title,
-                    description: description,
-                    url: window.location.href,
-                    selected_area: currentSelectionData?.selectedArea || null
-                };
-                submitToAPI(requestData);
-            });
+        const requestData = {
+            title: title,
+            description: description,
+            url: window.location.href,
+            selected_area: currentSelectionData?.selectedArea || null,
+            screenshot: screenshotData || null
+        };
+        
+        console.log('Widget: Submitting feedback with real screenshot:', !!screenshotData);
+        submitToAPI(requestData);
     }
     
     // Submit to API
@@ -722,7 +796,7 @@
         })
         .then(data => {
             console.log('Widget: Feedback submitted successfully:', data);
-            showSuccess('Feedback erfolgreich gesendet!');
+            showSuccess('Feedback mit echtem Screenshot erfolgreich gesendet! 📸');
             setTimeout(() => {
                 closeModal();
             }, 1500);
@@ -735,7 +809,7 @@
             const titleEl = modal.querySelector('#feedback-title');
             const descriptionEl = modal.querySelector('#feedback-description');
             
-            if (submitBtn) submitBtn.textContent = 'Senden';
+            if (submitBtn) submitBtn.textContent = '📸 Mit Screenshot senden';
             if (submitBtn) submitBtn.disabled = false;
             if (titleEl) titleEl.disabled = false;
             if (descriptionEl) descriptionEl.disabled = false;
