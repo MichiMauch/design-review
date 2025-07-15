@@ -98,6 +98,36 @@ async function createJiraTicket({ feedback, jiraConfig }) {
             type: "paragraph",
             content: [{ type: "text", text: `URL: ${feedback.url}` }]
           },
+          ...(feedback.selected_area ? (() => {
+            try {
+              const areaData = typeof feedback.selected_area === 'string' 
+                ? JSON.parse(feedback.selected_area) 
+                : feedback.selected_area;
+              
+              const areaSize = Math.round(areaData.width) * Math.round(areaData.height);
+              const isLargeArea = areaSize > 50000;
+              const isSmallElement = areaData.width < 100 && areaData.height < 100;
+              
+              let areaDescription = `Ausgewählter Bereich: ${Math.round(areaData.width)}×${Math.round(areaData.height)}px`;
+              if (isLargeArea) areaDescription += ' (großer Bereich)';
+              if (isSmallElement) areaDescription += ' (kleines Element)';
+              areaDescription += ` - Position: ${Math.round(areaData.x)}px von links, ${Math.round(areaData.y)}px von oben`;
+              
+              return [
+                {
+                  type: "paragraph", 
+                  content: [{ type: "text", text: areaDescription }]
+                }
+              ];
+            } catch {
+              return [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Bereichs-Auswahl verfügbar" }]
+                }
+              ];
+            }
+          })() : []),
           ...(feedback.translation ? [
             {
               type: "paragraph",

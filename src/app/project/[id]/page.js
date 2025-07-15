@@ -571,19 +571,19 @@ export default function ProjectPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'createTicket',
-          feedback: {
-            title: jiraTaskData.title || selectedTask.title,
-            description: jiraTaskData.description || selectedTask.description || '',
-            url: selectedTask.url,
-            screenshot: selectedTask.screenshot ? (
-              selectedTask.screenshot.startsWith('http') 
-                ? selectedTask.screenshot 
-                : getScreenshotUrl(selectedTask.screenshot)
-            ) : null
-          },
+        },          body: JSON.stringify({
+            action: 'createTicket',
+            feedback: {
+              title: jiraTaskData.title || selectedTask.title,
+              description: jiraTaskData.description || selectedTask.description || '',
+              url: selectedTask.url,
+              selected_area: selectedTask.selected_area,
+              screenshot: selectedTask.screenshot ? (
+                selectedTask.screenshot.startsWith('http') 
+                  ? selectedTask.screenshot 
+                  : getScreenshotUrl(selectedTask.screenshot)
+              ) : null
+            },
           jiraConfig: {
             ...jiraConfig,
             defaultAssignee: jiraTaskData.assignee,
@@ -976,10 +976,37 @@ export default function ProjectPage() {
                               const areaData = typeof task.selected_area === 'string' 
                                 ? JSON.parse(task.selected_area) 
                                 : task.selected_area;
+                              
+                              const areaSize = Math.round(areaData.width) * Math.round(areaData.height);
+                              const isLargeArea = areaSize > 50000; // > 50k pixels
+                              const isSmallElement = areaData.width < 100 && areaData.height < 100;
+                              
                               return (
-                                <div className="text-xs text-blue-700 space-y-1">
-                                  <div>Position: x={Math.round(areaData.x)}, y={Math.round(areaData.y)}</div>
-                                  <div>Größe: {Math.round(areaData.width)} × {Math.round(areaData.height)} px</div>
+                                <div className="space-y-2">
+                                  <div className="text-xs text-blue-700 space-y-1">
+                                    <div>📍 Position: {Math.round(areaData.x)}px von links, {Math.round(areaData.y)}px von oben</div>
+                                    <div>📏 Größe: {Math.round(areaData.width)} × {Math.round(areaData.height)} px 
+                                      {isLargeArea && <span className="text-blue-600"> (großer Bereich)</span>}
+                                      {isSmallElement && <span className="text-blue-600"> (kleines Element)</span>}
+                                    </div>
+                                  </div>
+                                  
+                                  {task.url && (
+                                    <div className="pt-2 border-t border-blue-200">
+                                      <a
+                                        href={`${task.url}#feedback-highlight`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                      >
+                                        🔗 Seite öffnen und Bereich anzeigen
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                      <div className="text-xs text-blue-600 mt-1">
+                                        💡 Tipp: Entwickler können mit diesen Koordinaten den exakten Bereich im Browser-DevTools finden
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             } catch {
