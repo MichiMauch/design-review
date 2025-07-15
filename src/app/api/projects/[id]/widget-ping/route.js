@@ -40,7 +40,7 @@ export async function POST(request, { params }) {
     }
 }
 
-export async function OPTIONS(request) {
+export async function OPTIONS() {
     // Handle preflight requests
     return new NextResponse(null, {
         status: 200,
