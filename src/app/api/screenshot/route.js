@@ -14,7 +14,7 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
-    const { url, selectedArea } = await request.json();
+    const { url, width = 1920, height = 1080, quality = 90 } = await request.json();
 
     if (!url) {
       return addCorsHeaders(NextResponse.json(
@@ -23,28 +23,32 @@ export async function POST(request) {
       ));
     }
 
+    console.log('Screenshot API: Creating screenshot for URL:', url);
+
     // Multiple screenshot service fallbacks for reliability
     let imageBuffer = null;
     let method = 'unknown';
 
-    // Option 1: Try NodeHive API (primary)
+    // Option 1: Try NodeHive API (primary) - FIXED VERSION
     try {
       const nodeHiveUrl = new URL('https://preview.nodehive.com/api/screenshot');
-      nodeHiveUrl.searchParams.set('url', encodeURIComponent(url));
-      nodeHiveUrl.searchParams.set('resX', '1280');
-      nodeHiveUrl.searchParams.set('resY', '900');
+      nodeHiveUrl.searchParams.set('url', url); // Don't double-encode
+      nodeHiveUrl.searchParams.set('resX', width.toString());
+      nodeHiveUrl.searchParams.set('resY', height.toString());
       nodeHiveUrl.searchParams.set('outFormat', 'png');
-      nodeHiveUrl.searchParams.set('waitTime', '1000'); // Reduced wait time
-      nodeHiveUrl.searchParams.set('isFullPage', 'false'); // Faster rendering
+      nodeHiveUrl.searchParams.set('waitTime', '2000');
+      nodeHiveUrl.searchParams.set('isFullPage', 'false');
       
-      console.log('Trying NodeHive screenshot:', nodeHiveUrl.toString());
+      console.log('Screenshot API: Trying NodeHive:', nodeHiveUrl.toString());
 
       const response = await fetch(nodeHiveUrl.toString(), {
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/png,image/*,*/*',
+          'Cache-Control': 'no-cache'
         },
-        signal: AbortSignal.timeout(8000) // Reduced to 8 seconds
+        signal: AbortSignal.timeout(15000) // 15 seconds
       });
 
       if (response.ok) {
@@ -139,7 +143,6 @@ export async function POST(request) {
       screenshot: dataUrl,
       r2Url: r2Result.url,
       r2Filename: r2Result.filename,
-      selectedArea: selectedArea || null,
       method: method
     }));
 

@@ -189,46 +189,46 @@
             // Show loading modal
             showLoadingModal();
             
-            // Create screenshot with timeout
-            const screenshotUrl = `https://preview.nodehive.com/api/screenshot?url=${encodeURIComponent(window.location.href)}&width=1920&height=1080&format=jpeg&quality=90`;
+            // Use our own backend to create screenshot
+            const screenshotUrl = `${baseUrl}/api/screenshot`;
             
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            console.log('Widget: Requesting screenshot from:', screenshotUrl);
             
             const response = await fetch(screenshotUrl, {
-                signal: controller.signal
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: window.location.href,
+                    width: 1920,
+                    height: 1080,
+                    quality: 90
+                })
             });
             
-            clearTimeout(timeoutId);
-            
             if (!response.ok) {
-                throw new Error(`Screenshot API returned ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`Screenshot API returned ${response.status}: ${errorText}`);
             }
             
-            const blob = await response.blob();
-            const screenshotDataURL = await blobToDataURL(blob);
+            const result = await response.json();
             
-            console.log('Widget: Screenshot created, showing annotation interface');
+            if (!result.success || !result.screenshot) {
+                throw new Error('Screenshot API did not return valid data');
+            }
+            
+            console.log('Widget: Screenshot created successfully, showing annotation interface');
             
             // Close loading modal and show annotation interface
             closeLoadingModal();
-            showAnnotationInterface(screenshotDataURL);
+            showAnnotationInterface(result.screenshot);
             
         } catch (error) {
             console.error('Widget: Screenshot creation failed:', error);
             closeLoadingModal();
             showFeedbackModal(null); // Show feedback modal without screenshot
         }
-    }
-    
-    // Convert blob to data URL
-    function blobToDataURL(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
     }
     
     // Show loading modal
