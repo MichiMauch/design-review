@@ -170,12 +170,22 @@ class FallbackScreenshot {
       if (html2canvas) {
         console.log('Trying html2canvas capture...');
         const canvas = await html2canvas(element, {
-          allowTaint: false,
-          useCORS: true,
+          allowTaint: true,
+          useCORS: false,
           scale: 1,
           logging: false,
           backgroundColor: '#ffffff',
-          removeContainer: true
+          removeContainer: true,
+          ignoreElements: (element) => {
+            // Skip problematic elements
+            if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image')) {
+              return true;
+            }
+            if (element.tagName === 'IFRAME') {
+              return true;
+            }
+            return false;
+          }
         });
         
         return canvas.toDataURL('image/png', 0.95);
@@ -197,6 +207,16 @@ class FallbackScreenshot {
           style: {
             transform: 'scale(1)',
             transformOrigin: 'top left'
+          },
+          filter: (node) => {
+            // Skip problematic elements
+            if (node.tagName === 'IMG' && node.src && node.src.includes('_next/image')) {
+              return false;
+            }
+            if (node.tagName === 'IFRAME') {
+              return false;
+            }
+            return true;
           }
         });
       } else {
@@ -261,12 +281,22 @@ class FallbackScreenshot {
       if (html2canvas) {
         console.log('Trying html2canvas element capture...');
         const canvas = await html2canvas(element, {
-          allowTaint: false,
-          useCORS: true,
+          allowTaint: true,
+          useCORS: false,
           scale: 1,
           logging: false,
           backgroundColor: '#ffffff',
-          removeContainer: true
+          removeContainer: true,
+          ignoreElements: (element) => {
+            // Skip problematic elements
+            if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image')) {
+              return true;
+            }
+            if (element.tagName === 'IFRAME') {
+              return true;
+            }
+            return false;
+          }
         });
 
         return canvas.toDataURL('image/png', 0.95);
@@ -280,7 +310,17 @@ class FallbackScreenshot {
         console.log('Trying dom-to-image element capture...');
         return await domtoimage.toPng(element, {
           quality: 0.95,
-          bgcolor: '#ffffff'
+          bgcolor: '#ffffff',
+          filter: (node) => {
+            // Skip problematic elements
+            if (node.tagName === 'IMG' && node.src && node.src.includes('_next/image')) {
+              return false;
+            }
+            if (node.tagName === 'IFRAME') {
+              return false;
+            }
+            return true;
+          }
         });
       } else {
         console.warn('dom-to-image not available for element capture');
@@ -308,14 +348,24 @@ class FallbackScreenshot {
       if (html2canvas) {
         console.log('Trying html2canvas area capture...');
         const fullScreenshot = await html2canvas(document.body, {
-          allowTaint: false,
-          useCORS: true,
+          allowTaint: true,
+          useCORS: false,
           scale: 1,
           logging: false,
           backgroundColor: '#ffffff',
           removeContainer: true,
           width: window.innerWidth,
-          height: window.innerHeight
+          height: window.innerHeight,
+          ignoreElements: (element) => {
+            // Skip problematic elements
+            if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image')) {
+              return true;
+            }
+            if (element.tagName === 'IFRAME') {
+              return true;
+            }
+            return false;
+          }
         });
         
         // Create a new canvas for the cropped area
@@ -383,7 +433,17 @@ class FallbackScreenshot {
             quality: 0.95,
             bgcolor: '#ffffff',
             width: area.width,
-            height: area.height
+            height: area.height,
+            filter: (node) => {
+              // Skip problematic elements
+              if (node.tagName === 'IMG' && node.src && node.src.includes('_next/image')) {
+                return false;
+              }
+              if (node.tagName === 'IFRAME') {
+                return false;
+              }
+              return true;
+            }
           });
           
           return screenshot;
