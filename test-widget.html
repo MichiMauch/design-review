@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        .highlight-box {
+            background: #e3f2fd;
+            padding: 15px;
+            border-left: 4px solid #2196f3;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test-Webseite für Feedback Widget</h1>
+        <p>Diese Seite dient zum Testen des Feedback-Widgets. Das Widget sollte als Button in der rechten unteren Ecke erscheinen.</p>
+        
+        <div class="highlight-box">
+            <h2>Wichtiger Hinweis</h2>
+            <p>Wenn Sie auf den Feedback-Button klicken, können Sie Bereiche auf dieser Seite markieren und Feedback dazu abgeben.</p>
+        </div>
+        
+        <h2>Testbereich 1</h2>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+        
+        <h2>Testbereich 2</h2>
+        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        
+        <div class="highlight-box">
+            <h3>Feature-Liste</h3>
+            <ul>
+                <li>Element-Auswahl durch Klick</li>
+                <li>Screenshot-Erstellung</li>
+                <li>Feedback-Text eingeben</li>
+                <li>Daten an Server senden</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Widget Integration -->
+    <script src="http://localhost:3000/widget.js" data-project-id="test-project"></script>
+</body>
+</html>
