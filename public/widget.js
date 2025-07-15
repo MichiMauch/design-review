@@ -100,6 +100,12 @@
     
     // Send widget ping to server
     function sendWidgetPing() {
+        // Skip ping to avoid CORS errors during development
+        if (baseUrl.includes('localhost')) {
+            console.log('Widget: Skipping ping for localhost');
+            return;
+        }
+        
         fetch(`${baseUrl}/api/projects/${encodeURIComponent(projectId)}/widget-ping`, {
             method: 'POST',
             headers: {
@@ -110,7 +116,7 @@
                 timestamp: new Date().toISOString()
             })
         }).catch(err => {
-            console.warn('Widget: Failed to send ping:', err);
+            console.warn('Widget: Failed to send ping (non-critical):', err);
         });
     }
     
@@ -188,13 +194,27 @@
                 const hybridScreenshot = new window.HybridScreenshot();
                 const screenshotData = await hybridScreenshot.selectAndCaptureArea();
                 
-                // Set fake selection data for the modal
+                // Check if user cancelled
+                if (screenshotData === null) {
+                    console.log('Widget: User cancelled screenshot selection');
+                    // Reset state and show button again
+                    isSelecting = false;
+                    const button = document.getElementById('feedback-widget-button');
+                    if (button) {
+                        button.style.display = 'flex';
+                    }
+                    return;
+                }
+                
+                // Set selection data for the modal
                 currentSelectionData = {
                     type: 'area',
                     selectedArea: hybridScreenshot.selectedArea,
                     element: null,
                     selector: null
                 };
+                
+                console.log('Widget: Screenshot created successfully, showing modal');
                 
                 // Show modal directly with screenshot
                 showFeedbackModalDirect(screenshotData);
