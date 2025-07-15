@@ -585,7 +585,7 @@
     hideProblematicElements() {
       const hiddenElements = [];
       
-      // Hide ALL existing style elements and link elements
+      // Hide ALL existing style elements and link elements completely
       const allStyleElements = document.querySelectorAll('style, link[rel="stylesheet"]');
       allStyleElements.forEach(el => {
         hiddenElements.push({
@@ -595,74 +595,67 @@
           wasHidden: el.style.display === 'none',
           type: 'style'
         });
-        el.style.display = 'none';
+        el.remove(); // Completely remove instead of hiding
       });
       
-      // Find all elements with problematic inline styles and fix them
+      // Find all elements and replace their styles completely
       const allElements = document.querySelectorAll('*');
       allElements.forEach(el => {
         const originalStyle = el.getAttribute('style');
-        if (originalStyle) {
-          // Check if style contains problematic CSS functions
-          const hasProblematicCSS = /oklab|oklch|color\(|color-mix|lch|lab|hwb/i.test(originalStyle);
-          
-          if (hasProblematicCSS) {
-            hiddenElements.push({
-              element: el,
-              originalStyle: originalStyle,
-              type: 'inline-style'
-            });
-            
-            // Replace with safe styles
-            let safeStyle = originalStyle;
-            
-            // Remove problematic color functions
-            safeStyle = safeStyle.replace(/oklab\([^)]+\)/gi, '#000000');
-            safeStyle = safeStyle.replace(/oklch\([^)]+\)/gi, '#000000');
-            safeStyle = safeStyle.replace(/color\([^)]+\)/gi, '#000000');
-            safeStyle = safeStyle.replace(/color-mix\([^)]+\)/gi, '#000000');
-            safeStyle = safeStyle.replace(/lch\([^)]+\)/gi, '#000000');
-            safeStyle = safeStyle.replace(/lab\([^)]+\)/gi, '#000000');
-            safeStyle = safeStyle.replace(/hwb\([^)]+\)/gi, '#000000');
-            
-            el.setAttribute('style', safeStyle);
-          }
+        const computedStyle = window.getComputedStyle(el);
+        
+        // Store original data for restoration
+        hiddenElements.push({
+          element: el,
+          originalStyle: originalStyle,
+          originalClass: el.className,
+          type: 'element-style'
+        });
+        
+        // Remove all classes that might contain problematic CSS
+        el.className = '';
+        
+        // Set safe inline styles based on element type
+        let safeStyle = 'background: white !important; color: black !important; border: none !important;';
+        
+        if (el.tagName === 'BODY') {
+          safeStyle = 'background: white !important; color: black !important; margin: 0 !important; padding: 20px !important;';
+        } else if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(el.tagName)) {
+          safeStyle = 'background: #f5f5f5 !important; color: black !important; font-weight: bold !important; padding: 8px !important; margin: 10px 0 !important;';
+        } else if (['P', 'DIV', 'SPAN', 'A'].includes(el.tagName)) {
+          safeStyle = 'background: transparent !important; color: black !important; text-decoration: none !important; margin: 4px !important; padding: 4px !important;';
         }
-      });
-      
-      // Create a minimal safe stylesheet for basic styling
-      const safeStyleSheet = document.createElement('style');
-      safeStyleSheet.id = 'feedback-widget-safe-styles';
-      safeStyleSheet.textContent = `
-        .feedback-widget-button,
-        .feedback-widget-overlay,
-        .feedback-widget-selection-overlay,
-        .feedback-widget-selection-box {
-          display: none !important;
+        
+        // Add widget hiding
+        if (el.classList.contains('feedback-widget-button') || 
+            el.classList.contains('feedback-widget-overlay') || 
+            el.classList.contains('feedback-widget-selection-overlay') || 
+            el.classList.contains('feedback-widget-selection-box')) {
+          safeStyle += ' display: none !important;';
         }
-      `;
-      
-      document.head.appendChild(safeStyleSheet);
-      hiddenElements.push({
-        element: safeStyleSheet,
-        type: 'temporary'
+        
+        el.setAttribute('style', safeStyle);
       });
       
       return hiddenElements;
     }
 
     restoreProblematicElements(hiddenElements) {
-      hiddenElements.forEach(({element, originalDisplay, originalVisibility, wasHidden, originalStyle, type}) => {
+      hiddenElements.forEach(({element, originalDisplay, originalVisibility, wasHidden, originalStyle, originalClass, type}) => {
         if (type === 'temporary') {
           // Remove our temporary safe stylesheet
           element.remove();
-        } else if (type === 'inline-style') {
-          // Restore original inline styles
-          element.setAttribute('style', originalStyle);
+        } else if (type === 'element-style') {
+          // Restore original classes and styles
+          element.className = originalClass || '';
+          if (originalStyle) {
+            element.setAttribute('style', originalStyle);
+          } else {
+            element.removeAttribute('style');
+          }
         } else if (type === 'style' && !wasHidden) {
-          // Only restore style elements if they weren't originally hidden
-          element.style.display = originalDisplay;
-          element.style.visibility = originalVisibility;
+          // Re-add removed style elements to document head
+          document.head.appendChild(element);
         }
       });
     }
