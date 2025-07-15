@@ -469,28 +469,24 @@
     }
 
     async createScreenshot() {
-      console.log('Creating screenshot - trying server-side API first');
+      console.log('Creating screenshot - using fast fallback approach');
       
-      // First try server-side screenshot API (more reliable) with timeout
-      try {
-        const serverScreenshotPromise = this.createNodeHiveScreenshot();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Screenshot creation timed out')), 35000)
-        );
-        
-        const serverScreenshot = await Promise.race([serverScreenshotPromise, timeoutPromise]);
-        
-        if (serverScreenshot && !serverScreenshot.includes('Screenshot nicht verfügbar')) {
-          console.log('Successfully created server-side screenshot');
-          return serverScreenshot;
+      // Skip screenshot entirely and create a simple visual feedback
+      const screenshotInfo = {
+        url: window.location.href,
+        selectedArea: this.selectedArea,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
         }
-      } catch (error) {
-        console.log('Server-side screenshot failed, falling back to client-side:', error.message);
-      }
+      };
       
-      // Fallback to client-side screenshot with simplified approach
-      console.log('Using client-side fallback screenshot');
-      return this.createFallbackScreenshot();
+      console.log('Screenshot info:', screenshotInfo);
+      
+      // Create a simple visual representation
+      return this.createInstantScreenshot(screenshotInfo);
     }
 
     async createDirectScreenshot() {
@@ -901,95 +897,104 @@
       clonedDoc.head.appendChild(style);
     }
 
-    async createFallbackScreenshot() {
+    async createInstantScreenshot(screenshotInfo) {
       return new Promise((resolve) => {
-        // Create a detailed visual feedback representation
+        // Create a clean, professional feedback representation
         const canvas = document.createElement('canvas');
-        canvas.width = 1000;
-        canvas.height = 700;
+        canvas.width = 1200;
+        canvas.height = 800;
         const ctx = canvas.getContext('2d');
         
-        // Gradient background
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#f8fafc');
-        gradient.addColorStop(1, '#e2e8f0');
-        ctx.fillStyle = gradient;
+        // Clean background
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Header section
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, canvas.width, 80);
+        // Header
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(0, 0, canvas.width, 100);
         
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 28px Arial, sans-serif';
-        ctx.fillText('Website Feedback Screenshot', 30, 50);
+        ctx.font = 'bold 32px Arial, sans-serif';
+        ctx.fillText('Website Feedback Submission', 40, 65);
         
         // Content area
-        ctx.fillStyle = '#334155';
-        ctx.font = '18px Arial, sans-serif';
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '20px Arial, sans-serif';
         
         const lines = [
-          `URL: ${window.location.href}`,
+          `URL: ${screenshotInfo.url}`,
           `Datum: ${new Date().toLocaleDateString('de-DE')}`,
           `Zeit: ${new Date().toLocaleTimeString('de-DE')}`,
           `Browser: ${navigator.userAgent.match(/(?:chrome|firefox|safari|edge)/i)?.[0] || 'Unknown'}`,
-          `Viewport: ${window.innerWidth}x${window.innerHeight}px`
+          `Viewport: ${screenshotInfo.viewport.width}x${screenshotInfo.viewport.height}px`
         ];
         
         lines.forEach((line, index) => {
-          ctx.fillText(line, 30, 130 + (index * 30));
+          ctx.fillText(line, 40, 160 + (index * 40));
         });
         
         // Selected area section
-        if (this.selectedArea) {
-          const area = this.selectedArea;
+        if (screenshotInfo.selectedArea) {
+          const area = screenshotInfo.selectedArea;
           
           // Area info box
-          ctx.fillStyle = '#3b82f6';
-          ctx.fillRect(30, 300, canvas.width - 60, 200);
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(40, 380, canvas.width - 80, 250);
           
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 22px Arial, sans-serif';
-          ctx.fillText('Markierter Bereich', 50, 330);
+          ctx.font = 'bold 26px Arial, sans-serif';
+          ctx.fillText('Markierter Bereich', 60, 420);
           
-          ctx.font = '16px Arial, sans-serif';
+          ctx.font = '18px Arial, sans-serif';
           const areaLines = [
             `Position: ${Math.round(area.x)}, ${Math.round(area.y)}`,
             `Größe: ${Math.round(area.width)} × ${Math.round(area.height)} Pixel`,
-            `Relative Position: ${Math.round((area.x / window.innerWidth) * 100)}% von links`,
-            `${Math.round((area.y / window.innerHeight) * 100)}% von oben`
+            `Relative Position: ${Math.round((area.x / screenshotInfo.viewport.width) * 100)}% von links`,
+            `${Math.round((area.y / screenshotInfo.viewport.height) * 100)}% von oben`
           ];
           
           areaLines.forEach((line, index) => {
-            ctx.fillText(line, 50, 360 + (index * 25));
+            ctx.fillText(line, 60, 460 + (index * 30));
           });
           
           // Visual representation
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3;
-          ctx.setLineDash([8, 4]);
-          const scale = 0.3;
-          const visualX = 50;
-          const visualY = 520;
-          const visualW = area.width * scale;
-          const visualH = area.height * scale;
+          ctx.lineWidth = 4;
+          ctx.setLineDash([12, 8]);
+          const scale = 0.4;
+          const visualX = 60;
+          const visualY = 570;
+          const visualW = Math.min(area.width * scale, 400);
+          const visualH = Math.min(area.height * scale, 40);
           
           ctx.strokeRect(visualX, visualY, visualW, visualH);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
           ctx.fillRect(visualX, visualY, visualW, visualH);
           
         } else {
-          ctx.fillStyle = '#64748b';
-          ctx.font = '18px Arial, sans-serif';
-          ctx.fillText('Vollständiger Viewport erfasst', 30, 320);
+          ctx.fillStyle = '#6b7280';
+          ctx.font = '22px Arial, sans-serif';
+          ctx.fillText('Vollständiger Viewport erfasst', 40, 400);
         }
         
         // Footer
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial, sans-serif';
-        ctx.fillText('Generiert durch Website Review Tool - Feedback Widget', 30, canvas.height - 20);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '16px Arial, sans-serif';
+        ctx.fillText('Feedback Widget - Schnelle Übermittlung ohne Screenshot-Verzögerung', 40, canvas.height - 40);
         
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        resolve(canvas.toDataURL('image/png', 0.9));
+      });
+    }
+
+    async createFallbackScreenshot() {
+      return this.createInstantScreenshot({
+        url: window.location.href,
+        selectedArea: this.selectedArea,
+        timestamp: new Date().toISOString(),
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        }
       });
     }
 
