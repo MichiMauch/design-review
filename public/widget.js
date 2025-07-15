@@ -471,15 +471,21 @@
     async createScreenshot() {
       console.log('Creating screenshot - trying server-side API first');
       
-      // First try server-side screenshot API (more reliable)
+      // First try server-side screenshot API (more reliable) with timeout
       try {
-        const serverScreenshot = await this.createNodeHiveScreenshot();
+        const serverScreenshotPromise = this.createNodeHiveScreenshot();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Screenshot creation timed out')), 35000)
+        );
+        
+        const serverScreenshot = await Promise.race([serverScreenshotPromise, timeoutPromise]);
+        
         if (serverScreenshot && !serverScreenshot.includes('Screenshot nicht verfügbar')) {
           console.log('Successfully created server-side screenshot');
           return serverScreenshot;
         }
       } catch (error) {
-        console.log('Server-side screenshot failed, falling back to client-side:', error);
+        console.log('Server-side screenshot failed, falling back to client-side:', error.message);
       }
       
       // Fallback to client-side screenshot with simplified approach
@@ -695,7 +701,12 @@
 
     async createNodeHiveScreenshot() {
       try {
-        // Use our server-side screenshot API
+        console.log('Calling server-side screenshot API...');
+        
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
         const response = await fetch(`${this.apiBase}/api/screenshot`, {
           method: 'POST',
           headers: {
@@ -704,29 +715,42 @@
           body: JSON.stringify({
             url: window.location.href,
             selectedArea: this.selectedArea
-          })
+          }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
+        
+        console.log('Screenshot API response status:', response.status);
 
         if (!response.ok) {
           throw new Error(`Screenshot API returned ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('Screenshot API response data:', data);
         
         if (data.success && data.screenshot) {
           // If we have R2 filename, use that directly
           if (data.r2Filename) {
+            console.log('Using R2 filename:', data.r2Filename);
             return data.r2Filename;
           }
           // If we have a selected area, crop the screenshot
           if (this.selectedArea && !data.screenshot.includes('svg')) {
+            console.log('Cropping screenshot for selected area');
             return this.cropScreenshot(data.screenshot, this.selectedArea);
           }
+          console.log('Using full screenshot');
           return data.screenshot;
         } else {
           throw new Error(data.error || 'Screenshot generation failed');
         }
       } catch (error) {
+        if (error.name === 'AbortError') {
+          console.error('Screenshot API request timed out');
+          throw new Error('Screenshot request timed out');
+        }
         console.error('Failed to create screenshot via API:', error);
         throw error;
       }
