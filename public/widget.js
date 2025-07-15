@@ -65,7 +65,7 @@
           📝 Feedback
         </div>
       `;
-      button.addEventListener('click', () => this.toggleOverlay());
+      button.addEventListener('click', () => this.startFeedbackProcess());
       
       // Enhanced styles for better visibility
       button.style.cssText = `
@@ -208,6 +208,11 @@
       });
     }
 
+    startFeedbackProcess() {
+      // Direkt Bereichsauswahl starten
+      this.startAreaSelection();
+    }
+
     toggleOverlay() {
       const overlay = document.querySelector('.feedback-widget-overlay');
       if (overlay.style.display === 'none') {
@@ -276,19 +281,37 @@
         transform: translateX(-50%);
         background: #1f2937;
         color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
+        padding: 16px 24px;
+        border-radius: 12px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 14px;
         z-index: 1000002;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        text-align: center;
       `;
-      instructions.textContent = 'Ziehen Sie, um einen Bereich auszuwählen. ESC zum Abbrechen.';
+      instructions.innerHTML = `
+        <div style="margin-bottom: 12px; font-weight: 500;">Bereich für Screenshot auswählen</div>
+        <div style="font-size: 12px; color: #d1d5db; margin-bottom: 12px;">Ziehen Sie, um einen Bereich auszuwählen</div>
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <button class="skip-selection-btn" style="background: #6b7280; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+            Ohne Auswahl
+          </button>
+        </div>
+      `;
 
       document.body.appendChild(overlay);
       document.body.appendChild(instructions);
 
       this.selectionOverlay = overlay;
+
+      // "Ohne Auswahl" Button Handler
+      const skipBtn = instructions.querySelector('.skip-selection-btn');
+      skipBtn.addEventListener('click', () => {
+        this.selectedArea = null;
+        this.clearSelection();
+        this.isSelecting = false;
+        this.openOverlay();
+      });
 
       // Event listeners for area selection
       overlay.addEventListener('mousedown', this.startSelection.bind(this));
@@ -364,7 +387,7 @@
       if (e.key === 'Escape' && this.isSelecting) {
         this.clearSelection();
         this.isSelecting = false;
-        this.openOverlay();
+        // Bei ESC kein Formular öffnen, komplett abbrechen
       }
     }
 

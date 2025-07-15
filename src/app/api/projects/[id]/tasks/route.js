@@ -57,6 +57,18 @@ export async function POST(request, { params }) {
     const resolvedParams = await params;
     const { title, description, screenshot, url, selected_area, title_en, description_en } = await request.json();
 
+    console.log('📝 Task creation request:', {
+      title,
+      description,
+      screenshot,
+      screenshot_type: typeof screenshot,
+      screenshot_length: screenshot ? screenshot.length : 0,
+      url,
+      selected_area,
+      title_en,
+      description_en
+    });
+
     if (!title || !url) {
       return addCorsHeaders(new Response('Titel und URL sind erforderlich', { status: 400 }));
     }
