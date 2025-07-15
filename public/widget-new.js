@@ -440,22 +440,14 @@
       
       try {
         // Try server-side screenshot first
-        const serverResult = await this.tryServerScreenshot();
-        if (serverResult.success) {
-          console.log('✅ Server-side screenshot successful');
-          return serverResult.screenshot;
-        }
+        return await this.tryServerScreenshot();
       } catch (error) {
         console.log('❌ Server-side failed:', error.message);
       }
 
       try {
-        // Try client-side screenshot
-        const clientResult = await this.tryClientScreenshot();
-        if (clientResult) {
-          console.log('✅ Client-side screenshot successful');
-          return clientResult;
-        }
+        // Try client-side screenshot as fallback
+        return await this.tryClientScreenshot();
       } catch (error) {
         console.log('❌ Client-side failed:', error.message);
       }
@@ -485,11 +477,12 @@
         throw new Error('Server returned fallback instruction');
       }
 
-      return { success: true, screenshot: data.screenshot };
+      console.log('✅ Server-side screenshot successful');
+      return data.screenshot;
     }
 
     async tryClientScreenshot() {
-      // Load html2canvas
+      // Load html2canvas if not available
       if (!window.html2canvas) {
         await this.loadHtml2Canvas();
       }
@@ -524,7 +517,7 @@
                   return true;
                 }
               }
-            } catch {
+            } catch (error) {
               // Ignore style check errors
             }
 
@@ -540,6 +533,7 @@
         }
 
         const canvas = await window.html2canvas(document.body, options);
+        console.log('✅ Client-side screenshot successful');
         return canvas.toDataURL('image/png');
 
       } finally {
@@ -600,8 +594,8 @@
         
         const data = await response.json();
         return data.translatedText || text;
-      } catch {
-        console.error('Translation failed');
+      } catch (error) {
+        console.error('Translation failed:', error);
         return text;
       }
     }

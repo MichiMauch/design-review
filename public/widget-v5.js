@@ -524,7 +524,7 @@
                   return true;
                 }
               }
-            } catch {
+            } catch (e) {
               // Ignore style check errors
             }
 
@@ -600,8 +600,8 @@
         
         const data = await response.json();
         return data.translatedText || text;
-      } catch {
-        console.error('Translation failed');
+      } catch (error) {
+        console.error('Translation failed:', error);
         return text;
       }
     }

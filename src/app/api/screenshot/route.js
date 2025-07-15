@@ -23,31 +23,107 @@ export async function POST(request) {
       ));
     }
 
-    // Use NodeHive API with correct parameters
-    const nodeHiveUrl = new URL('https://preview.nodehive.com/api/screenshot');
-    nodeHiveUrl.searchParams.set('url', encodeURIComponent(url));
-    nodeHiveUrl.searchParams.set('resX', '1280');
-    nodeHiveUrl.searchParams.set('resY', '900');
-    nodeHiveUrl.searchParams.set('outFormat', 'png');
-    nodeHiveUrl.searchParams.set('waitTime', '1000');
-    nodeHiveUrl.searchParams.set('isFullPage', 'true');
-    nodeHiveUrl.searchParams.set('dismissModals', 'true');
-    
-    console.log('Requesting screenshot from:', nodeHiveUrl.toString());
+    // Multiple screenshot service fallbacks for reliability
+    let imageBuffer = null;
+    let method = 'unknown';
 
-    const response = await fetch(nodeHiveUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    // Option 1: Try NodeHive API (primary)
+    try {
+      const nodeHiveUrl = new URL('https://preview.nodehive.com/api/screenshot');
+      nodeHiveUrl.searchParams.set('url', encodeURIComponent(url));
+      nodeHiveUrl.searchParams.set('resX', '1280');
+      nodeHiveUrl.searchParams.set('resY', '900');
+      nodeHiveUrl.searchParams.set('outFormat', 'png');
+      nodeHiveUrl.searchParams.set('waitTime', '2000');
+      nodeHiveUrl.searchParams.set('isFullPage', 'false'); // Faster rendering
+      
+      console.log('Trying NodeHive screenshot:', nodeHiveUrl.toString());
+
+      const response = await fetch(nodeHiveUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        signal: AbortSignal.timeout(15000) // 15 second timeout
+      });
+
+      if (response.ok) {
+        imageBuffer = await response.arrayBuffer();
+        method = 'nodehive';
+        console.log('NodeHive screenshot successful');
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`NodeHive API returned ${response.status}: ${response.statusText}`);
+    } catch (error) {
+      console.log('NodeHive failed:', error.message);
     }
 
-    // Get the image as buffer
-    const imageBuffer = await response.arrayBuffer();
+    // Option 2: Try screenshot.rocks API (fallback)
+    if (!imageBuffer) {
+      try {
+        const screenshotUrl = `https://api.screenshot.rocks/screenshot?url=${encodeURIComponent(url)}&width=1280&height=900`;
+        console.log('Trying screenshot.rocks:', screenshotUrl);
+        
+        const response = await fetch(screenshotUrl, {
+          method: 'GET',
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+
+        if (response.ok) {
+          imageBuffer = await response.arrayBuffer();
+          method = 'screenshot-rocks';
+          console.log('Screenshot.rocks successful');
+        }
+      } catch (error) {
+        console.log('Screenshot.rocks failed:', error.message);
+      }
+    }
+
+    // Option 3: Use htmlcsstoimage.com if API key available
+    if (!imageBuffer && process.env.HTMLCSS_API_KEY) {
+      try {
+        console.log('Trying htmlcsstoimage.com');
+        const response = await fetch('https://hcti.io/v1/image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + Buffer.from(process.env.HTMLCSS_USER_ID + ':' + process.env.HTMLCSS_API_KEY).toString('base64')
+          },
+          body: JSON.stringify({
+            url: url,
+            viewport_width: 1280,
+            viewport_height: 900,
+            device_scale: 1
+          }),
+          signal: AbortSignal.timeout(12000) // 12 second timeout
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Download the image from the returned URL
+          const imageResponse = await fetch(data.url);
+          if (imageResponse.ok) {
+            imageBuffer = await imageResponse.arrayBuffer();
+            method = 'htmlcss';
+            console.log('HTMLCSS screenshot successful');
+          }
+        }
+      } catch (error) {
+        console.log('HTMLCSS failed:', error.message);
+      }
+    }
+
+    // If all services failed, return fallback response
+    if (!imageBuffer) {
+      console.log('All screenshot services failed, returning fallback');
+      return addCorsHeaders(NextResponse.json({
+        success: false,
+        fallback: true,
+        error: 'All screenshot services unavailable',
+        method: 'client-fallback',
+        message: 'Using client-side screenshot capture'
+      }));
+    }
+
+    console.log(`Screenshot successful using ${method}, size: ${imageBuffer.byteLength} bytes`);
     const imageBufferNode = Buffer.from(imageBuffer);
     
     // Upload to Cloudflare R2
@@ -63,7 +139,8 @@ export async function POST(request) {
       screenshot: dataUrl,
       r2Url: r2Result.url,
       r2Filename: r2Result.filename,
-      selectedArea: selectedArea || null
+      selectedArea: selectedArea || null,
+      method: method
     }));
 
   } catch (error) {
