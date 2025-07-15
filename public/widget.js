@@ -22,7 +22,26 @@
     let currentHighlightedElement = null;
     let currentSelectionData = null;
     
-    // Load dom-to-image library dynamically
+    // Load screenshot libraries dynamically
+    function loadScreenshotLibraries() {
+        return new Promise((resolve, reject) => {
+            // Load the hybrid screenshot classes
+            const script = document.createElement('script');
+            script.src = `${baseUrl}/screenshot-classes.js`;
+            script.onload = () => {
+                console.log('Widget: Hybrid screenshot classes loaded');
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('Widget: Failed to load screenshot classes');
+                // Fallback to original dom-to-image
+                loadDomToImage().then(resolve).catch(reject);
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    // Fallback: Load dom-to-image library dynamically
     function loadDomToImage() {
         return new Promise((resolve, reject) => {
             if (window.domtoimage) {
@@ -51,9 +70,9 @@
         console.log('Widget: Initializing');
         
         try {
-            await loadDomToImage();
+            await loadScreenshotLibraries();
         } catch (error) {
-            console.error('Widget: Failed to load dom-to-image:', error);
+            console.error('Widget: Failed to load screenshot libraries:', error);
         }
         
         // Ensure DOM is ready
@@ -408,8 +427,31 @@
         return element.tagName.toLowerCase();
     }
     
-    // Create real DOM screenshot of selected area
+    // Create screenshot using area selection
     async function createRealScreenshot() {
+        console.log('Widget: Creating screenshot with area selection');
+        
+        try {
+            // Use HybridScreenshot for area selection if available
+            if (window.HybridScreenshot) {
+                const hybridScreenshot = new window.HybridScreenshot();
+                
+                // Always use area selection
+                return await hybridScreenshot.selectAndCaptureArea();
+            } else {
+                console.warn('Widget: HybridScreenshot not available, using fallback');
+                // Fallback to original dom-to-image implementation
+                return await createOriginalScreenshot();
+            }
+        } catch (error) {
+            console.error('Widget: Area selection screenshot failed:', error);
+            // Fallback to original implementation
+            return await createOriginalScreenshot();
+        }
+    }
+
+    // Original screenshot implementation as fallback
+    async function createOriginalScreenshot() {
         if (!domtoimage) {
             console.error('Widget: dom-to-image not loaded');
             return null;
@@ -571,7 +613,7 @@
                 ${hasScreenshot ? `
                     <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
                         <div style="background: #f3f4f6; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 500; color: #374151;">
-                            📸 Echter Screenshot des ausgewählten Bereichs
+                            🔲 Screenshot des ausgewählten Bereichs
                         </div>
                         <img src="${screenshotData}" alt="Screenshot des ausgewählten Bereichs" style="width: 100%; height: auto; display: block; max-height: 300px; object-fit: contain;" />
                     </div>
@@ -629,7 +671,7 @@
                             id="submit-feedback"
                             style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
                         >
-                            📸 Mit Screenshot senden
+                            🔲 Bereich auswählen & senden
                         </button>
                     </div>
                 </form>
@@ -773,7 +815,15 @@
             screenshot: screenshotData || null
         };
         
-        console.log('Widget: Submitting feedback with real screenshot:', !!screenshotData);
+        console.log('Widget: Submitting feedback with screenshot:', !!screenshotData);
+        
+        // Update submit button text based on screenshot availability
+        if (screenshotData) {
+            submitBtn.textContent = 'Wird mit Bereich-Screenshot gesendet...';
+        } else {
+            submitBtn.textContent = 'Wird ohne Screenshot gesendet...';
+        }
+        
         submitToAPI(requestData);
     }
     
@@ -796,7 +846,11 @@
         })
         .then(data => {
             console.log('Widget: Feedback submitted successfully:', data);
-            showSuccess('Feedback mit echtem Screenshot erfolgreich gesendet! 📸');
+            const hasScreenshot = data.screenshot !== null;
+            const message = hasScreenshot 
+                ? 'Feedback mit Bereich-Screenshot erfolgreich gesendet! 🔲' 
+                : 'Feedback erfolgreich gesendet! ✅';
+            showSuccess(message);
             setTimeout(() => {
                 closeModal();
             }, 1500);
@@ -809,7 +863,7 @@
             const titleEl = modal.querySelector('#feedback-title');
             const descriptionEl = modal.querySelector('#feedback-description');
             
-            if (submitBtn) submitBtn.textContent = '📸 Mit Screenshot senden';
+            if (submitBtn) submitBtn.textContent = '🔲 Bereich auswählen & senden';
             if (submitBtn) submitBtn.disabled = false;
             if (titleEl) titleEl.disabled = false;
             if (descriptionEl) descriptionEl.disabled = false;
