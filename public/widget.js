@@ -467,7 +467,7 @@
         await this.createTask(taskData);
         
         this.showSuccess();
-        setTimeout(() => this.closeOverlay(), 2000);
+        // Removed automatic closing - user needs to click OK button
 
       } catch (error) {
         console.error('Error submitting feedback:', error);
@@ -510,7 +510,6 @@
         let canvas;
         
         if (this.selectedArea) {
-          // First create a full page screenshot, then crop it
           console.log('📏 Creating screenshot for selected area:', {
             x: this.selectedArea.x,
             y: this.selectedArea.y,
@@ -520,22 +519,21 @@
             viewport: { width: window.innerWidth, height: window.innerHeight }
           });
 
-          // Full page screenshot options - capture the entire document
-          const fullOptions = {
+          // Use html2canvas with direct cropping - much simpler approach
+          const options = {
             useCORS: false,
             allowTaint: true,
-            scale: 1, // Use full scale for better quality
+            scale: 1,
             backgroundColor: '#ffffff',
             logging: false,
-            // Capture full document size, not just viewport
-            height: Math.max(document.body.scrollHeight, document.body.offsetHeight, 
-                           document.documentElement.clientHeight, document.documentElement.scrollHeight, 
-                           document.documentElement.offsetHeight),
-            width: Math.max(document.body.scrollWidth, document.body.offsetWidth, 
-                          document.documentElement.clientWidth, document.documentElement.scrollWidth, 
-                          document.documentElement.offsetWidth),
-            x: 0,
-            y: 0,
+            // Crop directly in html2canvas
+            x: this.selectedArea.x,
+            y: this.selectedArea.y,
+            width: this.selectedArea.width,
+            height: this.selectedArea.height,
+            // Make sure we capture the full document, not just viewport
+            scrollX: 0,
+            scrollY: 0,
             ignoreElements: (element) => {
               // Ignore widget elements and problematic CSS
               const classList = element.classList || [];
@@ -563,45 +561,10 @@
             }
           };
 
-          // Create full screenshot
-          const fullCanvas = await window.html2canvas(document.body, fullOptions);
+          console.log('🎯 Html2canvas options:', options);
           
-          // Create cropped canvas
-          canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          // Set canvas size to selected area
-          canvas.width = this.selectedArea.width;
-          canvas.height = this.selectedArea.height;
-          
-          // Calculate source coordinates - these are already absolute positions
-          const sourceX = this.selectedArea.x;
-          const sourceY = this.selectedArea.y;
-          
-          console.log('🎯 Cropping from full screenshot:', {
-            sourceX,
-            sourceY,
-            targetWidth: this.selectedArea.width,
-            targetHeight: this.selectedArea.height,
-            fullCanvasSize: { width: fullCanvas.width, height: fullCanvas.height }
-          });
-          
-          // Ensure we're not trying to crop outside the canvas bounds
-          const cropX = Math.max(0, Math.min(sourceX, fullCanvas.width - this.selectedArea.width));
-          const cropY = Math.max(0, Math.min(sourceY, fullCanvas.height - this.selectedArea.height));
-          const cropWidth = Math.min(this.selectedArea.width, fullCanvas.width - cropX);
-          const cropHeight = Math.min(this.selectedArea.height, fullCanvas.height - cropY);
-          
-          console.log('🔧 Adjusted crop parameters:', {
-            cropX, cropY, cropWidth, cropHeight
-          });
-          
-          // Crop the selected area from full screenshot
-          ctx.drawImage(
-            fullCanvas,
-            cropX, cropY, cropWidth, cropHeight, // Source
-            0, 0, cropWidth, cropHeight // Destination
-          );
+          // Create screenshot with cropping
+          canvas = await window.html2canvas(document.body, options);
           
         } else {
           // Full page screenshot if no area selected
@@ -646,6 +609,12 @@
           console.warn('⚠️ Screenshot appears to be empty/white, trying fallback');
           throw new Error('Empty screenshot detected');
         }
+        
+        console.log('✅ Screenshot created successfully:', {
+          width: canvas.width,
+          height: canvas.height,
+          hasContent: hasContent
+        });
         
         // Upload client-side screenshot to R2
         try {
@@ -792,11 +761,29 @@
 
     showSuccess() {
       const loading = document.querySelector('.feedback-widget-loading');
+      const submit = document.querySelector('.feedback-widget-submit');
+      
       loading.innerHTML = `
         <div style="color: #059669; font-size: 16px;">✅ Feedback erfolgreich gesendet!</div>
         <div style="margin-top: 8px; color: #6b7280; font-size: 14px;">Vielen Dank für Ihr Feedback.</div>
+        <div style="margin-top: 12px;">
+          <button onclick="window.FeedbackWidget.closeOverlay()" style="
+            background: #059669; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 14px;
+          ">OK</button>
+        </div>
       `;
       loading.style.display = 'block';
+      
+      // Hide the submit button
+      if (submit) {
+        submit.style.display = 'none';
+      }
     }
 
     showError(message) {
