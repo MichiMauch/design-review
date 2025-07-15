@@ -469,8 +469,22 @@
     }
 
     async createScreenshot() {
-      console.log('Creating browser screenshot with Tailwind CSS v3');
-      return this.createDirectScreenshot();
+      console.log('Creating screenshot - trying server-side API first');
+      
+      // First try server-side screenshot API (more reliable)
+      try {
+        const serverScreenshot = await this.createNodeHiveScreenshot();
+        if (serverScreenshot && !serverScreenshot.includes('Screenshot nicht verfügbar')) {
+          console.log('Successfully created server-side screenshot');
+          return serverScreenshot;
+        }
+      } catch (error) {
+        console.log('Server-side screenshot failed, falling back to client-side:', error);
+      }
+      
+      // Fallback to client-side screenshot with simplified approach
+      console.log('Using client-side fallback screenshot');
+      return this.createFallbackScreenshot();
     }
 
     async createDirectScreenshot() {
