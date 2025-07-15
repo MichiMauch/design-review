@@ -507,57 +507,147 @@
       elements.forEach(el => el.style.display = 'none');
 
       try {
-        const options = {
-          useCORS: false,
-          allowTaint: true,
-          scale: 0.5,
-          backgroundColor: '#ffffff',
-          logging: false,
-          ignoreElements: (element) => {
-            // Ignore widget elements and problematic CSS
-            const classList = element.classList || [];
-            if (classList.contains('feedback-widget-button') || 
-                classList.contains('feedback-widget-overlay')) {
-              return true;
-            }
-
-            // Check for problematic CSS
-            try {
-              const style = window.getComputedStyle(element);
-              const colorProps = ['color', 'backgroundColor', 'borderColor'];
-              for (let prop of colorProps) {
-                const value = style[prop];
-                if (value && (value.includes('oklab') || value.includes('oklch') || 
-                            value.includes('color-mix') || value.includes('lch'))) {
-                  return true;
-                }
-              }
-            } catch {
-              // Ignore style check errors
-            }
-
-            return false;
-          }
-        };
-
+        let canvas;
+        
         if (this.selectedArea) {
-          options.x = this.selectedArea.x;
-          options.y = this.selectedArea.y;
-          options.width = this.selectedArea.width;
-          options.height = this.selectedArea.height;
-          console.log('📏 Using selected area for screenshot:', {
-            x: options.x,
-            y: options.y,
-            width: options.width,
-            height: options.height,
-            pageScroll: { x: window.pageXOffset, y: window.pageYOffset }
+          // First create a full page screenshot, then crop it
+          console.log('📏 Creating screenshot for selected area:', {
+            x: this.selectedArea.x,
+            y: this.selectedArea.y,
+            width: this.selectedArea.width,
+            height: this.selectedArea.height,
+            pageScroll: { x: window.pageXOffset, y: window.pageYOffset },
+            viewport: { width: window.innerWidth, height: window.innerHeight }
           });
-        }
 
-        const canvas = await window.html2canvas(document.body, options);
+          // Full page screenshot options - capture the entire document
+          const fullOptions = {
+            useCORS: false,
+            allowTaint: true,
+            scale: 1, // Use full scale for better quality
+            backgroundColor: '#ffffff',
+            logging: false,
+            // Capture full document size, not just viewport
+            height: Math.max(document.body.scrollHeight, document.body.offsetHeight, 
+                           document.documentElement.clientHeight, document.documentElement.scrollHeight, 
+                           document.documentElement.offsetHeight),
+            width: Math.max(document.body.scrollWidth, document.body.offsetWidth, 
+                          document.documentElement.clientWidth, document.documentElement.scrollWidth, 
+                          document.documentElement.offsetWidth),
+            x: 0,
+            y: 0,
+            ignoreElements: (element) => {
+              // Ignore widget elements and problematic CSS
+              const classList = element.classList || [];
+              if (classList.contains('feedback-widget-button') || 
+                  classList.contains('feedback-widget-overlay')) {
+                return true;
+              }
+
+              // Check for problematic CSS
+              try {
+                const style = window.getComputedStyle(element);
+                const colorProps = ['color', 'backgroundColor', 'borderColor'];
+                for (let prop of colorProps) {
+                  const value = style[prop];
+                  if (value && (value.includes('oklab') || value.includes('oklch') || 
+                              value.includes('color-mix') || value.includes('lch'))) {
+                    return true;
+                  }
+                }
+              } catch {
+                // Ignore style check errors
+              }
+
+              return false;
+            }
+          };
+
+          // Create full screenshot
+          const fullCanvas = await window.html2canvas(document.body, fullOptions);
+          
+          // Create cropped canvas
+          canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Set canvas size to selected area
+          canvas.width = this.selectedArea.width;
+          canvas.height = this.selectedArea.height;
+          
+          // Calculate source coordinates - these are already absolute positions
+          const sourceX = this.selectedArea.x;
+          const sourceY = this.selectedArea.y;
+          
+          console.log('🎯 Cropping from full screenshot:', {
+            sourceX,
+            sourceY,
+            targetWidth: this.selectedArea.width,
+            targetHeight: this.selectedArea.height,
+            fullCanvasSize: { width: fullCanvas.width, height: fullCanvas.height }
+          });
+          
+          // Ensure we're not trying to crop outside the canvas bounds
+          const cropX = Math.max(0, Math.min(sourceX, fullCanvas.width - this.selectedArea.width));
+          const cropY = Math.max(0, Math.min(sourceY, fullCanvas.height - this.selectedArea.height));
+          const cropWidth = Math.min(this.selectedArea.width, fullCanvas.width - cropX);
+          const cropHeight = Math.min(this.selectedArea.height, fullCanvas.height - cropY);
+          
+          console.log('🔧 Adjusted crop parameters:', {
+            cropX, cropY, cropWidth, cropHeight
+          });
+          
+          // Crop the selected area from full screenshot
+          ctx.drawImage(
+            fullCanvas,
+            cropX, cropY, cropWidth, cropHeight, // Source
+            0, 0, cropWidth, cropHeight // Destination
+          );
+          
+        } else {
+          // Full page screenshot if no area selected
+          const options = {
+            useCORS: false,
+            allowTaint: true,
+            scale: 0.5,
+            backgroundColor: '#ffffff',
+            logging: false,
+            ignoreElements: (element) => {
+              const classList = element.classList || [];
+              return classList.contains('feedback-widget-button') || 
+                     classList.contains('feedback-widget-overlay');
+            }
+          };
+          
+          canvas = await window.html2canvas(document.body, options);
+        }
+        
         const dataUrl = canvas.toDataURL('image/png');
         
-        // Upload client-side screenshot to R2 as well
+        // Check if canvas is empty (all white)
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+        let hasContent = false;
+        
+        // Check if there's any non-white pixel
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          const a = pixels[i + 3];
+          
+          if (a > 0 && (r < 250 || g < 250 || b < 250)) {
+            hasContent = true;
+            break;
+          }
+        }
+        
+        if (!hasContent) {
+          console.warn('⚠️ Screenshot appears to be empty/white, trying fallback');
+          throw new Error('Empty screenshot detected');
+        }
+        
+        // Upload client-side screenshot to R2
         try {
           const uploadResult = await this.uploadScreenshotToR2(dataUrl);
           if (uploadResult.success) {
