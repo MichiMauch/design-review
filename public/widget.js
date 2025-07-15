@@ -1,8 +1,8 @@
-// Feedback Widget with DOM-based Element Selection
+// Feedback Widget with Visual Area Screenshots
 (function() {
     'use strict';
     
-    console.log('Widget: Loading feedback widget');
+    console.log('Widget: Loading visual feedback widget');
     
     // Configuration
     const script = document.currentScript || document.querySelector('script[data-project-id]');
@@ -16,7 +16,6 @@
     let isSubmitting = false;
     let overlay = null;
     let modal = null;
-    let screenshotBlob = null;
     let currentHighlightedElement = null;
     let currentSelectionData = null;
     
@@ -376,6 +375,79 @@
         return element.tagName.toLowerCase();
     }
     
+    // Create visual screenshot of selected area
+    function createVisualScreenshot() {
+        return new Promise((resolve, reject) => {
+            if (!currentSelectionData || !currentSelectionData.selectedArea) {
+                reject('No area selected');
+                return;
+            }
+            
+            try {
+                const area = currentSelectionData.selectedArea;
+                
+                // Create canvas for the visual representation
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size - minimum 400x300 for readability
+                const minWidth = 400;
+                const minHeight = 300;
+                canvas.width = Math.max(area.width, minWidth);
+                canvas.height = Math.max(area.height, minHeight);
+                
+                // Background
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Main border
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+                
+                // Title area
+                ctx.fillStyle = '#2563eb';
+                ctx.fillRect(2, 2, canvas.width - 4, 50);
+                
+                // Title text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Ausgewählter Bereich', canvas.width / 2, 30);
+                
+                // Info text
+                ctx.fillStyle = '#1e40af';
+                ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'center';
+                
+                const centerX = canvas.width / 2;
+                const centerY = (canvas.height + 50) / 2;
+                
+                // Area info
+                ctx.fillText(`Größe: ${Math.round(area.width)} × ${Math.round(area.height)} px`, centerX, centerY - 40);
+                ctx.fillText(`Position: ${Math.round(area.x)} px von links, ${Math.round(area.y)} px von oben`, centerX, centerY - 10);
+                ctx.fillText(`URL: ${window.location.href}`, centerX, centerY + 20);
+                
+                // Element info if available
+                if (currentSelectionData.type === 'element' && currentSelectionData.selector) {
+                    ctx.fillText(`CSS Selector: ${currentSelectionData.selector}`, centerX, centerY + 50);
+                }
+                
+                // Timestamp
+                ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.fillStyle = '#6b7280';
+                ctx.fillText(`Erstellt am: ${new Date().toLocaleString('de-DE')}`, centerX, canvas.height - 20);
+                
+                // Convert to base64
+                const dataURL = canvas.toDataURL('image/png', 0.9);
+                resolve(dataURL);
+                
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+    
     // Show feedback modal
     function showFeedbackModal() {
         console.log('Widget: Showing feedback modal');
@@ -416,67 +488,126 @@
             border-radius: 12px;
             padding: 24px;
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
             max-height: 80vh;
             overflow-y: auto;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         `;
         
-        modalContent.innerHTML = `
-            <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
-                Feedback senden
-            </h2>
+        // Create preview of selected area
+        createVisualScreenshot().then(screenshotData => {
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
+                    Feedback senden
+                </h2>
+                
+                <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                    <img src="${screenshotData}" alt="Ausgewählter Bereich" style="width: 100%; height: auto; display: block;" />
+                </div>
+                
+                <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <label for="feedback-title" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                            Titel *
+                        </label>
+                        <input 
+                            type="text" 
+                            id="feedback-title" 
+                            required
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; box-sizing: border-box;"
+                            placeholder="Kurze Beschreibung des Problems oder Vorschlags"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label for="feedback-description" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                            Beschreibung
+                        </label>
+                        <textarea 
+                            id="feedback-description" 
+                            rows="4"
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;"
+                            placeholder="Detaillierte Beschreibung..."
+                        ></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                        <button 
+                            type="button" 
+                            id="cancel-feedback"
+                            style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; cursor: pointer;"
+                        >
+                            Abbrechen
+                        </button>
+                        <button 
+                            type="submit" 
+                            id="submit-feedback"
+                            style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
+                        >
+                            Senden
+                        </button>
+                    </div>
+                </form>
+            `;
             
-            <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
-                <div>
-                    <label for="feedback-title" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
-                        Titel *
-                    </label>
-                    <input 
-                        type="text" 
-                        id="feedback-title" 
-                        required
-                        style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; box-sizing: border-box;"
-                        placeholder="Kurze Beschreibung des Problems oder Vorschlags"
-                    />
-                </div>
+            setupModalEvents();
+        }).catch(error => {
+            console.error('Widget: Failed to create screenshot:', error);
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 20px; font-weight: 600; color: #1f2937;">
+                    Feedback senden
+                </h2>
                 
-                <div>
-                    <label for="feedback-description" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
-                        Beschreibung
-                    </label>
-                    <textarea 
-                        id="feedback-description" 
-                        rows="4"
-                        style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;"
-                        placeholder="Detaillierte Beschreibung..."
-                    ></textarea>
-                </div>
-                
-                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
-                    <button 
-                        type="button" 
-                        id="cancel-feedback"
-                        style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; cursor: pointer;"
-                    >
-                        Abbrechen
-                    </button>
-                    <button 
-                        type="submit" 
-                        id="submit-feedback"
-                        style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
-                    >
-                        Senden
-                    </button>
-                </div>
-            </form>
-        `;
+                <form id="feedback-form" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <label for="feedback-title" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                            Titel *
+                        </label>
+                        <input 
+                            type="text" 
+                            id="feedback-title" 
+                            required
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; box-sizing: border-box;"
+                            placeholder="Kurze Beschreibung des Problems oder Vorschlags"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label for="feedback-description" style="display: block; margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; color: #374151;">
+                            Beschreibung
+                        </label>
+                        <textarea 
+                            id="feedback-description" 
+                            rows="4"
+                            style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;"
+                            placeholder="Detaillierte Beschreibung..."
+                        ></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                        <button 
+                            type="button" 
+                            id="cancel-feedback"
+                            style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; cursor: pointer;"
+                        >
+                            Abbrechen
+                        </button>
+                        <button 
+                            type="submit" 
+                            id="submit-feedback"
+                            style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;"
+                        >
+                            Senden
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            setupModalEvents();
+        });
         
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
-        
-        // Setup modal events
-        setupModalEvents();
     }
     
     // Setup modal events
@@ -546,23 +677,40 @@
         titleEl.disabled = true;
         descriptionEl.disabled = true;
         
-        // Prepare JSON data
-        const requestData = {
-            title: title,
-            description: description,
-            url: window.location.href,
-            selected_area: currentSelectionData?.selectedArea || null
-        };
-        
-        console.log('Widget: Submitting feedback', requestData);
-        
-        // Submit to API
+        // Create screenshot and submit
+        createVisualScreenshot()
+            .then(screenshotData => {
+                const requestData = {
+                    title: title,
+                    description: description,
+                    url: window.location.href,
+                    selected_area: currentSelectionData?.selectedArea || null,
+                    screenshot: screenshotData
+                };
+                
+                console.log('Widget: Submitting feedback with screenshot');
+                submitToAPI(requestData);
+            })
+            .catch(error => {
+                console.error('Widget: Failed to create screenshot:', error);
+                const requestData = {
+                    title: title,
+                    description: description,
+                    url: window.location.href,
+                    selected_area: currentSelectionData?.selectedArea || null
+                };
+                submitToAPI(requestData);
+            });
+    }
+    
+    // Submit to API
+    function submitToAPI(data) {
         fetch(`${baseUrl}/api/projects/${encodeURIComponent(projectId)}/tasks`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify(data)
         })
         .then(response => {
             console.log('Widget: Feedback submission response:', response.status);
@@ -583,10 +731,14 @@
             console.error('Widget: Failed to submit feedback:', error);
             showError('Fehler beim Senden des Feedbacks: ' + error.message);
             // Re-enable form
-            submitBtn.textContent = 'Senden';
-            submitBtn.disabled = false;
-            titleEl.disabled = false;
-            descriptionEl.disabled = false;
+            const submitBtn = modal.querySelector('#submit-feedback');
+            const titleEl = modal.querySelector('#feedback-title');
+            const descriptionEl = modal.querySelector('#feedback-description');
+            
+            if (submitBtn) submitBtn.textContent = 'Senden';
+            if (submitBtn) submitBtn.disabled = false;
+            if (titleEl) titleEl.disabled = false;
+            if (descriptionEl) descriptionEl.disabled = false;
             isSubmitting = false;
         });
     }
@@ -637,7 +789,6 @@
         
         isSelecting = false;
         isSubmitting = false;
-        screenshotBlob = null;
         currentSelectionData = null;
         
         removeHighlight();
