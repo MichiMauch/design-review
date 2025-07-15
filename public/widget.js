@@ -28,24 +28,84 @@
     let modal = null;
     let selectionArea = null;
     
-    // Load html2canvas for screenshots
-    async function loadHtml2Canvas() {
-        if (window.html2canvas) {
-            return window.html2canvas;
+    // Create screenshot using external API
+    async function createScreenshot() {
+        if (!selectionArea) {
+            console.error('Widget: No selection area available');
+            return null;
         }
         
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-            script.onload = () => {
-                console.log('Widget: html2canvas loaded');
-                resolve(window.html2canvas);
+        try {
+            console.log('Widget: Creating screenshot using external API...');
+            
+            // Use preview.nodehive.com API for screenshot
+            const screenshotUrl = `https://preview.nodehive.com/api/screenshot?url=${encodeURIComponent(window.location.href)}&width=1920&height=1080&format=jpeg&quality=90`;
+            
+            console.log('Widget: Fetching screenshot from:', screenshotUrl);
+            
+            const response = await fetch(screenshotUrl);
+            if (!response.ok) {
+                throw new Error(`Screenshot API returned ${response.status}`);
+            }
+            
+            // Convert response to blob and then to data URL
+            const blob = await response.blob();
+            const dataURL = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+            
+            console.log('Widget: Screenshot fetched successfully');
+            
+            // Crop the screenshot to the selected area
+            const croppedDataURL = await cropImageToArea(dataURL, selectionArea);
+            
+            console.log('Widget: Screenshot cropped successfully');
+            return croppedDataURL;
+            
+        } catch (error) {
+            console.error('Widget: Screenshot creation failed:', error);
+            return null;
+        }
+    }
+    
+    // Crop image to selected area
+    function cropImageToArea(dataURL, area) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = area.width;
+                canvas.height = area.height;
+                const ctx = canvas.getContext('2d');
+                
+                // Calculate scale factor (screenshot might be different size than viewport)
+                const scaleX = img.width / window.innerWidth;
+                const scaleY = img.height / window.innerHeight;
+                
+                // Scale the selection area to match the screenshot dimensions
+                const scaledArea = {
+                    x: area.x * scaleX,
+                    y: area.y * scaleY,
+                    width: area.width * scaleX,
+                    height: area.height * scaleY
+                };
+                
+                // Draw the cropped area
+                ctx.drawImage(
+                    img,
+                    scaledArea.x, scaledArea.y, scaledArea.width, scaledArea.height,
+                    0, 0, area.width, area.height
+                );
+                
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
             };
-            script.onerror = () => {
-                console.error('Widget: Failed to load html2canvas');
-                reject(new Error('Failed to load html2canvas'));
+            img.onerror = () => {
+                console.error('Widget: Failed to load screenshot image');
+                resolve(null);
             };
-            document.head.appendChild(script);
+            img.src = dataURL;
         });
     }
     
@@ -280,7 +340,7 @@
         selectionArea = null;
     }
     
-    // Create screenshot
+    // Create screenshot using external API
     async function createScreenshot() {
         if (!selectionArea) {
             console.error('Widget: No selection area available');
@@ -288,74 +348,33 @@
         }
         
         try {
-            console.log('Widget: Creating screenshot...');
+            console.log('Widget: Creating screenshot using external API...');
             
-            // Load html2canvas
-            const html2canvas = await loadHtml2Canvas();
+            // Use preview.nodehive.com API for screenshot
+            const screenshotUrl = `https://preview.nodehive.com/api/screenshot?url=${encodeURIComponent(window.location.href)}&width=1920&height=1080&format=jpeg&quality=90`;
             
-            // Hide widget elements temporarily
-            const widgetElements = document.querySelectorAll('#feedback-widget-button, #feedback-modal');
-            widgetElements.forEach(el => {
-                el.style.display = 'none';
+            console.log('Widget: Fetching screenshot from:', screenshotUrl);
+            
+            const response = await fetch(screenshotUrl);
+            if (!response.ok) {
+                throw new Error(`Screenshot API returned ${response.status}`);
+            }
+            
+            // Convert response to blob and then to data URL
+            const blob = await response.blob();
+            const dataURL = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
             });
             
-            // Capture full page
-            const canvas = await html2canvas(document.body, {
-                useCORS: true,
-                allowTaint: false,
-                scale: 1,
-                logging: false,
-                backgroundColor: '#ffffff',
-                ignoreElements: (element) => {
-                    // Skip elements that might cause issues
-                    if (element.style && element.style.color && element.style.color.includes('oklab')) {
-                        return true;
-                    }
-                    if (element.style && element.style.backgroundColor && element.style.backgroundColor.includes('oklab')) {
-                        return true;
-                    }
-                    return false;
-                },
-                onclone: (clonedDoc) => {
-                    // Remove problematic CSS that html2canvas can't handle
-                    const elements = clonedDoc.querySelectorAll('*');
-                    elements.forEach(el => {
-                        if (el.style) {
-                            // Replace oklab colors with fallback
-                            if (el.style.color && el.style.color.includes('oklab')) {
-                                el.style.color = '#000000';
-                            }
-                            if (el.style.backgroundColor && el.style.backgroundColor.includes('oklab')) {
-                                el.style.backgroundColor = '#ffffff';
-                            }
-                            // Remove CSS features that might cause issues
-                            el.style.colorScheme = '';
-                            el.style.accentColor = '';
-                        }
-                    });
-                }
-            });
+            console.log('Widget: Screenshot fetched successfully');
             
-            // Restore widget elements
-            widgetElements.forEach(el => {
-                el.style.display = '';
-            });
+            // Crop the screenshot to the selected area
+            const croppedDataURL = await cropImageToArea(dataURL, selectionArea);
             
-            // Crop to selected area
-            const croppedCanvas = document.createElement('canvas');
-            croppedCanvas.width = selectionArea.width;
-            croppedCanvas.height = selectionArea.height;
-            const ctx = croppedCanvas.getContext('2d');
-            
-            ctx.drawImage(
-                canvas,
-                selectionArea.x, selectionArea.y, selectionArea.width, selectionArea.height,
-                0, 0, selectionArea.width, selectionArea.height
-            );
-            
-            const dataURL = croppedCanvas.toDataURL('image/png', 0.9);
-            console.log('Widget: Screenshot created successfully');
-            return dataURL;
+            console.log('Widget: Screenshot cropped successfully');
+            return croppedDataURL;
             
         } catch (error) {
             console.error('Widget: Screenshot creation failed:', error);
