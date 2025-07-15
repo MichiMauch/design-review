@@ -188,8 +188,8 @@
         
         isSelecting = true;
         
-        // Use RobustScreenshot if available, otherwise fallback
-        if (window.RobustScreenshot) {
+        // Use ImprovedRobustScreenshot if available, otherwise fallback
+        if (window.ImprovedRobustScreenshot) {
             try {
                 // First, let user select area
                 const hybridScreenshot = new window.HybridScreenshot();
@@ -207,9 +207,9 @@
                     return;
                 }
                 
-                // Now use RobustScreenshot to capture the area
-                const robustScreenshot = new window.RobustScreenshot();
-                const screenshotData = await robustScreenshot.captureArea(selectedArea);
+                // Now use ImprovedRobustScreenshot to capture the area
+                const improvedScreenshot = new window.ImprovedRobustScreenshot();
+                const screenshotData = await improvedScreenshot.captureArea(selectedArea);
                 
                 // Set selection data for the modal
                 currentSelectionData = {
@@ -220,15 +220,15 @@
                 };
                 
                 if (screenshotData) {
-                    console.log('Widget: RobustScreenshot succeeded, showing modal');
+                    console.log('Widget: ImprovedRobustScreenshot succeeded, showing modal');
                     showFeedbackModalDirect(screenshotData);
                 } else {
-                    console.log('Widget: RobustScreenshot failed, showing modal without screenshot');
+                    console.log('Widget: ImprovedRobustScreenshot failed, showing modal without screenshot');
                     showFeedbackModalDirect(null);
                 }
                 
             } catch (error) {
-                console.error('Widget: RobustScreenshot failed:', error);
+                console.error('Widget: ImprovedRobustScreenshot failed:', error);
                 // Reset and fallback to old system
                 isSelecting = false;
                 const button = document.getElementById('feedback-widget-button');

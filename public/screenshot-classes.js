@@ -1317,19 +1317,14 @@ class ImagePreloader {
   }
 
   async triggerIntersectionObserver(element) {
-    // Alle Elemente kurz in den Viewport bringen
-    const allElements = element.querySelectorAll('*');
+    // Nur Bilder sanft in den Viewport bringen ohne wildes Scrollen
+    const images = element.querySelectorAll('img[loading="lazy"], img[data-src]');
     
-    for (let i = 0; i < allElements.length; i += 10) { // Batches von 10
-      const batch = Array.from(allElements).slice(i, i + 10);
-      batch.forEach(el => {
-        el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-      });
-      await new Promise(resolve => setTimeout(resolve, 10));
+    for (const img of images) {
+      // Sanft ins Viewport bringen ohne zu scrollen
+      img.scrollIntoView({ block: 'nearest', behavior: 'instant', inline: 'nearest' });
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
-    
-    // Zurück zum ursprünglichen Scroll-Position
-    window.scrollTo(0, 0);
   }
 }
 
@@ -1552,6 +1547,472 @@ class FullPageScreenshot {
   }
 }
 
+class ReliableHTML2CanvasLoader {
+  constructor() {
+    this.html2canvasLoaded = false;
+    this.loadingPromise = null;
+  }
+
+  async loadHTML2Canvas() {
+    if (this.html2canvasLoaded && window.html2canvas) {
+      return window.html2canvas;
+    }
+
+    if (this.loadingPromise) {
+      return this.loadingPromise;
+    }
+
+    this.loadingPromise = this.tryMultipleLoaders();
+    return this.loadingPromise;
+  }
+
+  async tryMultipleLoaders() {
+    const loaders = [
+      () => this.loadFromCDN(),
+      () => this.loadFromUnpkg(),
+      () => this.loadFromJsdelivr(),
+      () => this.loadFromBundle()
+    ];
+
+    for (const loader of loaders) {
+      try {
+        const html2canvas = await loader();
+        if (html2canvas) {
+          this.html2canvasLoaded = true;
+          window.html2canvas = html2canvas;
+          console.log('html2canvas loaded successfully via ReliableLoader');
+          return html2canvas;
+        }
+      } catch (error) {
+        console.warn(`html2canvas loader failed:`, error.message);
+        continue;
+      }
+    }
+
+    throw new Error('All html2canvas loaders failed');
+  }
+
+  async loadFromCDN() {
+    return new Promise((resolve, reject) => {
+      if (window.html2canvas) {
+        resolve(window.html2canvas);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      script.onload = () => resolve(window.html2canvas);
+      script.onerror = () => reject(new Error('CDN load failed'));
+      document.head.appendChild(script);
+      
+      // Timeout nach 10 Sekunden
+      setTimeout(() => reject(new Error('CDN load timeout')), 10000);
+    });
+  }
+
+  async loadFromUnpkg() {
+    const response = await fetch('https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js');
+    const code = await response.text();
+    
+    // Execute code
+    const script = document.createElement('script');
+    script.textContent = code;
+    document.head.appendChild(script);
+    
+    return window.html2canvas;
+  }
+
+  async loadFromJsdelivr() {
+    const response = await fetch('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+    const code = await response.text();
+    
+    const script = document.createElement('script');
+    script.textContent = code;
+    document.head.appendChild(script);
+    
+    return window.html2canvas;
+  }
+
+  async loadFromBundle() {
+    // Fallback: Dynamic import wenn verfügbar
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      return html2canvas;
+    } catch (error) {
+      throw new Error('Dynamic import failed');
+    }
+  }
+}
+
+class BrokenImageHandler {
+  async fixBrokenImages(element = document.body) {
+    const brokenImages = await this.findBrokenImages(element);
+    console.log(`BrokenImageHandler: Found ${brokenImages.length} broken images`);
+    
+    for (const img of brokenImages) {
+      await this.handleBrokenImage(img);
+    }
+  }
+
+  async findBrokenImages(element) {
+    const images = element.querySelectorAll('img');
+    const brokenImages = [];
+    
+    for (const img of images) {
+      if (await this.isImageBroken(img)) {
+        brokenImages.push(img);
+      }
+    }
+    
+    return brokenImages;
+  }
+
+  async isImageBroken(img) {
+    return new Promise((resolve) => {
+      // Bereits geladene Images checken
+      if (img.complete) {
+        resolve(img.naturalWidth === 0);
+        return;
+      }
+      
+      // Noch ladende Images checken
+      const timeout = setTimeout(() => {
+        resolve(true); // Als broken behandeln wenn zu lange dauert
+      }, 5000);
+      
+      img.onload = () => {
+        clearTimeout(timeout);
+        resolve(img.naturalWidth === 0);
+      };
+      
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+    });
+  }
+
+  async handleBrokenImage(img) {
+    const originalSrc = img.src;
+    console.log(`BrokenImageHandler: Fixing broken image: ${originalSrc}`);
+    
+    // 1. Versuche verschiedene Fallbacks
+    const fallbacks = await this.generateFallbacks(originalSrc, img);
+    
+    for (const fallbackSrc of fallbacks) {
+      if (await this.testImageUrl(fallbackSrc)) {
+        img.src = fallbackSrc;
+        console.log(`BrokenImageHandler: Fixed with fallback: ${fallbackSrc}`);
+        return;
+      }
+    }
+    
+    // 2. Letzter Ausweg: Placeholder
+    this.createPlaceholder(img);
+  }
+
+  async generateFallbacks(originalSrc, img) {
+    const fallbacks = [];
+    
+    // Verschiedene URL-Varianten probieren
+    if (originalSrc.includes('_next/image')) {
+      // Next.js Image Optimizer Problem
+      const urlParams = new URLSearchParams(originalSrc.split('?')[1]);
+      const originalUrl = urlParams.get('url');
+      
+      if (originalUrl) {
+        fallbacks.push(decodeURIComponent(originalUrl));
+        
+        // Verschiedene Größen probieren
+        fallbacks.push(originalSrc.replace(/w=\d+/, 'w=800'));
+        fallbacks.push(originalSrc.replace(/w=\d+/, 'w=400'));
+        fallbacks.push(originalSrc.replace(/&q=\d+/, '&q=50'));
+      }
+    }
+    
+    // Relative URLs zu absoluten machen
+    if (originalSrc.startsWith('/')) {
+      fallbacks.push(window.location.origin + originalSrc);
+    }
+    
+    // HTTP/HTTPS Varianten
+    if (originalSrc.startsWith('http://')) {
+      fallbacks.push(originalSrc.replace('http://', 'https://'));
+    }
+    
+    return fallbacks;
+  }
+
+  async testImageUrl(url) {
+    return new Promise((resolve) => {
+      const testImg = new Image();
+      testImg.onload = () => resolve(true);
+      testImg.onerror = () => resolve(false);
+      testImg.src = url;
+      
+      // Timeout nach 3 Sekunden
+      setTimeout(() => resolve(false), 3000);
+    });
+  }
+
+  createPlaceholder(img) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Größe vom Original-Image nehmen
+    const rect = img.getBoundingClientRect();
+    canvas.width = rect.width || 200;
+    canvas.height = rect.height || 150;
+    
+    // Placeholder zeichnen
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#999';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Bild nicht verfügbar', canvas.width/2, canvas.height/2);
+    
+    // Canvas als Data URL setzen
+    img.src = canvas.toDataURL('image/png');
+    console.log('BrokenImageHandler: Created placeholder for broken image');
+  }
+}
+
+class ImprovedRobustScreenshot {
+  constructor() {
+    this.html2canvasLoader = new ReliableHTML2CanvasLoader();
+    this.imageHandler = new BrokenImageHandler();
+  }
+
+  async captureArea(area) {
+    console.log('ImprovedRobustScreenshot: Starting area capture with enhanced fallbacks', { area });
+    
+    // 1. Broken Images fixen (ohne wildes Scrollen)
+    await this.imageHandler.fixBrokenImages();
+    
+    // 2. html2canvas sicherstellen
+    try {
+      await this.html2canvasLoader.loadHTML2Canvas();
+    } catch (error) {
+      console.warn('ImprovedRobustScreenshot: html2canvas loading failed, will skip html2canvas methods');
+    }
+    
+    const methods = [
+      () => this.tryHTML2CanvasArea(area),
+      () => this.tryDomToImageArea(area),
+      () => this.tryScreenCapture(),
+      () => this.createFallbackScreenshot(area)
+    ];
+
+    for (const [index, method] of methods.entries()) {
+      try {
+        console.log(`ImprovedRobustScreenshot: Trying method ${index + 1}/4...`);
+        const result = await method();
+        if (result) {
+          console.log(`ImprovedRobustScreenshot: Success with method ${index + 1}`);
+          return result;
+        }
+      } catch (error) {
+        console.warn(`ImprovedRobustScreenshot: method ${index + 1} failed:`, error.message);
+        continue;
+      }
+    }
+
+    throw new Error('All screenshot methods failed');
+  }
+
+  async tryHTML2CanvasArea(area) {
+    if (!window.html2canvas) {
+      throw new Error('html2canvas not available');
+    }
+    
+    console.log('ImprovedRobustScreenshot: Trying html2canvas with area crop...');
+    
+    // Ganzseitigen Screenshot machen ohne zu scrollen
+    const canvas = await window.html2canvas(document.body, {
+      useCORS: true,
+      allowTaint: false,
+      scale: 1,
+      logging: false,
+      width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+      height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+      ignoreElements: (element) => {
+        // Nur Widget-Elemente und Broken Images ignorieren
+        if (element.classList && element.classList.contains('widget')) {
+          return true;
+        }
+        if (element.id && element.id.includes('feedback')) {
+          return true;
+        }
+        if (element.tagName === 'IMG' && element.naturalWidth === 0) {
+          return true;
+        }
+        return false;
+      }
+    });
+    
+    // Area aus dem Screenshot croppen
+    return this.cropCanvasToArea(canvas, area);
+  }
+
+  async tryDomToImageArea(area) {
+    console.log('ImprovedRobustScreenshot: Trying dom-to-image...');
+    
+    const domtoimage = await this.loadDomToImage();
+    
+    // Ganzseitigen Screenshot machen
+    const dataUrl = await domtoimage.toPng(document.body, {
+      quality: 0.95,
+      bgcolor: '#ffffff',
+      width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+      height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+      filter: (node) => {
+        // Nur Widget-Elemente und Broken Images ausschließen
+        if (node.classList && node.classList.contains('widget')) {
+          return false;
+        }
+        if (node.id && node.id.includes('feedback')) {
+          return false;
+        }
+        if (node.tagName === 'IMG' && node.naturalWidth === 0) {
+          return false;
+        }
+        return true;
+      }
+    });
+    
+    // Area aus dem Screenshot croppen
+    return this.cropDataUrlToArea(dataUrl, area);
+  }
+
+  async tryScreenCapture() {
+    if (!('getDisplayMedia' in navigator.mediaDevices)) {
+      throw new Error('Screen Capture API not available');
+    }
+    
+    console.log('ImprovedRobustScreenshot: Trying Screen Capture API...');
+    
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { 
+        mediaSource: 'screen',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+    
+    return this.streamToDataURL(stream);
+  }
+
+  async createFallbackScreenshot(area) {
+    console.log('ImprovedRobustScreenshot: Creating fallback screenshot...');
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = area ? area.width : 800;
+    canvas.height = area ? area.height : 600;
+    
+    // Hintergrund
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Info-Text
+    ctx.fillStyle = '#333333';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    
+    const lines = [
+      'Screenshot Fallback',
+      `URL: ${window.location.href}`,
+      `Bereich: ${area ? `${area.width}x${area.height}` : 'Vollbild'}`,
+      `Zeit: ${new Date().toLocaleString()}`
+    ];
+    
+    lines.forEach((line, index) => {
+      ctx.fillText(line, canvas.width/2, 50 + (index * 30));
+    });
+    
+    return canvas.toDataURL('image/png');
+  }
+
+  cropCanvasToArea(canvas, area) {
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = area.width;
+    croppedCanvas.height = area.height;
+    const ctx = croppedCanvas.getContext('2d');
+    
+    ctx.drawImage(
+      canvas,
+      area.x, area.y, area.width, area.height,
+      0, 0, area.width, area.height
+    );
+    
+    return croppedCanvas.toDataURL('image/png');
+  }
+
+  cropDataUrlToArea(dataUrl, area) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = area.width;
+        canvas.height = area.height;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(
+          img,
+          area.x, area.y, area.width, area.height,
+          0, 0, area.width, area.height
+        );
+        
+        resolve(canvas.toDataURL('image/png', 0.95));
+      };
+      img.src = dataUrl;
+    });
+  }
+
+  async loadDomToImage() {
+    if (window.domtoimage) {
+      return window.domtoimage;
+    }
+    
+    // Versuche das bereits geladene dom-to-image zu verwenden
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/dom-to-image-more@2.8.0/dist/dom-to-image-more.min.js';
+    
+    return new Promise((resolve, reject) => {
+      script.onload = () => {
+        window.domtoimage = window.domtoimage;
+        resolve(window.domtoimage);
+      };
+      script.onerror = () => reject(new Error('dom-to-image loading failed'));
+      document.head.appendChild(script);
+    });
+  }
+
+  streamToDataURL(stream) {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.muted = true;
+
+      video.addEventListener('loadedmetadata', () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+
+        stream.getTracks().forEach(track => track.stop());
+        resolve(canvas.toDataURL('image/png'));
+      });
+    });
+  }
+}
+
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -1561,7 +2022,10 @@ if (typeof module !== 'undefined' && module.exports) {
     RobustScreenshot,
     ImagePreloader,
     PositionAwareScreenshot,
-    FullPageScreenshot
+    FullPageScreenshot,
+    ReliableHTML2CanvasLoader,
+    BrokenImageHandler,
+    ImprovedRobustScreenshot
   };
 }
 
@@ -1574,6 +2038,9 @@ if (typeof window !== 'undefined') {
   window.ImagePreloader = ImagePreloader;
   window.PositionAwareScreenshot = PositionAwareScreenshot;
   window.FullPageScreenshot = FullPageScreenshot;
+  window.ReliableHTML2CanvasLoader = ReliableHTML2CanvasLoader;
+  window.BrokenImageHandler = BrokenImageHandler;
+  window.ImprovedRobustScreenshot = ImprovedRobustScreenshot;
   
   // Debug logging
   console.log('Screenshot classes loaded:', {
@@ -1583,6 +2050,9 @@ if (typeof window !== 'undefined') {
     RobustScreenshot: typeof RobustScreenshot,
     ImagePreloader: typeof ImagePreloader,
     PositionAwareScreenshot: typeof PositionAwareScreenshot,
-    FullPageScreenshot: typeof FullPageScreenshot
+    FullPageScreenshot: typeof FullPageScreenshot,
+    ReliableHTML2CanvasLoader: typeof ReliableHTML2CanvasLoader,
+    BrokenImageHandler: typeof BrokenImageHandler,
+    ImprovedRobustScreenshot: typeof ImprovedRobustScreenshot
   });
 }
