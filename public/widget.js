@@ -10,7 +10,19 @@
     // Configuration
     const script = document.currentScript || document.querySelector('script[data-project-id]');
     const projectId = script?.getAttribute('data-project-id') || 'default-project';
-    const baseUrl = script?.src ? new URL(script.src).origin : 'https://design-review-self.vercel.app';
+    
+    // Auto-detect baseUrl: if script is loaded from localhost, use localhost, otherwise use production
+    let baseUrl = 'http://localhost:3000'; // Default for local development
+    if (script?.src) {
+        const scriptUrl = new URL(script.src);
+        if (scriptUrl.hostname === 'localhost' || scriptUrl.hostname === '127.0.0.1') {
+            baseUrl = `${scriptUrl.protocol}//${scriptUrl.hostname}:${scriptUrl.port}`;
+        } else {
+            // External deployment - we need to find the correct production URL
+            // For now, let's try to use the same origin as the script
+            baseUrl = scriptUrl.origin;
+        }
+    }
     
     console.log('Widget: Configuration loaded', { projectId, baseUrl });
     
