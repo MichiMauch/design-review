@@ -406,10 +406,16 @@
         // Upload screenshot to blob storage
         const screenshotUrl = await this.uploadScreenshot(screenshot);
         
-        // Create task
+        // Translate title and description to English
+        const translatedTitle = await this.translateText(title);
+        const translatedDescription = description ? await this.translateText(description) : '';
+        
+        // Create task with both German and English versions
         await this.createTask({
           title,
           description,
+          title_en: translatedTitle,
+          description_en: translatedDescription,
           screenshot: screenshotUrl,
           url: window.location.href,
           selected_area: this.selectedArea
@@ -431,6 +437,37 @@
       }
     }
 
+    async translateText(text) {
+      try {
+        if (!text || !text.trim()) {
+          return '';
+        }
+        
+        const response = await fetch(`${this.apiBase}/api/translate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: text.trim(),
+            from: 'de',
+            to: 'en'
+          })
+        });
+        
+        if (!response.ok) {
+          console.error('Translation failed:', response.status);
+          return text; // Return original text if translation fails
+        }
+        
+        const data = await response.json();
+        return data.translatedText || text;
+      } catch (error) {
+        console.error('Translation error:', error);
+        return text; // Return original text if translation fails
+      }
+    }
+
     async createScreenshot() {
       console.log('Creating browser screenshot with Tailwind CSS v3');
       return this.createDirectScreenshot();
@@ -443,6 +480,9 @@
       }
 
       return new Promise((resolve) => {
+        // Hide problematic elements before taking screenshot
+        const hiddenElements = this.hideProblematicElements();
+        
         const options = {
           useCORS: true,
           allowTaint: false,
@@ -468,6 +508,8 @@
         }
 
         window.html2canvas(document.body, options).then(canvas => {
+          // Restore hidden elements
+          this.restoreProblematicElements(hiddenElements);
           console.log('Screenshot captured:', {
             width: canvas.width,
             height: canvas.height,
@@ -499,8 +541,10 @@
             
             window.html2canvas(document.body, options).then(fallbackCanvas => {
               console.log('Fallback screenshot captured');
+              this.restoreProblematicElements(hiddenElements);
               resolve(fallbackCanvas.toDataURL('image/png', 0.9));
             }).catch(() => {
+              this.restoreProblematicElements(hiddenElements);
               resolve(this.createFallbackScreenshot());
             });
             return;
@@ -516,6 +560,8 @@
           resolve(canvas.toDataURL('image/png', 0.9));
         }).catch(error => {
           console.error('Screenshot failed:', error);
+          // Restore hidden elements even on error
+          this.restoreProblematicElements(hiddenElements);
           resolve(this.createFallbackScreenshot());
         });
       });
@@ -537,39 +583,87 @@
     }
 
     hideProblematicElements() {
-      const problematicSelectors = [
-        'style[data-emotion]',
-        'style[data-styled]',
-        '[class*="gradient"]',
-        '[style*="oklch"]',
-        '[style*="color("]'
-      ];
-      
       const hiddenElements = [];
       
-      problematicSelectors.forEach(selector => {
-        try {
-          const elements = document.querySelectorAll(selector);
-          elements.forEach(el => {
-            if (el.style.display !== 'none') {
-              hiddenElements.push({
-                element: el,
-                originalDisplay: el.style.display || ''
-              });
-              el.style.display = 'none';
-            }
-          });
-        } catch {
-          // Ignore selector errors
+      // Hide ALL existing style elements and link elements
+      const allStyleElements = document.querySelectorAll('style, link[rel="stylesheet"]');
+      allStyleElements.forEach(el => {
+        hiddenElements.push({
+          element: el,
+          originalDisplay: el.style.display || '',
+          originalVisibility: el.style.visibility || '',
+          wasHidden: el.style.display === 'none',
+          type: 'style'
+        });
+        el.style.display = 'none';
+      });
+      
+      // Find all elements with problematic inline styles and fix them
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(el => {
+        const originalStyle = el.getAttribute('style');
+        if (originalStyle) {
+          // Check if style contains problematic CSS functions
+          const hasProblematicCSS = /oklab|oklch|color\(|color-mix|lch|lab|hwb/i.test(originalStyle);
+          
+          if (hasProblematicCSS) {
+            hiddenElements.push({
+              element: el,
+              originalStyle: originalStyle,
+              type: 'inline-style'
+            });
+            
+            // Replace with safe styles
+            let safeStyle = originalStyle;
+            
+            // Remove problematic color functions
+            safeStyle = safeStyle.replace(/oklab\([^)]+\)/gi, '#000000');
+            safeStyle = safeStyle.replace(/oklch\([^)]+\)/gi, '#000000');
+            safeStyle = safeStyle.replace(/color\([^)]+\)/gi, '#000000');
+            safeStyle = safeStyle.replace(/color-mix\([^)]+\)/gi, '#000000');
+            safeStyle = safeStyle.replace(/lch\([^)]+\)/gi, '#000000');
+            safeStyle = safeStyle.replace(/lab\([^)]+\)/gi, '#000000');
+            safeStyle = safeStyle.replace(/hwb\([^)]+\)/gi, '#000000');
+            
+            el.setAttribute('style', safeStyle);
+          }
         }
+      });
+      
+      // Create a minimal safe stylesheet for basic styling
+      const safeStyleSheet = document.createElement('style');
+      safeStyleSheet.id = 'feedback-widget-safe-styles';
+      safeStyleSheet.textContent = `
+        .feedback-widget-button,
+        .feedback-widget-overlay,
+        .feedback-widget-selection-overlay,
+        .feedback-widget-selection-box {
+          display: none !important;
+        }
+      `;
+      
+      document.head.appendChild(safeStyleSheet);
+      hiddenElements.push({
+        element: safeStyleSheet,
+        type: 'temporary'
       });
       
       return hiddenElements;
     }
 
     restoreProblematicElements(hiddenElements) {
-      hiddenElements.forEach(({element, originalDisplay}) => {
-        element.style.display = originalDisplay;
+      hiddenElements.forEach(({element, originalDisplay, originalVisibility, wasHidden, originalStyle, type}) => {
+        if (type === 'temporary') {
+          // Remove our temporary safe stylesheet
+          element.remove();
+        } else if (type === 'inline-style') {
+          // Restore original inline styles
+          element.setAttribute('style', originalStyle);
+        } else if (type === 'style' && !wasHidden) {
+          // Only restore style elements if they weren't originally hidden
+          element.style.display = originalDisplay;
+          element.style.visibility = originalVisibility;
+        }
       });
     }
 

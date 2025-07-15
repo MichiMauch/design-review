@@ -33,7 +33,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const resolvedParams = await params;
-    const { title, description, screenshot, url, selected_area } = await request.json();
+    const { title, description, screenshot, url, selected_area, title_en, description_en } = await request.json();
 
     if (!title || !url) {
       return addCorsHeaders(new Response('Titel und URL sind erforderlich', { status: 400 }));
@@ -56,8 +56,8 @@ export async function POST(request, { params }) {
 
     const result = await db.execute({
       sql: `
-        INSERT INTO tasks (project_id, title, description, screenshot, url, selected_area, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (project_id, title, description, screenshot, url, selected_area, title_en, description_en, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       args: [
         resolvedParams.id,
@@ -66,6 +66,8 @@ export async function POST(request, { params }) {
         screenshot || null,
         url,
         selected_area ? JSON.stringify(selected_area) : null,
+        title_en || null,
+        description_en || null,
         germanTime
       ]
     });
@@ -81,6 +83,8 @@ export async function POST(request, { params }) {
       url,
       status: 'open',
       selected_area,
+      title_en,
+      description_en,
       created_at: germanTime
     }));
 
