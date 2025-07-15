@@ -595,7 +595,7 @@ class HybridScreenshot {
 
   async selectAndCaptureArea() {
     return new Promise((resolve) => {
-      this.createAreaSelectionOverlay((selectedArea) => {
+      this.createAreaSelectionOverlayWithCallback((selectedArea) => {
         if (selectedArea) {
           this.selectedArea = selectedArea;
           this.highlightSelectedArea(selectedArea);
@@ -615,6 +615,15 @@ class HybridScreenshot {
         } else {
           resolve(null);
         }
+      });
+    });
+  }
+
+  // Promise-based version for easier async/await usage
+  async createAreaSelectionOverlay() {
+    return new Promise((resolve) => {
+      this.createAreaSelectionOverlayWithCallback((selectedArea) => {
+        resolve(selectedArea);
       });
     });
   }
@@ -645,7 +654,7 @@ class HybridScreenshot {
     });
   }
 
-  createAreaSelectionOverlay(callback) {
+  createAreaSelectionOverlayWithCallback(callback) {
     const overlay = document.createElement('div');
     overlay.style.cssText = `
       position: fixed;
