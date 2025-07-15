@@ -983,7 +983,11 @@ class RobustScreenshot {
   constructor() {
     this.reliableScreenshot = new ReliableScreenshot();
     this.fallbackScreenshot = new FallbackScreenshot();
+    this.positionAwareScreenshot = new PositionAwareScreenshot();
+    this.fullPageScreenshot = new FullPageScreenshot();
     this.methods = [
+      { name: 'position-aware', func: (area) => this.tryPositionAware(area) },
+      { name: 'full-page', func: (area) => this.tryFullPage(area) },
       { name: 'html2canvas-modern', func: () => this.tryHtml2CanvasModern() },
       { name: 'html2canvas-legacy', func: () => this.tryHtml2CanvasLegacy() },
       { name: 'dom-to-image', func: () => this.tryDomToImage() },
@@ -993,12 +997,12 @@ class RobustScreenshot {
   }
 
   async captureWithFallbacks(element = document.body, area = null) {
-    console.log('RobustScreenshot: Starting capture with fallbacks');
+    console.log('RobustScreenshot: Starting capture with fallbacks', { area });
     
     for (const method of this.methods) {
       try {
         console.log(`RobustScreenshot: Trying ${method.name}...`);
-        const result = await method.func();
+        const result = await method.func(area);
         
         if (result) {
           console.log(`RobustScreenshot: Success with ${method.name}`);
@@ -1012,6 +1016,25 @@ class RobustScreenshot {
     
     console.error('RobustScreenshot: All methods failed');
     return null;
+  }
+
+  async tryPositionAware(area = null) {
+    if (!area) {
+      throw new Error('Area required for position-aware capture');
+    }
+    
+    console.log('RobustScreenshot: Using PositionAwareScreenshot...');
+    return await this.positionAwareScreenshot.captureSpecificArea(area);
+  }
+
+  async tryFullPage(area = null) {
+    console.log('RobustScreenshot: Using FullPageScreenshot...');
+    
+    if (area) {
+      return await this.fullPageScreenshot.captureArea(area);
+    } else {
+      return await this.fullPageScreenshot.captureFullPage();
+    }
   }
 
   async tryHtml2CanvasModern() {
@@ -1135,8 +1158,21 @@ class RobustScreenshot {
     return await this.fallbackScreenshot.serverScreenshot();
   }
 
-  // Convenience method for area capture
+  // Enhanced area capture with new position-aware methods
   async captureArea(area) {
+    console.log('RobustScreenshot: Starting area capture with enhanced methods', area);
+    
+    // Pass area to captureWithFallbacks so position-aware methods can use it
+    const screenshot = await this.captureWithFallbacks(document.body, area);
+    
+    if (screenshot) {
+      console.log('RobustScreenshot: Area capture successful');
+      return screenshot;
+    }
+    
+    console.warn('RobustScreenshot: Area capture failed, trying fallback crop method');
+    
+    // Fallback: capture full page and crop manually
     const fullScreenshot = await this.captureWithFallbacks();
     
     if (!fullScreenshot) {
@@ -1165,13 +1201,367 @@ class RobustScreenshot {
   }
 }
 
+class ImagePreloader {
+  async ensureAllImagesLoaded(element = document.body) {
+    console.log('ImagePreloader: Starting comprehensive image loading...');
+    
+    // 1. Lazy Loading Images forcieren
+    await this.loadLazyImages(element);
+    
+    // 2. Background Images laden
+    await this.loadBackgroundImages(element);
+    
+    // 3. Warten bis alle Images geladen sind
+    await this.waitForImageLoad(element);
+    
+    // 4. Intersection Observer Images triggern
+    await this.triggerIntersectionObserver(element);
+    
+    console.log('ImagePreloader: All images loaded');
+  }
+
+  async loadLazyImages(element) {
+    const lazyImages = element.querySelectorAll(`
+      img[loading="lazy"],
+      img[data-src],
+      img[data-lazy],
+      img[data-original],
+      [data-bg],
+      [data-background]
+    `);
+
+    console.log(`ImagePreloader: Found ${lazyImages.length} lazy images`);
+
+    lazyImages.forEach(img => {
+      // data-src zu src
+      if (img.dataset.src) {
+        img.src = img.dataset.src;
+      }
+      
+      // data-background zu background
+      if (img.dataset.bg || img.dataset.background) {
+        img.style.backgroundImage = `url(${img.dataset.bg || img.dataset.background})`;
+      }
+      
+      // loading="lazy" entfernen
+      if (img.loading === 'lazy') {
+        img.loading = 'eager';
+      }
+      
+      // In den Viewport scrollen (triggert Lazy Loading)
+      img.scrollIntoView({ block: 'nearest' });
+    });
+
+    // Kurz warten
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  async loadBackgroundImages(element) {
+    const elementsWithBg = [];
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_ELEMENT,
+      null,
+      false
+    );
+
+    let node;
+    while (node = walker.nextNode()) {
+      const style = getComputedStyle(node);
+      const bgImage = style.backgroundImage;
+      
+      if (bgImage && bgImage !== 'none' && bgImage.includes('url(')) {
+        elementsWithBg.push({
+          element: node,
+          url: this.extractImageUrl(bgImage)
+        });
+      }
+    }
+
+    console.log(`ImagePreloader: Found ${elementsWithBg.length} background images`);
+
+    // Background Images preloaden
+    const loadPromises = elementsWithBg.map(({ url }) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = resolve;
+        img.onerror = resolve; // Auch bei Fehlern weitermachen
+        img.src = url;
+      });
+    });
+
+    await Promise.all(loadPromises);
+  }
+
+  extractImageUrl(bgImage) {
+    const match = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+    return match ? match[1] : '';
+  }
+
+  async waitForImageLoad(element) {
+    const images = element.querySelectorAll('img');
+    console.log(`ImagePreloader: Waiting for ${images.length} images to load`);
+    
+    const loadPromises = Array.from(images).map(img => {
+      return new Promise((resolve) => {
+        if (img.complete) {
+          resolve();
+        } else {
+          img.onload = resolve;
+          img.onerror = resolve;
+        }
+      });
+    });
+
+    await Promise.all(loadPromises);
+  }
+
+  async triggerIntersectionObserver(element) {
+    // Alle Elemente kurz in den Viewport bringen
+    const allElements = element.querySelectorAll('*');
+    
+    for (let i = 0; i < allElements.length; i += 10) { // Batches von 10
+      const batch = Array.from(allElements).slice(i, i + 10);
+      batch.forEach(el => {
+        el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    // Zurück zum ursprünglichen Scroll-Position
+    window.scrollTo(0, 0);
+  }
+}
+
+class PositionAwareScreenshot {
+  constructor() {
+    this.imagePreloader = new ImagePreloader();
+  }
+
+  async captureSpecificArea(targetArea) {
+    console.log('PositionAwareScreenshot: Capturing area:', targetArea);
+    
+    // 1. Absolute Position berechnen
+    const absoluteRect = {
+      x: targetArea.x,
+      y: targetArea.y,
+      width: targetArea.width,
+      height: targetArea.height
+    };
+
+    console.log('Target Area Position:', absoluteRect);
+
+    // 2. Zum Bereich scrollen
+    await this.scrollToArea(absoluteRect);
+    
+    // 3. Images laden
+    await this.imagePreloader.ensureAllImagesLoaded();
+    
+    // 4. Screenshot mit korrekter Position
+    return await this.captureWithPosition(absoluteRect);
+  }
+
+  async scrollToArea(area) {
+    // Smooth scroll zum Bereich
+    window.scrollTo({ 
+      left: Math.max(0, area.x - 100),
+      top: Math.max(0, area.y - 100),
+      behavior: 'instant'
+    });
+    
+    // Warten bis Scroll abgeschlossen
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Images nachladen nach Scroll
+    await this.imagePreloader.loadLazyImages(document.body);
+  }
+
+  async captureWithPosition(targetRect) {
+    try {
+      // Methode 1: Ganzer Viewport mit nachträglichem Crop
+      const fullScreenshot = await this.captureFullViewport();
+      return this.cropToArea(fullScreenshot, targetRect);
+      
+    } catch (error) {
+      console.log('Viewport capture failed, trying full page capture');
+      
+      // Methode 2: Full Page capture
+      const fullPageScreenshot = new FullPageScreenshot();
+      const fullImage = await fullPageScreenshot.captureFullPage();
+      return this.cropToArea(fullImage, targetRect);
+    }
+  }
+
+  async captureFullViewport() {
+    const html2canvas = window.html2canvas;
+    if (!html2canvas) {
+      throw new Error('html2canvas not available');
+    }
+    
+    const canvas = await html2canvas(document.body, {
+      useCORS: true,
+      allowTaint: false,
+      scale: 1,
+      x: 0,
+      y: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollX: 0,
+      scrollY: 0,
+      ignoreElements: (element) => {
+        if (element.classList && element.classList.contains('widget')) {
+          return true;
+        }
+        if (element.id && element.id.includes('feedback')) {
+          return true;
+        }
+        return false;
+      }
+    });
+    
+    return canvas.toDataURL('image/png');
+  }
+
+  cropToArea(dataUrl, targetRect) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Canvas auf Zielgröße setzen
+        canvas.width = targetRect.width;
+        canvas.height = targetRect.height;
+        
+        // Crop-Bereich aus Original-Image
+        const currentScrollX = window.pageXOffset;
+        const currentScrollY = window.pageYOffset;
+        
+        const cropX = targetRect.x - currentScrollX;
+        const cropY = targetRect.y - currentScrollY;
+        
+        ctx.drawImage(
+          img,
+          cropX, cropY, targetRect.width, targetRect.height,  // Source
+          0, 0, targetRect.width, targetRect.height           // Destination
+        );
+        
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = dataUrl;
+    });
+  }
+}
+
+class FullPageScreenshot {
+  constructor() {
+    this.imagePreloader = new ImagePreloader();
+  }
+
+  async captureFullPage() {
+    console.log('FullPageScreenshot: Starting full page capture...');
+    
+    // 1. Aktuelle Scroll-Position merken
+    const originalScrollX = window.pageXOffset;
+    const originalScrollY = window.pageYOffset;
+    
+    // 2. Zum Seitenanfang scrollen
+    window.scrollTo(0, 0);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 3. Alle Images laden
+    await this.imagePreloader.ensureAllImagesLoaded(document.body);
+    
+    // 4. Page-Dimensionen ermitteln
+    const pageHeight = Math.max(
+      document.body.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.clientHeight,
+      document.documentElement.scrollHeight,
+      document.documentElement.offsetHeight
+    );
+    
+    const pageWidth = Math.max(
+      document.body.scrollWidth,
+      document.body.offsetWidth,
+      document.documentElement.clientWidth,
+      document.documentElement.scrollWidth,
+      document.documentElement.offsetWidth
+    );
+    
+    console.log(`FullPageScreenshot: Page dimensions: ${pageWidth}x${pageHeight}`);
+    
+    // 5. Full-Page Screenshot
+    const html2canvas = window.html2canvas;
+    if (!html2canvas) {
+      throw new Error('html2canvas not available');
+    }
+    
+    const canvas = await html2canvas(document.body, {
+      useCORS: true,
+      allowTaint: false,
+      scale: 1,
+      height: pageHeight,
+      width: pageWidth,
+      scrollX: 0,
+      scrollY: 0,
+      ignoreElements: (element) => {
+        if (element.classList && element.classList.contains('widget')) {
+          return true;
+        }
+        if (element.id && element.id.includes('feedback')) {
+          return true;
+        }
+        // Nur spezifische problematische Next.js Bilder ausschließen
+        if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image') && element.src.includes('backend-economiesuisse-ch-main.netnode.app')) {
+          return true;
+        }
+        return false;
+      }
+    });
+    
+    // 6. Zurück zur ursprünglichen Position
+    window.scrollTo(originalScrollX, originalScrollY);
+    
+    console.log('FullPageScreenshot: Full page capture completed');
+    return canvas.toDataURL('image/png');
+  }
+
+  // Convenience method for area capture from full page
+  async captureArea(area) {
+    const fullScreenshot = await this.captureFullPage();
+    
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = area.width;
+        canvas.height = area.height;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(
+          img,
+          area.x, area.y, area.width, area.height,
+          0, 0, area.width, area.height
+        );
+        
+        resolve(canvas.toDataURL('image/png', 0.95));
+      };
+      img.src = fullScreenshot;
+    });
+  }
+}
+
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     ReliableScreenshot,
     FallbackScreenshot,
     HybridScreenshot,
-    RobustScreenshot
+    RobustScreenshot,
+    ImagePreloader,
+    PositionAwareScreenshot,
+    FullPageScreenshot
   };
 }
 
@@ -1181,12 +1571,18 @@ if (typeof window !== 'undefined') {
   window.FallbackScreenshot = FallbackScreenshot;
   window.HybridScreenshot = HybridScreenshot;
   window.RobustScreenshot = RobustScreenshot;
+  window.ImagePreloader = ImagePreloader;
+  window.PositionAwareScreenshot = PositionAwareScreenshot;
+  window.FullPageScreenshot = FullPageScreenshot;
   
   // Debug logging
   console.log('Screenshot classes loaded:', {
     ReliableScreenshot: typeof ReliableScreenshot,
     FallbackScreenshot: typeof FallbackScreenshot,
     HybridScreenshot: typeof HybridScreenshot,
-    RobustScreenshot: typeof RobustScreenshot
+    RobustScreenshot: typeof RobustScreenshot,
+    ImagePreloader: typeof ImagePreloader,
+    PositionAwareScreenshot: typeof PositionAwareScreenshot,
+    FullPageScreenshot: typeof FullPageScreenshot
   });
 }
