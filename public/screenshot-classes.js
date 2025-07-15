@@ -95,7 +95,19 @@ class FallbackScreenshot {
     return new Promise((resolve, reject) => {
       if (window.html2canvas) {
         this.html2canvas = window.html2canvas;
+        console.log('html2canvas already loaded');
         resolve();
+        return;
+      }
+
+      // Check if script is already being loaded
+      const existingScript = document.querySelector('script[src*="html2canvas"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => {
+          this.html2canvas = window.html2canvas;
+          console.log('html2canvas loaded from existing script');
+          resolve();
+        });
         return;
       }
 
@@ -103,9 +115,13 @@ class FallbackScreenshot {
       script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
       script.onload = () => {
         this.html2canvas = window.html2canvas;
+        console.log('html2canvas loaded successfully');
         resolve();
       };
-      script.onerror = reject;
+      script.onerror = (error) => {
+        console.error('Failed to load html2canvas:', error);
+        reject(error);
+      };
       document.head.appendChild(script);
     });
   }
@@ -114,7 +130,19 @@ class FallbackScreenshot {
     return new Promise((resolve, reject) => {
       if (window.domtoimage) {
         this.domtoimage = window.domtoimage;
+        console.log('dom-to-image already loaded');
         resolve();
+        return;
+      }
+
+      // Check if script is already being loaded
+      const existingScript = document.querySelector('script[src*="dom-to-image"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => {
+          this.domtoimage = window.domtoimage;
+          console.log('dom-to-image loaded from existing script');
+          resolve();
+        });
         return;
       }
 
@@ -122,9 +150,13 @@ class FallbackScreenshot {
       script.src = 'https://cdn.jsdelivr.net/npm/dom-to-image-more@2.8.0/dist/dom-to-image-more.min.js';
       script.onload = () => {
         this.domtoimage = window.domtoimage;
+        console.log('dom-to-image loaded successfully');
         resolve();
       };
-      script.onerror = reject;
+      script.onerror = (error) => {
+        console.error('Failed to load dom-to-image:', error);
+        reject(error);
+      };
       document.head.appendChild(script);
     });
   }
@@ -134,36 +166,49 @@ class FallbackScreenshot {
     
     // Try html2canvas first
     try {
-      const canvas = await this.html2canvas(element, {
-        allowTaint: false,
-        useCORS: true,
-        scale: 1,
-        logging: false,
-        backgroundColor: '#ffffff',
-        removeContainer: true
-      });
-      
-      return canvas.toDataURL('image/png', 0.95);
+      const html2canvas = this.html2canvas || window.html2canvas;
+      if (html2canvas) {
+        console.log('Trying html2canvas capture...');
+        const canvas = await html2canvas(element, {
+          allowTaint: false,
+          useCORS: true,
+          scale: 1,
+          logging: false,
+          backgroundColor: '#ffffff',
+          removeContainer: true
+        });
+        
+        return canvas.toDataURL('image/png', 0.95);
+      } else {
+        console.warn('html2canvas not available');
+      }
     } catch (error) {
       console.warn('html2canvas failed:', error);
     }
 
     // Fallback to dom-to-image
     try {
-      return await this.domtoimage.toPng(element, {
-        quality: 0.95,
-        bgcolor: '#ffffff',
-        style: {
-          transform: 'scale(1)',
-          transformOrigin: 'top left'
-        }
-      });
+      const domtoimage = this.domtoimage || window.domtoimage;
+      if (domtoimage) {
+        console.log('Trying dom-to-image capture...');
+        return await domtoimage.toPng(element, {
+          quality: 0.95,
+          bgcolor: '#ffffff',
+          style: {
+            transform: 'scale(1)',
+            transformOrigin: 'top left'
+          }
+        });
+      } else {
+        console.warn('dom-to-image not available');
+      }
     } catch (error) {
       console.warn('dom-to-image failed:', error);
     }
 
     // Last resort: try server-side screenshot
     try {
+      console.log('Trying server-side screenshot...');
       return await this.serverScreenshot();
     } catch (error) {
       console.warn('Server screenshot failed:', error);
@@ -212,29 +257,40 @@ class FallbackScreenshot {
 
     try {
       // Try html2canvas first
-      const canvas = await this.html2canvas(element, {
-        allowTaint: false,
-        useCORS: true,
-        scale: 1,
-        logging: false,
-        backgroundColor: '#ffffff',
-        removeContainer: true
-      });
+      const html2canvas = this.html2canvas || window.html2canvas;
+      if (html2canvas) {
+        console.log('Trying html2canvas element capture...');
+        const canvas = await html2canvas(element, {
+          allowTaint: false,
+          useCORS: true,
+          scale: 1,
+          logging: false,
+          backgroundColor: '#ffffff',
+          removeContainer: true
+        });
 
-      return canvas.toDataURL('image/png', 0.95);
-    } catch (error) {
-      console.warn('Element capture with html2canvas failed:', error);
+        return canvas.toDataURL('image/png', 0.95);
+      } else {
+        console.warn('html2canvas not available for element capture');
+      }
       
       // Fallback to dom-to-image
-      try {
-        return await this.domtoimage.toPng(element, {
+      const domtoimage = this.domtoimage || window.domtoimage;
+      if (domtoimage) {
+        console.log('Trying dom-to-image element capture...');
+        return await domtoimage.toPng(element, {
           quality: 0.95,
           bgcolor: '#ffffff'
         });
-      } catch (domError) {
-        console.warn('Element capture with dom-to-image failed:', domError);
-        throw new Error('Element capture failed');
+      } else {
+        console.warn('dom-to-image not available for element capture');
       }
+      
+      throw new Error('Element capture failed with all methods');
+      
+    } catch (error) {
+      console.warn('Element capture failed:', error);
+      throw new Error('Element capture failed with all methods');
     } finally {
       // Restore hidden elements
       hiddenElements.forEach(({ element, originalDisplay }) => {
@@ -248,38 +304,47 @@ class FallbackScreenshot {
     
     try {
       // First, try to capture the full page
-      const fullScreenshot = await this.html2canvas(document.body, {
-        allowTaint: false,
-        useCORS: true,
-        scale: 1,
-        logging: false,
-        backgroundColor: '#ffffff',
-        removeContainer: true,
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-      
-      // Create a new canvas for the cropped area
-      const croppedCanvas = document.createElement('canvas');
-      croppedCanvas.width = area.width;
-      croppedCanvas.height = area.height;
-      const ctx = croppedCanvas.getContext('2d');
-      
-      // Draw the selected area from the full screenshot
-      ctx.drawImage(
-        fullScreenshot,
-        area.x, area.y, area.width, area.height,  // Source coordinates
-        0, 0, area.width, area.height             // Destination coordinates
-      );
-      
-      return croppedCanvas.toDataURL('image/png', 0.95);
+      const html2canvas = this.html2canvas || window.html2canvas;
+      if (html2canvas) {
+        console.log('Trying html2canvas area capture...');
+        const fullScreenshot = await html2canvas(document.body, {
+          allowTaint: false,
+          useCORS: true,
+          scale: 1,
+          logging: false,
+          backgroundColor: '#ffffff',
+          removeContainer: true,
+          width: window.innerWidth,
+          height: window.innerHeight
+        });
+        
+        // Create a new canvas for the cropped area
+        const croppedCanvas = document.createElement('canvas');
+        croppedCanvas.width = area.width;
+        croppedCanvas.height = area.height;
+        const ctx = croppedCanvas.getContext('2d');
+        
+        // Draw the selected area from the full screenshot
+        ctx.drawImage(
+          fullScreenshot,
+          area.x, area.y, area.width, area.height,  // Source coordinates
+          0, 0, area.width, area.height             // Destination coordinates
+        );
+        
+        return croppedCanvas.toDataURL('image/png', 0.95);
+      } else {
+        console.warn('html2canvas not available for area capture');
+      }
       
     } catch (error) {
       console.warn('html2canvas area capture failed:', error);
-      
-      // Fallback to dom-to-image approach
-      try {
-        await this.loadLibraries();
+    }
+    
+    // Fallback to dom-to-image approach
+    try {
+      const domtoimage = this.domtoimage || window.domtoimage;
+      if (domtoimage) {
+        console.log('Trying dom-to-image area capture...');
         
         // Create a temporary container that covers the selected area
         const tempContainer = document.createElement('div');
@@ -314,7 +379,7 @@ class FallbackScreenshot {
         tempContainer.style.height = area.height + 'px';
         
         try {
-          const screenshot = await this.domtoimage.toPng(tempContainer, {
+          const screenshot = await domtoimage.toPng(tempContainer, {
             quality: 0.95,
             bgcolor: '#ffffff',
             width: area.width,
@@ -325,11 +390,14 @@ class FallbackScreenshot {
         } finally {
           tempContainer.remove();
         }
-      } catch (domError) {
-        console.warn('dom-to-image area capture failed:', domError);
-        throw new Error('Area capture failed with all methods');
+      } else {
+        console.warn('dom-to-image not available for area capture');
       }
+    } catch (domError) {
+      console.warn('dom-to-image area capture failed:', domError);
     }
+    
+    throw new Error('Area capture failed with all methods');
   }
 }
 
