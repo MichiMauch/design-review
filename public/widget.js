@@ -469,24 +469,65 @@
     }
 
     async createScreenshot() {
-      console.log('Creating screenshot - using fast fallback approach');
+      console.log('Creating screenshot - using minimal html2canvas approach');
       
-      // Skip screenshot entirely and create a simple visual feedback
-      const screenshotInfo = {
-        url: window.location.href,
-        selectedArea: this.selectedArea,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight
+      // Try a very simple html2canvas approach with minimal options
+      try {
+        if (!window.html2canvas) {
+          await this.loadHtml2Canvas();
         }
-      };
-      
-      console.log('Screenshot info:', screenshotInfo);
-      
-      // Create a simple visual representation
-      return this.createInstantScreenshot(screenshotInfo);
+        
+        // Hide all problematic elements completely
+        const widgetElements = document.querySelectorAll('.feedback-widget-button, .feedback-widget-overlay, .feedback-widget-selection-overlay, .feedback-widget-selection-box');
+        widgetElements.forEach(el => el.style.display = 'none');
+        
+        // Very minimal options to avoid CSS issues
+        const options = {
+          useCORS: false,
+          allowTaint: true,
+          scale: 0.5,
+          backgroundColor: '#ffffff',
+          logging: false,
+          removeContainer: true,
+          foreignObjectRendering: false
+        };
+        
+        // If area is selected, capture only that area
+        if (this.selectedArea) {
+          options.x = this.selectedArea.x;
+          options.y = this.selectedArea.y;
+          options.width = this.selectedArea.width;
+          options.height = this.selectedArea.height;
+        }
+        
+        const canvas = await window.html2canvas(document.body, options);
+        
+        // Restore widget elements
+        widgetElements.forEach(el => el.style.display = '');
+        
+        // Add border for selected area
+        if (this.selectedArea) {
+          const ctx = canvas.getContext('2d');
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        console.log('Simple screenshot created successfully');
+        return canvas.toDataURL('image/png', 0.8);
+        
+      } catch (error) {
+        console.log('Simple screenshot failed, using fallback:', error.message);
+        return this.createInstantScreenshot({
+          url: window.location.href,
+          selectedArea: this.selectedArea,
+          timestamp: new Date().toISOString(),
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          }
+        });
+      }
     }
 
     async createDirectScreenshot() {
