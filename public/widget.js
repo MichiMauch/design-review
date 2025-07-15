@@ -321,14 +321,15 @@
     startSelection(e) {
       e.preventDefault();
       this.isDragging = true;
-      this.startX = e.clientX;
-      this.startY = e.clientY;
+      // Füge Scroll-Position zur clientX/Y hinzu für absolute Koordinaten
+      this.startX = e.clientX + window.pageXOffset;
+      this.startY = e.clientY + window.pageYOffset;
 
       // Create selection box
       const box = document.createElement('div');
       box.className = 'feedback-widget-selection-box';
       box.style.cssText = `
-        position: fixed;
+        position: absolute;
         border: 2px solid #3b82f6;
         background: rgba(59, 130, 246, 0.2);
         z-index: 1000003;
@@ -345,10 +346,14 @@
     updateSelection(e) {
       if (!this.isDragging || !this.selectionBox) return;
 
-      const x = Math.min(e.clientX, this.startX);
-      const y = Math.min(e.clientY, this.startY);
-      const width = Math.abs(e.clientX - this.startX);
-      const height = Math.abs(e.clientY - this.startY);
+      // Berechne aktuelle Maus-Position inklusive Scroll-Offset
+      const currentX = e.clientX + window.pageXOffset;
+      const currentY = e.clientY + window.pageYOffset;
+
+      const x = Math.min(currentX, this.startX);
+      const y = Math.min(currentY, this.startY);
+      const width = Math.abs(currentX - this.startX);
+      const height = Math.abs(currentY - this.startY);
 
       this.selectionBox.style.left = x + 'px';
       this.selectionBox.style.top = y + 'px';
@@ -363,14 +368,28 @@
       document.removeEventListener('mousemove', this.updateSelection);
       document.removeEventListener('mouseup', this.endSelection);
 
-      const x = Math.min(e.clientX, this.startX);
-      const y = Math.min(e.clientY, this.startY);
-      const width = Math.abs(e.clientX - this.startX);
-      const height = Math.abs(e.clientY - this.startY);
+      // Berechne finale Position inklusive Scroll-Offset
+      const endX = e.clientX + window.pageXOffset;
+      const endY = e.clientY + window.pageYOffset;
+
+      const x = Math.min(endX, this.startX);
+      const y = Math.min(endY, this.startY);
+      const width = Math.abs(endX - this.startX);
+      const height = Math.abs(endY - this.startY);
 
       if (width > 10 && height > 10) {
-        this.selectedArea = { x, y, width, height };
-        console.log('Area selected:', this.selectedArea);
+        // Speichere sowohl absolute (für Screenshot) als auch relative Koordinaten (für Anzeige)
+        this.selectedArea = { 
+          x, 
+          y, 
+          width, 
+          height,
+          // Viewport-relative Koordinaten für Debugging
+          viewportX: Math.min(e.clientX, this.startX - window.pageXOffset),
+          viewportY: Math.min(e.clientY, this.startY - window.pageYOffset)
+        };
+        console.log('Area selected (absolute coords):', this.selectedArea);
+        console.log('Page scroll:', { x: window.pageXOffset, y: window.pageYOffset });
       }
 
       this.clearSelection();
@@ -526,6 +545,13 @@
           options.y = this.selectedArea.y;
           options.width = this.selectedArea.width;
           options.height = this.selectedArea.height;
+          console.log('📏 Using selected area for screenshot:', {
+            x: options.x,
+            y: options.y,
+            width: options.width,
+            height: options.height,
+            pageScroll: { x: window.pageXOffset, y: window.pageYOffset }
+          });
         }
 
         const canvas = await window.html2canvas(document.body, options);
