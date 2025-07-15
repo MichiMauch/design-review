@@ -188,8 +188,56 @@
         
         isSelecting = true;
         
-        // Use HybridScreenshot if available, otherwise fallback to old system
-        if (window.HybridScreenshot) {
+        // Use RobustScreenshot if available, otherwise fallback
+        if (window.RobustScreenshot) {
+            try {
+                // First, let user select area
+                const hybridScreenshot = new window.HybridScreenshot();
+                const selectedArea = await hybridScreenshot.createAreaSelectionOverlay();
+                
+                // Check if user cancelled
+                if (!selectedArea) {
+                    console.log('Widget: User cancelled area selection');
+                    // Reset state and show button again
+                    isSelecting = false;
+                    const button = document.getElementById('feedback-widget-button');
+                    if (button) {
+                        button.style.display = 'flex';
+                    }
+                    return;
+                }
+                
+                // Now use RobustScreenshot to capture the area
+                const robustScreenshot = new window.RobustScreenshot();
+                const screenshotData = await robustScreenshot.captureArea(selectedArea);
+                
+                // Set selection data for the modal
+                currentSelectionData = {
+                    type: 'area',
+                    selectedArea: selectedArea,
+                    element: null,
+                    selector: null
+                };
+                
+                if (screenshotData) {
+                    console.log('Widget: RobustScreenshot succeeded, showing modal');
+                    showFeedbackModalDirect(screenshotData);
+                } else {
+                    console.log('Widget: RobustScreenshot failed, showing modal without screenshot');
+                    showFeedbackModalDirect(null);
+                }
+                
+            } catch (error) {
+                console.error('Widget: RobustScreenshot failed:', error);
+                // Reset and fallback to old system
+                isSelecting = false;
+                const button = document.getElementById('feedback-widget-button');
+                if (button) {
+                    button.style.display = 'flex';
+                }
+                startOldSelectionMode();
+            }
+        } else if (window.HybridScreenshot) {
             try {
                 const hybridScreenshot = new window.HybridScreenshot();
                 const screenshotData = await hybridScreenshot.selectAndCaptureArea();

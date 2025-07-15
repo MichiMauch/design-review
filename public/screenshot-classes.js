@@ -955,12 +955,188 @@ class HybridScreenshot {
   }
 }
 
+class RobustScreenshot {
+  constructor() {
+    this.reliableScreenshot = new ReliableScreenshot();
+    this.fallbackScreenshot = new FallbackScreenshot();
+    this.methods = [
+      { name: 'html2canvas-modern', func: () => this.tryHtml2CanvasModern() },
+      { name: 'html2canvas-legacy', func: () => this.tryHtml2CanvasLegacy() },
+      { name: 'dom-to-image', func: () => this.tryDomToImage() },
+      { name: 'screen-capture', func: () => this.tryScreenCapture() },
+      { name: 'server-side', func: () => this.tryServerSide() }
+    ];
+  }
+
+  async captureWithFallbacks(element = document.body, area = null) {
+    console.log('RobustScreenshot: Starting capture with fallbacks');
+    
+    for (const method of this.methods) {
+      try {
+        console.log(`RobustScreenshot: Trying ${method.name}...`);
+        const result = await method.func();
+        
+        if (result) {
+          console.log(`RobustScreenshot: Success with ${method.name}`);
+          return result;
+        }
+      } catch (error) {
+        console.warn(`RobustScreenshot: ${method.name} failed:`, error.message);
+        continue;
+      }
+    }
+    
+    console.error('RobustScreenshot: All methods failed');
+    return null;
+  }
+
+  async tryHtml2CanvasModern() {
+    await this.fallbackScreenshot.loadLibraries();
+    const html2canvas = this.fallbackScreenshot.html2canvas || window.html2canvas;
+    
+    if (!html2canvas) {
+      throw new Error('html2canvas not available');
+    }
+
+    // Modern approach with CSS3 support
+    const canvas = await html2canvas(document.body, {
+      allowTaint: true,
+      useCORS: false,
+      scale: 1,
+      logging: false,
+      backgroundColor: '#ffffff',
+      removeContainer: true,
+      foreignObjectRendering: true, // Better for modern CSS
+      ignoreElements: (element) => {
+        // Skip problematic elements
+        if (element.tagName === 'IMG' && element.src && element.src.includes('_next/image')) {
+          return true;
+        }
+        if (element.tagName === 'IFRAME' || element.tagName === 'VIDEO') {
+          return true;
+        }
+        // Skip elements with oklab/oklch colors
+        const computedStyle = window.getComputedStyle(element);
+        if (computedStyle.color && (computedStyle.color.includes('oklab') || computedStyle.color.includes('oklch'))) {
+          return true;
+        }
+        return false;
+      }
+    });
+
+    return canvas.toDataURL('image/png', 0.95);
+  }
+
+  async tryHtml2CanvasLegacy() {
+    await this.fallbackScreenshot.loadLibraries();
+    const html2canvas = this.fallbackScreenshot.html2canvas || window.html2canvas;
+    
+    if (!html2canvas) {
+      throw new Error('html2canvas not available');
+    }
+
+    // Legacy approach - more conservative
+    const canvas = await html2canvas(document.body, {
+      allowTaint: false,
+      useCORS: true,
+      scale: 0.8, // Lower scale for performance
+      logging: false,
+      backgroundColor: '#ffffff',
+      removeContainer: true,
+      foreignObjectRendering: false,
+      imageTimeout: 5000,
+      ignoreElements: (element) => {
+        // More aggressive filtering
+        if (element.tagName === 'IMG' || element.tagName === 'VIDEO' || element.tagName === 'IFRAME') {
+          return true;
+        }
+        if (element.classList.contains('widget') || element.id.includes('feedback')) {
+          return true;
+        }
+        return false;
+      }
+    });
+
+    return canvas.toDataURL('image/png', 0.8);
+  }
+
+  async tryDomToImage() {
+    await this.fallbackScreenshot.loadLibraries();
+    const domtoimage = this.fallbackScreenshot.domtoimage || window.domtoimage;
+    
+    if (!domtoimage) {
+      throw new Error('dom-to-image not available');
+    }
+
+    return await domtoimage.toPng(document.body, {
+      quality: 0.8,
+      bgcolor: '#ffffff',
+      style: {
+        transform: 'scale(0.8)',
+        transformOrigin: 'top left'
+      },
+      filter: (node) => {
+        // Conservative filtering
+        if (node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'IFRAME') {
+          return false;
+        }
+        if (node.classList && node.classList.contains('widget')) {
+          return false;
+        }
+        return true;
+      }
+    });
+  }
+
+  async tryScreenCapture() {
+    if (!this.reliableScreenshot.isSupported()) {
+      throw new Error('Screen capture not supported');
+    }
+
+    return await this.reliableScreenshot.captureWithPermission();
+  }
+
+  async tryServerSide() {
+    return await this.fallbackScreenshot.serverScreenshot();
+  }
+
+  // Convenience method for area capture
+  async captureArea(area) {
+    const fullScreenshot = await this.captureWithFallbacks();
+    
+    if (!fullScreenshot) {
+      return null;
+    }
+
+    // Crop the area from the full screenshot
+    const img = new Image();
+    return new Promise((resolve) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = area.width;
+        canvas.height = area.height;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(
+          img,
+          area.x, area.y, area.width, area.height,
+          0, 0, area.width, area.height
+        );
+        
+        resolve(canvas.toDataURL('image/png', 0.95));
+      };
+      img.src = fullScreenshot;
+    });
+  }
+}
+
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     ReliableScreenshot,
     FallbackScreenshot,
-    HybridScreenshot
+    HybridScreenshot,
+    RobustScreenshot
   };
 }
 
@@ -969,11 +1145,13 @@ if (typeof window !== 'undefined') {
   window.ReliableScreenshot = ReliableScreenshot;
   window.FallbackScreenshot = FallbackScreenshot;
   window.HybridScreenshot = HybridScreenshot;
+  window.RobustScreenshot = RobustScreenshot;
   
   // Debug logging
   console.log('Screenshot classes loaded:', {
     ReliableScreenshot: typeof ReliableScreenshot,
     FallbackScreenshot: typeof FallbackScreenshot,
-    HybridScreenshot: typeof HybridScreenshot
+    HybridScreenshot: typeof HybridScreenshot,
+    RobustScreenshot: typeof RobustScreenshot
   });
 }
