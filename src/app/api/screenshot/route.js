@@ -15,9 +15,6 @@ export async function OPTIONS() {
   return addCorsHeaders(new Response(null, { status: 200 }));
 }
 
-// Check if we're running on Vercel
-const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
-
 // Playwright configuration for Vercel serverless
 const PLAYWRIGHT_CONFIG = {
   headless: true,
@@ -33,7 +30,8 @@ const PLAYWRIGHT_CONFIG = {
     '--disable-extensions',
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',
-    '--disable-renderer-backgrounding'
+    '--disable-renderer-backgrounding',
+    '--disable-features=VizDisplayCompositor'
   ]
 };
 
@@ -106,12 +104,6 @@ async function cropScreenshot(imageBuffer, selectionArea, viewportWidth, viewpor
 }
 
 async function createScreenshotWithPlaywright(url, options = {}) {
-  // Skip Playwright on Vercel due to missing browser binaries
-  if (isVercel) {
-    console.log('Playwright: Skipping on Vercel environment, browser binaries not available');
-    throw new Error('Playwright not available on Vercel serverless');
-  }
-
   const { 
     width = 1920, 
     height = 1080, 
@@ -135,7 +127,11 @@ async function createScreenshotWithPlaywright(url, options = {}) {
   let browser = null;
   try {
     console.log('Playwright: Starting browser...');
+    console.log('Playwright: Environment check - Node version:', process.version);
+    console.log('Playwright: Environment check - Platform:', process.platform);
+    
     browser = await chromium.launch(PLAYWRIGHT_CONFIG);
+    console.log('Playwright: Browser launched successfully');
     
     const context = await browser.newContext({
       viewport: { width: viewportWidth, height: viewportHeight },
