@@ -111,6 +111,7 @@ export async function POST(request, { params }) {
 
     // Determine screenshot type and storage strategy
     let screenshotUrl = null;
+    let screenshotFilename = null;
     let screenshotBlob = null;
     
     if (screenshot) {
@@ -120,13 +121,16 @@ export async function POST(request, { params }) {
         screenshotBlob = screenshot;
         console.log('Screenshot type: Base64 blob (fallback)');
       } else if (screenshot.startsWith('http')) {
-        // Full URL - extract filename and store URL
+        // Full URL - extract filename and store both
         screenshotUrl = screenshot;
+        screenshotFilename = screenshot.split('/').pop(); // Extract filename from URL
         console.log('Screenshot type: Full URL');
       } else if (screenshot.includes('.png') || screenshot.includes('.jpg') || screenshot.includes('.jpeg')) {
-        // Filename only - construct R2 URL
+        // Filename only - store filename and construct R2 URL
+        screenshotFilename = screenshot;
         screenshotUrl = `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/screenshots/${screenshot}`;
         console.log('Screenshot type: Filename -> R2 URL:', screenshotUrl);
+        console.log('Screenshot filename stored:', screenshotFilename);
       } else {
         // Unknown format - treat as blob
         screenshotBlob = screenshot;
@@ -143,7 +147,7 @@ export async function POST(request, { params }) {
         projectId, // Now using the resolved numeric project ID
         title,
         description || null,
-        screenshotBlob || null, // Only base64 fallbacks
+        screenshotFilename || screenshotBlob || null, // Filename preferred, fallback to base64
         screenshotUrl || null,  // R2 URLs and external URLs
         url,
         selected_area ? JSON.stringify(selected_area) : null,
@@ -160,7 +164,7 @@ export async function POST(request, { params }) {
       project_id: Number(projectId),
       title,
       description,
-      screenshot: screenshotBlob,
+      screenshot: screenshotFilename || screenshotBlob,
       screenshot_url: screenshotUrl,
       url,
       status: 'open',
