@@ -34,6 +34,7 @@
     let jiraSprints = [];
     let jiraIssueTypes = [];
     let currentFeedbackData = null;
+    let selectedBoardId = null;
     
     // Create feedback button
     function createFeedbackButton() {
@@ -504,16 +505,6 @@
                     
                     <div id="jira-form" style="display: none;">
                         <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Zusammenfassung:</label>
-                            <input id="jira-summary" value="${feedbackData.title}" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;" />
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Beschreibung:</label>
-                            <textarea id="jira-description" style="width: 100%; height: 80px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box;">${feedbackData.description}</textarea>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
                             <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Issue-Typ:</label>
                             <select id="jira-issue-type" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
                                 <option value="">Wählen Sie einen Issue-Typ...</option>
@@ -541,7 +532,10 @@
                         
                         <div style="display: flex; gap: 10px; justify-content: flex-end;">
                             <button id="jira-config-cancel" style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Abbrechen</button>
-                            <button id="jira-config-create" style="padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">JIRA-Task erstellen</button>
+                            <button id="jira-config-create" style="padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; display: flex; align-items: center; gap: 8px;">
+                                <span id="jira-create-text">JIRA-Task erstellen</span>
+                                <div id="jira-create-spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -628,8 +622,8 @@
                 console.log('Widget: Boards result:', boardsResult);
                 
                 if (boardsResult.success && boardsResult.data && boardsResult.data.length > 0) {
-                    const boardId = boardsResult.data[0].id; // Use first board
-                    console.log('Widget: Using board ID:', boardId);
+                    selectedBoardId = boardsResult.data[0].id; // Use first board
+                    console.log('Widget: Using board ID:', selectedBoardId);
                     
                     // Now load sprints for this board
                     const sprintsResponse = await fetch(`${baseUrl}/api/jira`, {
@@ -643,7 +637,7 @@
                                 apiToken: projectConfig.jira_api_token,
                                 projectKey: projectConfig.jira_project_key
                             },
-                            boardId: boardId
+                            boardId: selectedBoardId
                         })
                     });
                     
@@ -727,15 +721,16 @@
     // Create JIRA task from modal
     async function createJiraTaskFromModal() {
         const createBtn = document.getElementById('jira-config-create');
-        if (createBtn) {
-            createBtn.disabled = true;
-            createBtn.textContent = 'Erstelle Task...';
-        }
+        const buttonText = document.getElementById('jira-create-text');
+        const spinner = document.getElementById('jira-create-spinner');
+        
+        // Show spinner and disable button
+        if (createBtn) createBtn.disabled = true;
+        if (buttonText) buttonText.textContent = 'Erstelle Task...';
+        if (spinner) spinner.style.display = 'block';
         
         try {
-            // Get form values
-            const summary = document.getElementById('jira-summary')?.value || currentFeedbackData.title;
-            const description = document.getElementById('jira-description')?.value || currentFeedbackData.description;
+            // Get form values (no title/description anymore)
             const issueType = document.getElementById('jira-issue-type')?.value || 'Bug';
             const assignee = document.getElementById('jira-assignee')?.value || '';
             const sprint = document.getElementById('jira-sprint')?.value || '';
@@ -745,15 +740,17 @@
             const labels = labelsInput.split(',').map(label => label.trim()).filter(label => label);
             
             console.log('Widget: Creating JIRA task with config:', {
-                summary, issueType, assignee, sprint, labels
+                title: currentFeedbackData.title,
+                description: currentFeedbackData.description,
+                issueType, assignee, sprint, labels
             });
             
             // Create JIRA payload
             const jiraPayload = {
                 action: 'createTicket',
                 feedback: {
-                    title: summary,
-                    description: description,
+                    title: currentFeedbackData.title,
+                    description: currentFeedbackData.description,
                     screenshot: currentFeedbackData.screenshot,
                     url: currentFeedbackData.url
                 },
@@ -765,7 +762,8 @@
                     issueType: issueType,
                     defaultAssignee: assignee,
                     defaultLabels: labels,
-                    defaultSprint: sprint
+                    selectedSprint: sprint,
+                    selectedBoardId: selectedBoardId
                 }
             };
             
@@ -851,11 +849,10 @@
             }, 5000);
             
         } finally {
-            // Re-enable button
-            if (createBtn) {
-                createBtn.disabled = false;
-                createBtn.textContent = 'JIRA-Task erstellen';
-            }
+            // Re-enable button and hide spinner
+            if (createBtn) createBtn.disabled = false;
+            if (buttonText) buttonText.textContent = 'JIRA-Task erstellen';
+            if (spinner) spinner.style.display = 'none';
         }
     }
     
