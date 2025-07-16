@@ -306,9 +306,9 @@
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Calculate scale factors based on the full document size
-                const scaleX = img.width / document.documentElement.scrollWidth;
-                const scaleY = img.height / document.documentElement.scrollHeight;
+                // Calculate scale factors based on the body size
+                const scaleX = img.width / document.body.scrollWidth;
+                const scaleY = img.height / document.body.scrollHeight;
                 
                 console.log('Scale factors:', { scaleX, scaleY });
                 
