@@ -245,12 +245,11 @@ export default function ProjectPage() {
     } else if (diffDays < 7) {
       return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
     } else {
-      // For older dates, show in German timezone
+      // For older dates, show in local timezone
       return date.toLocaleDateString('de-DE', {
         day: '2-digit',
         month: '2-digit',
-        year: 'numeric',
-        timeZone: 'Europe/Berlin'
+        year: 'numeric'
       });
     }
   };
@@ -886,263 +885,238 @@ export default function ProjectPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Open Tasks - prominent display */}
-                  {tasks.filter(task => !task.jira_key).length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium text-gray-900">Offene Tasks</h3>
-                      {tasks.filter(task => !task.jira_key).map((task) => (
-                    <div key={task.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
-                        <span>{formatTime(task.created_at)}</span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
-                          {getStatusIcon(task.status)}
-                          {task.status === 'open' ? 'Offen' : task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
-                        </span>
-                      </div>
-                      <div className="mb-2">
-                        {editingTask === task.id ? (
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={editForm.title}
-                              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="Task-Titel"
-                            />
-                            <textarea
-                              value={editForm.description}
-                              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                              rows="3"
-                              placeholder="Beschreibung (optional)"
-                            />
+                  {/* All Tasks */}
+                  {tasks.length > 0 ? (
+                    <div className="space-y-6">
+                      {tasks.map((task) => (
+                        <div key={task.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
+                            <span>{formatTime(task.created_at)}</span>
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => saveTask(task.id)}
-                                className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                              >
-                                <Save className="h-3 w-3" />
-                                Speichern
-                              </button>
-                              <button
-                                onClick={cancelEditing}
-                                className="flex items-center gap-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
-                              >
-                                <X className="h-3 w-3" />
-                                Abbrechen
-                              </button>
+                              {task.jira_key ? (
+                                <a
+                                  href={task.jira_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getJiraStatusColor(jiraStatuses[task.id])}`}
+                                >
+                                  <JiraIcon className="h-3 w-3" />
+                                  {jiraStatuses[task.id]?.name || 'JIRA'}
+                                </a>
+                              ) : (
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
+                                  {getStatusIcon(task.status)}
+                                  {task.status === 'open' ? 'Offen' : task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
+                                </span>
+                              )}
                             </div>
                           </div>
-                        ) : (
-                          <div className="flex items-start justify-between">
-                            <h3 className="font-medium text-gray-900 flex-1">{task.title}</h3>
-                            <div className="flex items-center gap-1 ml-2">
+                          <div className="mb-2">
+                            {editingTask === task.id ? (
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={editForm.title}
+                                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="Task-Titel"
+                                />
+                                <textarea
+                                  value={editForm.description}
+                                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                  rows="3"
+                                  placeholder="Beschreibung (optional)"
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => saveTask(task.id)}
+                                    className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                                  >
+                                    <Save className="h-3 w-3" />
+                                    Speichern
+                                  </button>
+                                  <button
+                                    onClick={cancelEditing}
+                                    className="flex items-center gap-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
+                                  >
+                                    <X className="h-3 w-3" />
+                                    Abbrechen
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-start justify-between">
+                                <h3 className="font-medium text-gray-900 flex-1">{task.title}</h3>
+                                <div className="flex items-center gap-1 ml-2">
+                                  {!task.jira_key && (
+                                    <button
+                                      onClick={() => startEditing(task)}
+                                      className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                                      title="Bearbeiten"
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openTaskDeleteModal(task)}
+                                    disabled={deletingTask === task.id}
+                                    className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
+                                    title="Task löschen"
+                                  >
+                                    {deletingTask === task.id ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                    ) : (
+                                      <X className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {!editingTask || editingTask !== task.id ? (
+                            task.description && (
+                              <p className="text-gray-600 text-sm mb-3">{task.description}</p>
+                            )
+                          ) : null}
+                          
+                          <div className="text-xs text-gray-500 space-y-2">
+                            <div className="flex items-center justify-between">
+                              {task.url && (
+                                <a 
+                                  href={task.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Seite öffnen
+                                </a>
+                              )}
+                              {task.jira_key && jiraTaskSprints[task.id] && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                                  <Calendar className="h-3 w-3" />
+                                  {jiraTaskSprints[task.id].name}
+                                </span>
+                              )}
                               {!task.jira_key && (
                                 <button
-                                  onClick={() => startEditing(task)}
-                                  className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                                  title="Bearbeiten"
+                                  onClick={() => openJiraModal(task)}
+                                  disabled={creatingJira === task.id || loadingJiraData}
+                                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
+                                  title="JIRA-Task erstellen"
                                 >
-                                  <Edit3 className="h-4 w-4" />
+                                  {creatingJira === task.id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                      Erstelle...
+                                    </>
+                                  ) : loadingJiraData ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                      Lade...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <JiraIcon className="h-3 w-3" />
+                                      JIRA-Task
+                                    </>
+                                  )}
                                 </button>
                               )}
-                              <button
-                                onClick={() => openTaskDeleteModal(task)}
-                                disabled={deletingTask === task.id}
-                                className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                                title="Task löschen"
-                              >
-                                {deletingTask === task.id ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                                ) : (
-                                  <X className="h-4 w-4" />
-                                )}
-                              </button>
                             </div>
+                            {task.url && (
+                              <div className="break-all text-gray-600 bg-gray-50 p-2 rounded border text-xs font-mono">
+                                {task.url}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      
-                      {!editingTask || editingTask !== task.id ? (
-                        task.description && (
-                          <p className="text-gray-600 text-sm mb-3">{task.description}</p>
-                        )
-                      ) : null}
-                      
-                      <div className="text-xs text-gray-500 space-y-2">
-                        <div className="flex items-center justify-between">
-                          {task.url && (
-                            <a 
-                              href={task.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              Seite öffnen
-                            </a>
-                          )}
-                          {!task.jira_key && (
-                            <button
-                              onClick={() => openJiraModal(task)}
-                              disabled={creatingJira === task.id || loadingJiraData}
-                              className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
-                              title="JIRA-Task erstellen"
-                            >
-                              {creatingJira === task.id ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                  Erstelle...
-                                </>
-                              ) : loadingJiraData ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                  Lade...
-                                </>
-                              ) : (
-                                <>
-                                  <JiraIcon className="h-3 w-3" />
-                                  JIRA-Task
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        {task.url && (
-                          <div className="break-all text-gray-600 bg-gray-50 p-2 rounded border text-xs font-mono">
-                            {task.url}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Selected Area Information */}
-                      {task.selected_area && (
-                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-                            <span className="text-sm font-medium text-blue-800">Ausgewählter Bereich</span>
-                          </div>
-                          {(() => {
-                            try {
-                              const areaData = typeof task.selected_area === 'string' 
-                                ? JSON.parse(task.selected_area) 
-                                : task.selected_area;
-                              
-                              const areaSize = Math.round(areaData.width) * Math.round(areaData.height);
-                              const isLargeArea = areaSize > 50000; // > 50k pixels
-                              const isSmallElement = areaData.width < 100 && areaData.height < 100;
-                              
-                              return (
-                                <div className="space-y-2">
-                                  <div className="text-xs text-blue-700 space-y-1">
-                                    <div>📍 Position: {Math.round(areaData.x)}px von links, {Math.round(areaData.y)}px von oben</div>
-                                    <div>📏 Größe: {Math.round(areaData.width)} × {Math.round(areaData.height)} px 
-                                      {isLargeArea && <span className="text-blue-600"> (großer Bereich)</span>}
-                                      {isSmallElement && <span className="text-blue-600"> (kleines Element)</span>}
-                                    </div>
-                                  </div>
+                          
+                          {/* Selected Area Information */}
+                          {task.selected_area && (
+                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+                                <span className="text-sm font-medium text-blue-800">Ausgewählter Bereich</span>
+                              </div>
+                              {(() => {
+                                try {
+                                  const areaData = typeof task.selected_area === 'string' 
+                                    ? JSON.parse(task.selected_area) 
+                                    : task.selected_area;
                                   
-                                  {task.url && (
-                                    <div className="pt-2 border-t border-blue-200">
-                                      <a
-                                        href={`${task.url}#feedback-highlight`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                                      >
-                                        🔗 Seite öffnen und Bereich anzeigen
-                                        <ExternalLink className="h-3 w-3" />
-                                      </a>
-                                      <div className="text-xs text-blue-600 mt-1">
-                                        💡 Tipp: Entwickler können mit diesen Koordinaten den exakten Bereich im Browser-DevTools finden
+                                  const areaSize = Math.round(areaData.width) * Math.round(areaData.height);
+                                  const isLargeArea = areaSize > 50000; // > 50k pixels
+                                  const isSmallElement = areaData.width < 100 && areaData.height < 100;
+                                  
+                                  return (
+                                    <div className="space-y-2">
+                                      <div className="text-xs text-blue-700 space-y-1">
+                                        <div>📍 Position: {Math.round(areaData.x)}px von links, {Math.round(areaData.y)}px von oben</div>
+                                        <div>📏 Größe: {Math.round(areaData.width)} × {Math.round(areaData.height)} px 
+                                          {isLargeArea && <span className="text-blue-600"> (großer Bereich)</span>}
+                                          {isSmallElement && <span className="text-blue-600"> (kleines Element)</span>}
+                                        </div>
                                       </div>
+                                      
+                                      {task.url && (
+                                        <div className="pt-2 border-t border-blue-200">
+                                          <a
+                                            href={`${task.url}#feedback-highlight`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                          >
+                                            🔗 Seite öffnen und Bereich anzeigen
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                          <div className="text-xs text-blue-600 mt-1">
+                                            💡 Tipp: Entwickler können mit diesen Koordinaten den exakten Bereich im Browser-DevTools finden
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            } catch {
-                              return <div className="text-xs text-blue-700">Bereichs-Daten verfügbar</div>;
-                            }
-                          })()}
+                                  );
+                                } catch {
+                                  return <div className="text-xs text-blue-700">Bereichs-Daten verfügbar</div>;
+                                }
+                              })()}
+                            </div>
+                          )}
+                          
+                          {task.screenshot && (
+                            <div className="mt-3">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img 
+                                src={task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot)} 
+                                alt="Task Screenshot" 
+                                className="max-w-full h-auto rounded border"
+                                style={{ maxHeight: '200px' }}
+                              />
+                            </div>
+                          )}
                         </div>
-                      )}
-                      
-                      {task.screenshot && (
-                        <div className="mt-3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot)} 
-                            alt="Task Screenshot" 
-                            className="max-w-full h-auto rounded border"
-                            style={{ maxHeight: '200px' }}
-                          />
-                        </div>
-                      )}
-                    </div>
                       ))}
                     </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>Noch keine Tasks vorhanden</p>
+                      <p className="text-sm mt-2">
+                        {project.widget_installed 
+                          ? "Tasks werden automatisch erstellt, wenn Nutzer Feedback über das Widget senden."
+                          : "Installieren Sie zuerst das Widget, damit Nutzer Feedback senden können."
+                        }
+                      </p>
+                    </div>
                   )}
-                </div>
-              )}
             </div>
           </div>
           
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            {/* JIRA Tasks */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">JIRA Tasks ({tasks.filter(task => task.jira_key).length})</h3>
-              {tasks.filter(task => task.jira_key).length > 0 ? (
-                <div className="space-y-2">
-                  {tasks.filter(task => task.jira_key).map((task) => (
-                    <div key={task.id} className="bg-gray-50 rounded p-3 border border-gray-100">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="w-full max-w-xs">
-                          <div className="mb-1">
-                            <a
-                              href={`${jiraConfig.serverUrl}/browse/${task.jira_key}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              {task.jira_key}
-                            </a>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {jiraStatuses[task.id] && (
-                            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}>
-                              {jiraStatuses[task.id].name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {jiraTaskSprints[task.id] && (
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="w-full max-w-xs">
-                            <div className="mb-1">
-                              <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300">
-                                {jiraTaskSprints[task.id].name}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-sm text-gray-700 font-medium mb-1">{task.title}</p>
-                      <p className="text-xs text-gray-500">{formatTime(task.created_at)}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500">
-                  <div className="text-sm">Noch keine JIRA Tasks erstellt</div>
-                  <div className="text-xs mt-1">Tasks können über den &quot;JIRA-Task&quot; Button erstellt werden</div>
-                </div>
-              )}
-            </div>
+            
 
             {/* Project Stats */}
             <div className="bg-white rounded-lg shadow-lg p-6">
