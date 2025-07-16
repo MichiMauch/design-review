@@ -143,24 +143,11 @@
                     const left = Math.min(e.clientX, startX);
                     const top = Math.min(e.clientY, startY);
                     
-                    // Add scroll offset to get absolute coordinates from page top
-                    const scrollX = window.scrollX || window.pageXOffset;
-                    const scrollY = window.scrollY || window.pageYOffset;
-                    const absoluteX = left + scrollX;
-                    const absoluteY = top + scrollY;
-                    
-                    // Ensure coordinates are within bounds
-                    const clampedLeft = Math.max(0, absoluteX);
-                    const clampedTop = Math.max(0, absoluteY);
-                    const clampedWidth = Math.min(width, window.innerWidth - left);
-                    const clampedHeight = Math.min(height, window.innerHeight - top);
-                    
                     selectionArea = {
-                        x: clampedLeft,
-                        y: clampedTop,
-                        width: clampedWidth,
-                        height: clampedHeight,
-                        // Store viewport coordinates too for debugging
+                        x: left,
+                        y: top,
+                        width: width,
+                        height: height,
                         viewportX: left,
                         viewportY: top
                     };
@@ -243,25 +230,16 @@
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Screenshot von der gesamten Seite machen
-            console.log('Widget: Taking screenshot of the entire page...');
-            // Temporär Feedback-Overlays ausblenden
-            const overlays = document.querySelectorAll('[id*="feedback"], [id*="annotation"]');
-            const prevDisplay = [];
-            overlays.forEach(el => {
-                prevDisplay.push(el.style.display);
-                el.style.display = 'none';
-            });
+            console.log('Widget: Taking screenshot of the viewport...');
 
-            // Screenshot von der gesamten Seite machen
-            const screenshotDataUrl = await toPng(document.documentElement, {
+            const screenshotDataUrl = await toPng(document.body, {
                 quality: 0.9,
-                pixelRatio: 2, // Using a pixelRatio for better quality on high-res screens
-                backgroundColor: '#ffffff'
-            });
-
-            // Overlays wieder einblenden
-            overlays.forEach((el, i) => {
-                el.style.display = prevDisplay[i];
+                pixelRatio: 2,
+                backgroundColor: '#ffffff',
+                width: window.innerWidth,
+                height: window.innerHeight,
+                scrollX: window.scrollX,
+                scrollY: window.scrollY
             });
 
             console.log('Widget: Screenshot captured successfully, data URL length:', screenshotDataUrl.length);
@@ -305,17 +283,16 @@
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Calculate scale factors based on the documentElement size for consistency with screenshot
-                const scaleX = img.width / document.documentElement.scrollWidth;
-                const scaleY = img.height / document.documentElement.scrollHeight;
-                
+                const scaleX = img.width / window.innerWidth;
+                const scaleY = img.height / window.innerHeight;
+
                 console.log('Scale factors:', { scaleX, scaleY });
-                
-                // Verwenden Sie die absoluten Koordinaten für den Zuschnitt
-                const cropX = selectionArea.x * scaleX;
-                const cropY = selectionArea.y * scaleY;
-                const cropWidth = selectionArea.width * scaleX;
-                const cropHeight = selectionArea.height * scaleY;
+
+                // Use viewport coordinates directly for cropping
+                const cropX = selectionArea.viewportX * scaleX;
+                const cropY = selectionArea.viewportY * scaleY;
+                const cropWidth = selection.width * scaleX;
+                const cropHeight = selection.height * scaleY;
                 
                 console.log('Using ABSOLUTE coordinates for cropping:');
                 console.log('Absolute coords:', {
