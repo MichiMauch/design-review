@@ -44,6 +44,9 @@ export async function POST(request) {
       case 'getSwimlanes':
         result = await getJiraSwimlanes(data);
         break;
+      case 'getBoardColumns':
+        result = await getJiraBoardColumnsForWidget(data);
+        break;
       default:
         result = NextResponse.json({ 
           success: false, 
@@ -74,7 +77,8 @@ async function createJiraTicket({ feedback, jiraConfig }) {
     defaultDueDateDays,
     defaultDueDate,
     selectedSprint,
-    selectedBoardId
+    selectedBoardId,
+    selectedColumn
   } = jiraConfig;
   
   if (!serverUrl || !username || !apiToken || !projectKey) {
@@ -205,6 +209,13 @@ async function createJiraTicket({ feedback, jiraConfig }) {
       }
     }
   };
+
+  // Set status if column is selected
+  if (selectedColumn && selectedColumn.trim()) {
+    issueData.fields.status = {
+      id: selectedColumn.trim()
+    };
+  }
 
   // Labels nur hinzufügen wenn sie existieren
   if (labels && labels.length > 0) {
@@ -1047,6 +1058,89 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
 
   } catch (error) {
     console.error('JIRA Swimlanes Error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 });
+  }
+}
+
+async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
+  const { serverUrl, username, apiToken } = jiraConfig;
+  
+  if (!serverUrl || !username || !apiToken) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'JIRA Konfiguration unvollständig' 
+    }, { status: 400 });
+  }
+  
+  if (!boardId) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Board ID ist erforderlich' 
+    }, { status: 400 });
+  }
+
+  try {
+    // Get board configuration to access columns
+    const configUrl = `${serverUrl}/rest/agile/1.0/board/${boardId}/configuration`;
+    const configResponse = await fetch(configUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!configResponse.ok) {
+      const errorText = await configResponse.text();
+      console.error('JIRA Board Config API Error:', configResponse.status, errorText);
+      return NextResponse.json({ 
+        success: false, 
+        error: `JIRA Board Config API Error: ${configResponse.status}` 
+      }, { status: configResponse.status });
+    }
+
+    const configData = await configResponse.json();
+    console.log('JIRA Board Configuration for Columns:', JSON.stringify(configData.columnConfig, null, 2));
+    
+    let columnOptions = [];
+    
+    // Extract columns from board configuration
+    if (configData.columnConfig && configData.columnConfig.columns) {
+      columnOptions = configData.columnConfig.columns.map(column => {
+        // Get the first status from the column as the target status
+        const firstStatus = column.statuses && column.statuses.length > 0 ? column.statuses[0] : null;
+        
+        return {
+          id: firstStatus ? firstStatus.id : column.name.toLowerCase().replace(/\s+/g, '-'),
+          name: column.name,
+          statusId: firstStatus ? firstStatus.id : null,
+          statusName: firstStatus ? firstStatus.name : column.name,
+          statusCategory: firstStatus ? firstStatus.statusCategory?.name : 'new'
+        };
+      });
+    }
+    
+    // If no columns found, provide default options
+    if (columnOptions.length === 0) {
+      columnOptions = [
+        { id: 'to-do', name: 'To Do', statusId: null, statusName: 'To Do', statusCategory: 'new' },
+        { id: 'in-progress', name: 'In Progress', statusId: null, statusName: 'In Progress', statusCategory: 'indeterminate' },
+        { id: 'done', name: 'Done', statusId: null, statusName: 'Done', statusCategory: 'done' }
+      ];
+    }
+    
+    console.log('JIRA Board Columns found:', columnOptions.length, columnOptions);
+    
+    return NextResponse.json({
+      success: true,
+      data: columnOptions
+    });
+
+  } catch (error) {
+    console.error('JIRA Board Columns Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 

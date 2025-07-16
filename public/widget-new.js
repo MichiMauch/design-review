@@ -33,6 +33,7 @@
     let jiraUsers = [];
     let jiraSprints = [];
     let jiraSwimlanes = [];
+    let jiraBoardColumns = [];
     let jiraIssueTypes = [];
     let currentFeedbackData = null;
     let selectedBoardId = null;
@@ -578,9 +579,9 @@
                         </div>
                         
                         <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Swimlane:</label>
-                            <select id="jira-swimlane" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
-                                <option value="">Keine Swimlane</option>
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Board-Spalte:</label>
+                            <select id="jira-column" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
+                                <option value="">Standard-Spalte (To Do)</option>
                             </select>
                         </div>
                         
@@ -708,12 +709,12 @@
                         }
                     }
                     
-                    // Load swimlanes for this board
-                    const swimlanesResponse = await fetch(`${baseUrl}/api/jira`, {
+                    // Load board columns for this board
+                    const columnsResponse = await fetch(`${baseUrl}/api/jira`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            action: 'getSwimlanes',
+                            action: 'getBoardColumns',
                             jiraConfig: {
                                 serverUrl: projectConfig.jira_server_url,
                                 username: projectConfig.jira_username,
@@ -724,11 +725,11 @@
                         })
                     });
                     
-                    if (swimlanesResponse.ok) {
-                        const swimlanesResult = await swimlanesResponse.json();
-                        if (swimlanesResult.success) {
-                            jiraSwimlanes = swimlanesResult.data || [];
-                            console.log('Widget: Loaded JIRA swimlanes:', jiraSwimlanes.length);
+                    if (columnsResponse.ok) {
+                        const columnsResult = await columnsResponse.json();
+                        if (columnsResult.success) {
+                            jiraBoardColumns = columnsResult.data || [];
+                            console.log('Widget: Loaded JIRA board columns:', jiraBoardColumns.length);
                         }
                     }
                 }
@@ -798,15 +799,16 @@
             });
         }
         
-        // Populate swimlanes
-        const swimlaneSelect = document.getElementById('jira-swimlane');
-        if (swimlaneSelect) {
-            jiraSwimlanes.forEach(swimlane => {
+        // Populate board columns
+        const columnSelect = document.getElementById('jira-column');
+        if (columnSelect) {
+            jiraBoardColumns.forEach(column => {
                 const option = document.createElement('option');
-                option.value = swimlane.id;
-                option.textContent = swimlane.name;
-                if (swimlane.id === 'assignee') option.selected = true; // Default to assignee
-                swimlaneSelect.appendChild(option);
+                option.value = column.statusId || column.id;
+                option.textContent = column.name;
+                // Default to first column (usually "To Do")
+                if (column.statusCategory === 'new') option.selected = true;
+                columnSelect.appendChild(option);
             });
         }
         
@@ -829,7 +831,7 @@
             const issueType = document.getElementById('jira-issue-type')?.value || 'Bug';
             const assignee = document.getElementById('jira-assignee')?.value || '';
             const sprint = document.getElementById('jira-sprint')?.value || '';
-            const swimlane = document.getElementById('jira-swimlane')?.value || '';
+            const column = document.getElementById('jira-column')?.value || '';
             const labelsInput = document.getElementById('jira-labels')?.value || '';
             
             // Parse labels
@@ -838,7 +840,7 @@
             console.log('Widget: Creating JIRA task with config:', {
                 title: currentFeedbackData.title,
                 description: currentFeedbackData.description,
-                issueType, assignee, sprint, swimlane, labels
+                issueType, assignee, sprint, column, labels
             });
             
             // Create JIRA payload
@@ -860,7 +862,7 @@
                     defaultLabels: labels,
                     selectedSprint: sprint,
                     selectedBoardId: selectedBoardId,
-                    selectedSwimlane: swimlane
+                    selectedColumn: column
                 }
             };
             
