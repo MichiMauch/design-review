@@ -252,13 +252,14 @@
                 const dpr = window.devicePixelRatio || 1;
                 const canvas = document.createElement('canvas');
 
-                // Absolute screen coordinates
-                const screenX = window.screenX * dpr;
-                const screenY = window.screenY * dpr;
-                const browserUIOffset = (window.outerHeight - window.innerHeight) * dpr;
+                // Calculate the vertical offset caused by the browser's UI (address bar, tabs, etc.)
+                const browserChromeY = (window.outerHeight - window.innerHeight);
 
-                const cropX = screenX + (selection.viewportX * dpr);
-                const cropY = screenY + browserUIOffset + (selection.viewportY * dpr);
+                // Calculate the final crop coordinates in physical pixels.
+                // We need to account for the window's position on the screen (screenX/Y),
+                // the browser's own UI (chrome), and the selection's position within the viewport.
+                const cropX = (window.screenX + selection.viewportX) * dpr;
+                const cropY = (window.screenY + browserChromeY + selection.viewportY) * dpr;
                 const cropWidth = selection.width * dpr;
                 const cropHeight = selection.height * dpr;
 
