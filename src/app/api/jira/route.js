@@ -32,6 +32,12 @@ export async function POST(request) {
       case 'testConnection':
         result = await testJiraConnection(data);
         break;
+      case 'getUsers':
+        result = await getJiraUsersForWidget(data);
+        break;
+      case 'getSprints':
+        result = await getJiraSprintsForWidget(data);
+        break;
       default:
         result = NextResponse.json({ 
           success: false, 
@@ -752,4 +758,136 @@ async function getJiraBoardColumns({ serverUrl, username, apiToken, boardId }) {
       }))
     })) || []
   });
+}
+
+// POST API wrappers for widget usage
+async function getJiraUsersForWidget({ jiraConfig }) {
+  const { serverUrl, username, apiToken, projectKey } = jiraConfig;
+  
+  if (!serverUrl || !username || !apiToken) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'JIRA Konfiguration unvollständig' 
+    }, { status: 400 });
+  }
+
+  let url = `${serverUrl}/rest/api/3/users/search?maxResults=50`;
+  
+  // Falls projectKey angegeben, filtere nach Projekt-Zugehörigkeit
+  if (projectKey) {
+    url = `${serverUrl}/rest/api/3/user/assignable/search?project=${projectKey}&maxResults=50`;
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('JIRA Users API Error:', response.status, errorText);
+    return NextResponse.json({ 
+      success: false, 
+      error: `JIRA API Error: ${response.status} - ${errorText}` 
+    }, { status: response.status });
+  }
+
+  const data = await response.json();
+  
+  return NextResponse.json({
+    success: true,
+    data: data.map(user => ({
+      accountId: user.accountId,
+      name: user.name || user.displayName,
+      displayName: user.displayName,
+      emailAddress: user.emailAddress,
+      active: user.active !== false
+    }))
+  });
+}
+
+async function getJiraSprintsForWidget({ jiraConfig }) {
+  const { serverUrl, username, apiToken, projectKey } = jiraConfig;
+  
+  if (!serverUrl || !username || !apiToken) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'JIRA Konfiguration unvollständig' 
+    }, { status: 400 });
+  }
+
+  try {
+    // First get board ID for the project
+    const boardsUrl = `${serverUrl}/rest/agile/1.0/board?projectKeyOrId=${projectKey}&type=scrum&maxResults=1`;
+    const boardsResponse = await fetch(boardsUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!boardsResponse.ok) {
+      const errorText = await boardsResponse.text();
+      console.error('JIRA Boards API Error:', boardsResponse.status, errorText);
+      return NextResponse.json({ 
+        success: false, 
+        error: `JIRA Boards API Error: ${boardsResponse.status}` 
+      }, { status: boardsResponse.status });
+    }
+
+    const boardsData = await boardsResponse.json();
+    
+    if (!boardsData.values || boardsData.values.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [] // No scrum boards found
+      });
+    }
+
+    const boardId = boardsData.values[0].id;
+
+    // Now get sprints for the board
+    const sprintsUrl = `${serverUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future&maxResults=50`;
+    const sprintsResponse = await fetch(sprintsUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!sprintsResponse.ok) {
+      const errorText = await sprintsResponse.text();
+      console.error('JIRA Sprints API Error:', sprintsResponse.status, errorText);
+      return NextResponse.json({ 
+        success: false, 
+        error: `JIRA Sprints API Error: ${sprintsResponse.status}` 
+      }, { status: sprintsResponse.status });
+    }
+
+    const sprintsData = await sprintsResponse.json();
+    
+    return NextResponse.json({
+      success: true,
+      data: sprintsData.values.map(sprint => ({
+        id: sprint.id,
+        name: sprint.name,
+        state: sprint.state,
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        goal: sprint.goal
+      }))
+    });
+
+  } catch (error) {
+    console.error('JIRA Sprints Error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 });
+  }
 }
