@@ -98,13 +98,16 @@
             position: fixed;
             top: 50%;
             right: 0;
-            transform: translateY(-50%);
+            transform: translateY(-50%) rotate(-90deg);
+            transform-origin: 100% 50%;
             background: #28a745;
             color: white;
             border: none;
             padding: 10px 16px;
             border-top-left-radius: 8px;
-            border-bottom-left-radius: 8px;
+            border-top-right-radius: 8px;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
             font-family: Arial, sans-serif;
             font-size: 16px;
             cursor: pointer;
@@ -491,15 +494,25 @@
                                 <button class="color-tool" data-color="#ff0000" style="width: 24px; height: 24px; border-radius: 50%; background: #ff0000; border: 2px solid #000; cursor: pointer;"></button>
                                 <button class="color-tool" data-color="#0000ff" style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 2px solid #fff; cursor: pointer;"></button>
                                 <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
-                                <button class="color-tool" data-color="#ffff00" style="width: 24px; height: 24px; border-radius: 50%; background: #ffff00; border: 2px solid #fff; cursor: pointer;"></button>
+                                <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
                             </div>
                         </div>
-                        <div style="margin-bottom: 12px;">
-                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Liniendicke:</label>
-                            <div style="display: flex; gap: 6px;">
-                                <button class="thickness-tool" data-thickness="2" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #000; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">2</button>
-                                <button class="thickness-tool" data-thickness="4" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">4</button>
-                                <button class="thickness-tool" data-thickness="6" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">6</button>
+                        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="color-tool" data-color="#ff0000" style="width: 24px; height: 24px; border-radius: 50%; background: #ff0000; border: 2px solid #000; cursor: pointer;"></button>
+                                    <button class="color-tool" data-color="#0000ff" style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 2px solid #fff; cursor: pointer;"></button>
+                                    <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Liniendicke:</label>
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="thickness-tool" data-thickness="2" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #000; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">2</button>
+                                    <button class="thickness-tool" data-thickness="4" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">4</button>
+                                    <button class="thickness-tool" data-thickness="6" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">6</button>
+                                </div>
                             </div>
                         </div>
                     </div>
