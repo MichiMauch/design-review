@@ -252,11 +252,10 @@
                 const dpr = window.devicePixelRatio || 1;
                 const canvas = document.createElement('canvas');
 
-                // Calculate the browser UI offset
-                const browserUIOffset = window.outerHeight - window.innerHeight;
+                const browserUIOffset = (window.outerHeight - window.innerHeight) * dpr;
 
                 const cropX = selection.viewportX * dpr;
-                const cropY = (selection.viewportY * dpr) + (browserUIOffset * dpr);
+                const cropY = (selection.viewportY * dpr) + browserUIOffset;
                 const cropWidth = selection.width * dpr;
                 const cropHeight = selection.height * dpr;
 
