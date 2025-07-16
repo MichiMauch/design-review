@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm run build && ./install-browsers.sh",
+  "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "./install.sh",
   "regions": ["fra1"],
