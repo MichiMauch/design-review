@@ -62,7 +62,7 @@ export default function ProjectPage() {
   const [toast, setToast] = useState(null);
 
   const snippetCode = project ? 
-    `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget.js" data-project-id="${project.name}" defer></script>` :
+    `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.id}" defer></script>` :
     '';
 
   // Helper function to get screenshot URL
