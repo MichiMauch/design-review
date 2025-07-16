@@ -488,15 +488,7 @@
                                 <button id="tool-clear" title="Alles löschen" style="width: 38px; height: 38px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-size: 16px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; padding: 0;">🗑️</button>
                             </div>
                         </div>
-                        <div style="margin-bottom: 12px;">
-                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
-                            <div style="display: flex; gap: 6px;">
-                                <button class="color-tool" data-color="#ff0000" style="width: 24px; height: 24px; border-radius: 50%; background: #ff0000; border: 2px solid #000; cursor: pointer;"></button>
-                                <button class="color-tool" data-color="#0000ff" style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 2px solid #fff; cursor: pointer;"></button>
-                                <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
-                                <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
-                            </div>
-                        </div>
+                        
                         <div style="display: flex; gap: 12px; margin-bottom: 12px;">
                             <div>
                                 <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
