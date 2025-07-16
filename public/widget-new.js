@@ -97,7 +97,7 @@
         button.style.cssText = `
             position: fixed;
             top: 50%;
-            right: -36px; /* Adjusted to make it fully visible after rotation */
+            right: 20px;
             transform: translateY(-50%) rotate(-90deg);
             transform-origin: 100% 50%;
             background: #28a745;
