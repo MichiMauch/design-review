@@ -60,9 +60,6 @@ export default function ProjectPage() {
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
-  // Für Rückfrage bei JIRA-Issue nicht gefunden
-  const [showJiraDeleteConfirm, setShowJiraDeleteConfirm] = useState(false);
-  const [taskToDeleteByJira, setTaskToDeleteByJira] = useState(null);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget.js" data-project-id="${project.name}" defer></script>` :
@@ -444,14 +441,12 @@ export default function ProjectPage() {
         if (data.success) {
           return { taskId: task.id, status: data.status, sprint: data.sprint };
         } else {
-          // Rückfrage anzeigen, ob Task gelöscht werden soll
-          setTaskToDeleteByJira(task);
-          setShowJiraDeleteConfirm(true);
+          // JIRA-Issue nicht gefunden - einfach null zurückgeben
+          console.log('JIRA-Issue nicht gefunden für Task:', task.id);
         }
-      } catch (error) {
-        // Auch bei technischem Fehler Rückfrage
-        setTaskToDeleteByJira(task);
-        setShowJiraDeleteConfirm(true);
+      } catch {
+        // Auch bei technischem Fehler null zurückgeben
+        console.log('Fehler beim Laden des JIRA-Status für Task:', task.id);
       }
       return null;
     });
@@ -471,69 +466,6 @@ export default function ProjectPage() {
     setJiraStatuses(statusMap);
     setJiraTaskSprints(sprintMap);
   };
-  // Task löschen, wenn JIRA-Issue fehlt und bestätigt wurde
-  const handleJiraDeleteConfirm = async () => {
-    if (!taskToDeleteByJira) return;
-    setDeletingTask(taskToDeleteByJira.id);
-    try {
-      const response = await fetch(`/api/projects/${params.id}/tasks/${taskToDeleteByJira.id}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        showToast('Task wurde gelöscht, da das JIRA-Issue nicht mehr existiert.', 'success');
-        loadTasks();
-      } else {
-        showToast('Fehler beim Löschen der Task', 'error');
-      }
-    } catch (error) {
-      showToast('Fehler beim Löschen der Task', 'error');
-    } finally {
-      setDeletingTask(null);
-      setTaskToDeleteByJira(null);
-      setShowJiraDeleteConfirm(false);
-    }
-  };
-      {/* JIRA-Issue nicht gefunden: Rückfrage-Dialog */}
-      {showJiraDeleteConfirm && taskToDeleteByJira && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Task löschen?</h3>
-            <p className="text-gray-600 mb-6">
-              Das zugehörige JIRA-Issue (<strong>{taskToDeleteByJira.jira_key}</strong>) existiert nicht mehr oder ist nicht erreichbar.<br/>
-              Möchten Sie die Task <strong>&quot;{taskToDeleteByJira.title}&quot;</strong> löschen?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleJiraDeleteConfirm}
-                disabled={deletingTask === taskToDeleteByJira.id}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
-              >
-                {deletingTask === taskToDeleteByJira.id ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Lösche...
-                  </>
-                ) : (
-                  <>
-                    <X className="h-4 w-4" />
-                    Task löschen
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setShowJiraDeleteConfirm(false);
-                  setTaskToDeleteByJira(null);
-                }}
-                disabled={deletingTask === taskToDeleteByJira.id}
-                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
   const startEditing = (task) => {
     setEditingTask(task.id);
