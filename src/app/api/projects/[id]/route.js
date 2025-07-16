@@ -40,6 +40,24 @@ export async function PUT(request, { params }) {
       jira_auto_create
     } = body;
 
+    console.log('Updating project with JIRA config:', { 
+      id: resolvedParams.id, 
+      name, 
+      domain, 
+      jira_server_url: jira_server_url ? 'SET' : 'NULL' 
+    });
+
+    // First check if project exists
+    const existingProject = await db.execute({
+      sql: 'SELECT * FROM projects WHERE id = ?',
+      args: [resolvedParams.id]
+    });
+
+    if (existingProject.rows.length === 0) {
+      return new Response('Projekt nicht gefunden', { status: 404 });
+    }
+
+    // Try to update with JIRA fields
     const result = await db.execute({
       sql: `UPDATE projects SET 
             name = ?, 
@@ -57,20 +75,19 @@ export async function PUT(request, { params }) {
         jira_username,
         jira_api_token,
         jira_project_key,
-        jira_auto_create,
+        jira_auto_create || false,
         resolvedParams.id
       ]
     });
 
-    if (result.rowsAffected === 0) {
-      return new Response('Projekt nicht gefunden', { status: 404 });
-    }
+    console.log('Project update result:', result);
 
     return Response.json({ success: true, message: 'Projekt erfolgreich aktualisiert' });
 
   } catch (error) {
     console.error('Error updating project:', error);
-    return new Response('Fehler beim Aktualisieren des Projekts', { status: 500 });
+    console.error('Error details:', error.message);
+    return new Response(`Fehler beim Aktualisieren des Projekts: ${error.message}`, { status: 500 });
   }
 }
 
