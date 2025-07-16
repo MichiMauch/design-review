@@ -461,6 +461,11 @@
             
             // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
             if (jiraSection) {
+                console.log('Widget: Setting JIRA section visibility:', {
+                    projectConfig: projectConfig,
+                    jiraServerUrl: projectConfig?.jira_server_url,
+                    shouldShow: !!projectConfig?.jira_server_url
+                });
                 jiraSection.style.display = projectConfig?.jira_server_url ? 'flex' : 'none';
             }
         }, 0);
@@ -750,10 +755,15 @@
     
     async function loadProjectConfig() {
         try {
+            console.log('Widget: Loading project config for project ID:', projectId);
             const response = await fetch(`${baseUrl}/api/projects/${projectId}`);
+            console.log('Widget: Project config response status:', response.status);
             if (response.ok) {
                 projectConfig = await response.json();
-                console.log('Widget: Project config loaded', { jiraEnabled: !!projectConfig?.jira_server_url });
+                console.log('Widget: Project config loaded:', projectConfig);
+                console.log('Widget: JIRA enabled:', !!projectConfig?.jira_server_url);
+            } else {
+                console.error('Widget: Failed to load project config, status:', response.status);
             }
         } catch (error) {
             console.error('Widget: Failed to load project config:', error);
