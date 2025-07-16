@@ -379,17 +379,6 @@
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 8px; font-weight: bold; 
                                       color: #555; font-family: Arial, sans-serif;">
-                            Titel:
-                        </label>
-                        <input id="annotation-feedback-title" 
-                                  placeholder="Geben Sie einen kurzen Titel ein..."
-                                  style="width: 100%; padding: 12px; border: 1px solid #ddd; 
-                                         border-radius: 6px; font-family: Arial, sans-serif; 
-                                         box-sizing: border-box;" />
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; 
-                                      color: #555; font-family: Arial, sans-serif;">
                             Beschreiben Sie Ihr Feedback:
                         </label>
                         <textarea id="annotation-feedback-text" 
@@ -562,7 +551,6 @@
     
     // Submit annotated feedback
     async function submitAnnotatedFeedback() {
-        const feedbackTitle = document.getElementById('annotation-feedback-title').value.trim();
         const feedbackText = document.getElementById('annotation-feedback-text').value.trim();
         if (!feedbackText) {
             alert('Bitte geben Sie Ihr Feedback ein.');
@@ -592,7 +580,7 @@
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
             
             // Submit feedback
-            await submitFeedback(feedbackTitle, feedbackText, annotatedScreenshot);
+            await submitFeedback(feedbackText, annotatedScreenshot);
             
         } catch (error) {
             console.error('Widget: Failed to create annotated screenshot:', error);
@@ -665,7 +653,7 @@
     }
     
     // Submit feedback function
-    async function submitFeedback(feedbackTitle, feedbackText, screenshot) {
+    async function submitFeedback(feedbackText, screenshot) {
         if (isSubmitting) return;
         isSubmitting = true;
         
@@ -673,7 +661,6 @@
             const feedbackData = {
                 project_id: projectId,
                 url: window.location.href,
-                title: feedbackTitle,
                 text: feedbackText,
                 screenshot: screenshot,
                 selected_area: selectionArea ? JSON.stringify(selectionArea) : null,
