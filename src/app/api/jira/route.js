@@ -186,10 +186,10 @@ async function createJiraTicket({ feedback, jiraConfig }) {
     issueData.fields.duedate = dueDate;
   }
 
-  // Sprint hinzufügen falls ausgewählt
-  if (selectedSprint && selectedSprint.trim()) {
-    issueData.fields.customfield_10020 = parseInt(selectedSprint.trim()); // Standard Sprint field
-  }
+  // Sprint-Feld NICHT mehr setzen, da es zu Fehlern führt und nicht benötigt wird
+  // if (selectedSprint && selectedSprint.trim()) {
+  //   issueData.fields.customfield_10020 = parseInt(selectedSprint.trim()); // Standard Sprint field
+  // }
 
   // Bereich-Informationen hinzufügen falls vorhanden
   if (feedback.selected_area) {
