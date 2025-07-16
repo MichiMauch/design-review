@@ -124,13 +124,28 @@ async function createScreenshotWithPlaywright(url, options = {}) {
   console.log('Playwright: Screenshot dimensions will be:', { width, height });
   console.log('Playwright: Target scroll position:', { scrollX, scrollY });
   
+  // Check if we're on Vercel and Playwright is available
+  const isVercel = process.env.VERCEL === '1';
+  console.log('Playwright: Running on Vercel:', isVercel);
+  console.log('Playwright: Environment check - Node version:', process.version);
+  console.log('Playwright: Environment check - Platform:', process.platform);
+  
+  // Try to check if chromium is available
   let browser = null;
   try {
     console.log('Playwright: Starting browser...');
-    console.log('Playwright: Environment check - Node version:', process.version);
-    console.log('Playwright: Environment check - Platform:', process.platform);
     
-    browser = await chromium.launch(PLAYWRIGHT_CONFIG);
+    if (isVercel) {
+      // On Vercel, try with minimal config first
+      console.log('Playwright: Using Vercel-optimized config...');
+      browser = await chromium.launch({
+        ...PLAYWRIGHT_CONFIG,
+        executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined
+      });
+    } else {
+      browser = await chromium.launch(PLAYWRIGHT_CONFIG);
+    }
+    
     console.log('Playwright: Browser launched successfully');
     
     const context = await browser.newContext({
@@ -205,14 +220,21 @@ async function createScreenshotWithPlaywright(url, options = {}) {
     return screenshot;
     
   } catch (error) {
-    console.error('Playwright error:', error);
-    throw error;
+    console.error('Playwright: Browser launch failed:', error.message);
+    console.error('Playwright: Error details:', error);
+    
+    // If we're on Vercel and Playwright fails, throw immediately to use fallback
+    if (isVercel) {
+      throw new Error(`Playwright failed on Vercel: ${error.message}`);
+    } else {
+      throw error;
+    }
   } finally {
     if (browser) {
       try {
         await browser.close();
       } catch (closeError) {
-        console.warn('Error closing browser:', closeError);
+        console.warn('Playwright: Error closing browser:', closeError.message);
       }
     }
   }
