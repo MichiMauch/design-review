@@ -400,133 +400,78 @@
         annotationModal = document.createElement('div');
         annotationModal.id = 'feedback-annotation-modal';
         annotationModal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                        background: rgba(0,0,0,0.9); z-index: 10001; 
-                        display: flex; flex-direction: column;">
-                
+            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10001; display: flex; flex-direction: column;">
                 <!-- Header -->
-                <div style="background: white; padding: 15px 20px; 
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10002;">
+                <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10002;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif;">
-                            Screenshot markieren und Feedback geben
-                        </h3>
-                        <button id="annotation-close" style="background: none; border: none; 
-                                font-size: 24px; cursor: pointer; color: #666;">×</button>
+                        <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif;">Screenshot markieren und Feedback geben</h3>
+                        <button id="annotation-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
                     </div>
-                    
                     <!-- Toolbar -->
-                    <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
-                        <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle"
-                                style="padding: 8px 16px; border: 2px solid #007bff; background: #007bff; 
-                                       color: white; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">
-                            📱 Rechteck
-                        </button>
-                        <button id="tool-circle" class="annotation-tool" data-tool="circle"
-                                style="padding: 8px 16px; border: 2px solid #007bff; background: white; 
-                                       color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">
-                            ⭕ Kreis
-                        </button>
-                        <button id="tool-line" class="annotation-tool" data-tool="line"
-                                style="padding: 8px 16px; border: 2px solid #007bff; background: white; 
-                                       color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">
-                            📏 Linie
-                        </button>
-                        <div style="border-left: 1px solid #ddd; height: 30px; margin: 0 10px;"></div>
-                        <button id="tool-clear" style="padding: 8px 16px; border: 2px solid #dc3545; 
-                                background: white; color: #dc3545; border-radius: 4px; cursor: pointer; 
-                                font-family: Arial, sans-serif;">
-                            🗑️ Löschen
-                        </button>
-                    </div>
+                    <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 8px 16px; border: 2px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">📱 Rechteck</button>
+                    <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 8px 16px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">⭕ Kreis</button>
+                    <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 8px 16px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">📏 Linie</button>
+                    <div style="border-left: 1px solid #ddd; height: 30px; margin: 0 10px;"></div>
+                    <button id="tool-clear" style="padding: 8px 16px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">🗑️ Löschen</button>
                 </div>
-                
                 <!-- Screenshot Container -->
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; 
-                            padding: 20px; overflow: auto;">
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: auto;">
                     <div id="screenshot-container" style="position: relative; display: inline-block;">
-                        <img id="screenshot-image" src="${screenshotDataURL}" 
-                             style="max-width: 90vw; max-height: 70vh; border: 1px solid #ddd;" />
-                        <canvas id="annotation-canvas" 
-                                style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
+                        <img id="screenshot-image" src="${screenshotDataURL}" style="max-width: 90vw; max-height: 70vh; border: 1px solid #ddd;" />
+                        <canvas id="annotation-canvas" style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
                     </div>
                 </div>
-                
                 <!-- Footer -->
-                <div style="background: white; padding: 20px; 
-                            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
+                <div style="background: white; padding: 20px; box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
                     <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; 
-                                      color: #555; font-family: Arial, sans-serif;">
-                            Titel:
-                        </label>
-                        <input id="annotation-feedback-title" 
-                                  placeholder="Geben Sie einen kurzen Titel ein..."
-                                  style="width: 100%; padding: 12px; border: 1px solid #ddd; 
-                                         border-radius: 6px; font-family: Arial, sans-serif; 
-                                         box-sizing: border-box;" />
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Titel:</label>
+                        <input id="annotation-feedback-title" placeholder="Geben Sie einen kurzen Titel ein..." style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;" />
                     </div>
                     <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; 
-                                      color: #555; font-family: Arial, sans-serif;">
-                            Beschreibung:
-                        </label>
-                        <textarea id="annotation-feedback-text" 
-                                  placeholder="Beschreiben Sie, was Sie in den markierten Bereichen verbessern möchten..."
-                                  style="width: 100%; height: 80px; padding: 12px; border: 1px solid #ddd; 
-                                         border-radius: 6px; font-family: Arial, sans-serif; resize: vertical;
-                                         box-sizing: border-box;"></textarea>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Beschreibung:</label>
+                        <textarea id="annotation-feedback-text" placeholder="Beschreiben Sie, was Sie in den markierten Bereichen verbessern möchten..." style="width: 100%; height: 80px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
                     </div>
-                    
+                    <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="annotation-create-jira" style="margin-right: 8px;" />
+                        <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer;">Direkt als JIRA-Task anlegen</label>
+                        <span id="jira-status-message" style="margin-left: 10px; color: #28a745; font-size: 14px; display: none;"></span>
+                    </div>
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button id="annotation-cancel" style="padding: 12px 24px; border: 1px solid #ddd; 
-                                background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer;
-                                font-family: Arial, sans-serif;">
-                            Abbrechen
-                        </button>
-                        <button id="annotation-submit" style="padding: 12px 24px; background: #28a745; 
-                                color: white; border: none; border-radius: 6px; cursor: pointer;
-                                font-family: Arial, sans-serif;">
-                            📤 Feedback senden
-                        </button>
+                        <button id="annotation-cancel" style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Abbrechen</button>
+                        <button id="annotation-submit" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">📤 Feedback senden</button>
                     </div>
                 </div>
             </div>
         `;
-        
         document.body.appendChild(annotationModal);
-        
         // Initialize annotation functionality
         initializeAnnotation();
-        
         console.log('Widget: Annotation interface shown');
     }
-    
     // Initialize annotation functionality
     function initializeAnnotation() {
         const img = document.getElementById('screenshot-image');
         const canvas = document.getElementById('annotation-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        let currentTool = 'rectangle';
         let isDrawing = false;
         let startX, startY;
         let annotations = [];
-        
+        let currentTool = 'rectangle';
+        const ctx = canvas.getContext('2d');
+
         // Wait for image to load
         img.onload = () => {
             canvas.width = img.offsetWidth;
             canvas.height = img.offsetHeight;
             redrawAnnotations();
         };
-        
+
         // If image is already loaded
         if (img.complete) {
             canvas.width = img.offsetWidth;
             canvas.height = img.offsetHeight;
             redrawAnnotations();
         }
-        
+
         // Tool selection
         document.querySelectorAll('.annotation-tool').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -537,17 +482,16 @@
                 });
                 e.target.style.background = '#007bff';
                 e.target.style.color = 'white';
-                
                 currentTool = e.target.dataset.tool;
             });
         });
-        
+
         // Clear annotations
         document.getElementById('tool-clear').addEventListener('click', () => {
             annotations = [];
             redrawAnnotations();
         });
-        
+
         // Drawing events
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -555,7 +499,63 @@
             startY = e.clientY - rect.top;
             isDrawing = true;
         });
-        
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            redrawAnnotations();
+            drawShape(startX, startY, currentX, currentY, currentTool);
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const endX = e.clientX - rect.left;
+            const endY = e.clientY - rect.top;
+            // Save annotation
+            annotations.push({
+                tool: currentTool,
+                startX: startX,
+                startY: startY,
+                endX: endX,
+                endY: endY
+            });
+            redrawAnnotations();
+            isDrawing = false;
+        });
+
+        function drawShape(x1, y1, x2, y2, tool) {
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            switch (tool) {
+                case 'rectangle':
+                    ctx.rect(x1, y1, x2 - x1, y2 - y1);
+                    break;
+                case 'circle':
+                    const centerX = (x1 + x2) / 2;
+                    const centerY = (y1 + y2) / 2;
+                    const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) / 2;
+                    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                    break;
+                case 'line':
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    break;
+            }
+            ctx.stroke();
+        }
+
+        // Redraw all annotations
+        function redrawAnnotations() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            annotations.forEach(annotation => {
+                drawShape(annotation.startX, annotation.startY, annotation.endX, annotation.endY, annotation.tool);
+            });
+        }
+    // Ende initializeAnnotation
         canvas.addEventListener('mousemove', (e) => {
             if (!isDrawing) return;
             
@@ -582,52 +582,9 @@
                 endX: endX,
                 endY: endY
             });
-            
             redrawAnnotations();
             isDrawing = false;
         });
-        
-        // Event listeners for buttons
-        document.getElementById('annotation-close').addEventListener('click', closeAnnotationInterface);
-        document.getElementById('annotation-cancel').addEventListener('click', closeAnnotationInterface);
-        document.getElementById('annotation-submit').addEventListener('click', submitAnnotatedFeedback);
-        
-        // Draw shape function
-        function drawShape(x1, y1, x2, y2, tool) {
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            
-            switch (tool) {
-                case 'rectangle':
-                    const width = x2 - x1;
-                    const height = y2 - y1;
-                    ctx.rect(x1, y1, width, height);
-                    break;
-                
-                case 'circle':
-                    const centerX = (x1 + x2) / 2;
-                    const centerY = (y1 + y2) / 2;
-                    const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) / 2;
-                    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-                    break;
-                
-                case 'line':
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    break;
-            }
-            
-            ctx.stroke();
-        }
-        
-        // Redraw all annotations
-        function redrawAnnotations() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            annotations.forEach(annotation => {
-                drawShape(annotation.startX, annotation.startY, annotation.endX, annotation.endY, annotation.tool);
-            });
-        }
     }
     
     // Close annotation interface
@@ -643,45 +600,71 @@
     async function submitAnnotatedFeedback() {
         const title = document.getElementById('annotation-feedback-title').value.trim();
         const description = document.getElementById('annotation-feedback-text').value.trim();
+        const createJira = document.getElementById('annotation-create-jira').checked;
+        const jiraStatusMessage = document.getElementById('jira-status-message');
 
         if (!title) {
             alert('Bitte geben Sie einen Titel ein.');
             return;
         }
-
         if (!description) {
             alert('Bitte geben Sie eine Beschreibung ein.');
             return;
         }
-        
         try {
             // Get annotated screenshot
             const img = document.getElementById('screenshot-image');
             const canvas = document.getElementById('annotation-canvas');
-            
             // Create final combined image
             const finalCanvas = document.createElement('canvas');
             finalCanvas.width = img.naturalWidth;
             finalCanvas.height = img.naturalHeight;
             const finalCtx = finalCanvas.getContext('2d');
-            
             // Draw original image
             finalCtx.drawImage(img, 0, 0);
-            
             // Scale and draw annotations
             const scaleX = img.naturalWidth / img.offsetWidth;
             const scaleY = img.naturalHeight / img.offsetHeight;
-            
             finalCtx.drawImage(canvas, 0, 0, canvas.width * scaleX, canvas.height * scaleY);
-            
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
-            
-            // Submit feedback
+            // Submit feedback (DB)
             await submitFeedback(title, description, annotatedScreenshot);
-            
+            // Optional: JIRA direkt anlegen
+            if (createJira) {
+                jiraStatusMessage.style.display = 'inline';
+                jiraStatusMessage.style.color = '#007bff';
+                jiraStatusMessage.textContent = 'JIRA-Task wird erstellt...';
+                try {
+                    // Verschachtelung von Backticks vermeiden, daher String bauen:
+                    var jiraUrl = baseUrl + '/api/jira';
+                    var jiraBody = JSON.stringify({
+                        project_id: projectId,
+                        title: title,
+                        description: description,
+                        screenshot: annotatedScreenshot,
+                        url: window.location.href
+                    });
+                    const jiraRes = await fetch(jiraUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: jiraBody
+                    });
+                    if (jiraRes.ok) {
+                        jiraStatusMessage.style.color = '#28a745';
+                        jiraStatusMessage.textContent = 'JIRA-Task erfolgreich erstellt!';
+                    } else {
+                        jiraStatusMessage.style.color = '#dc3545';
+                        jiraStatusMessage.textContent = 'JIRA-Task konnte nicht erstellt werden.';
+                    }
+                } catch (jiraErr) {
+                    jiraStatusMessage.style.color = '#dc3545';
+                    jiraStatusMessage.textContent = 'JIRA-Task Fehler.';
+                }
+                setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 4000);
+            }
         } catch (error) {
             console.error('Widget: Failed to create annotated screenshot:', error);
-            await submitFeedback(feedbackText, null);
+            await submitFeedback(title, description, null);
         }
     }
     
@@ -714,37 +697,7 @@
     // Show error modal with custom message
     function showErrorModal(message) {
         const errorModal = document.createElement('div');
-        errorModal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                        background: rgba(0,0,0,0.5); z-index: 10001; 
-                        display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 40px; border-radius: 12px; 
-                            max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
-                    <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
-                    <h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">
-                        Screenshot-Problem
-                    </h3>
-                    <p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">
-                        ${message}
-                    </p>
-                    <div style="display: flex; gap: 10px; justify-content: center;">
-                        <button onclick="this.closest('div').parentElement.remove()" 
-                                style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; 
-                                       color: #666; border-radius: 6px; cursor: pointer;
-                                       font-family: Arial, sans-serif;">
-                            Abbrechen
-                        </button>
-                        <button onclick="this.closest('div').parentElement.remove(); 
-                                         window.feedbackWidget.createScreenshotAndAnnotate();" 
-                                style="padding: 12px 24px; background: #007bff; color: white; 
-                                       border: none; border-radius: 6px; cursor: pointer;
-                                       font-family: Arial, sans-serif;">
-                            Erneut versuchen
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
+        errorModal.innerHTML = `<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;"><div style="background: white; padding: 40px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);"><div style="font-size: 48px; margin-bottom: 20px;">⚠️</div><h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">Screenshot-Problem</h3><p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">${message}</p><div style="display: flex; gap: 10px; justify-content: center;"><button onclick="this.closest('div').parentElement.remove()" style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Abbrechen</button><button onclick="this.closest('div').parentElement.remove(); window.feedbackWidget.createScreenshotAndAnnotate();" style="padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Erneut versuchen</button></div></div></div>`;
         
         document.body.appendChild(errorModal);
     }
@@ -796,28 +749,7 @@
         if (modal) modal.remove();
         
         const successModal = document.createElement('div');
-        successModal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                        background: rgba(0,0,0,0.5); z-index: 10001; 
-                        display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 40px; border-radius: 12px; 
-                            max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
-                    <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
-                    <h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">
-                        Feedback gesendet!
-                    </h3>
-                    <p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">
-                        Vielen Dank für Ihr Feedback. Es wurde erfolgreich übermittelt.
-                    </p>
-                    <button onclick="this.closest('div').parentElement.remove()" 
-                            style="padding: 12px 24px; background: #28a745; color: white; 
-                                   border: none; border-radius: 6px; cursor: pointer;
-                                   font-family: Arial, sans-serif;">
-                        Schließen
-                    </button>
-                </div>
-            </div>
-        `;
+        successModal.innerHTML = `<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;"><div style="background: white; padding: 40px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);"><div style="font-size: 48px; margin-bottom: 20px;">✅</div><h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">Feedback gesendet!</h3><p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">Vielen Dank für Ihr Feedback. Es wurde erfolgreich übermittelt.</p><button onclick="this.closest('div').parentElement.remove()" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Schließen</button></div></div>`;
         
         document.body.appendChild(successModal);
         
@@ -831,28 +763,7 @@
     // Show error message
     function showErrorMessage() {
         const errorModal = document.createElement('div');
-        errorModal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                        background: rgba(0,0,0,0.5); z-index: 10001; 
-                        display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 40px; border-radius: 12px; 
-                            max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
-                    <div style="font-size: 48px; margin-bottom: 20px;">❌</div>
-                    <h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">
-                        Fehler beim Senden
-                    </h3>
-                    <p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">
-                        Das Feedback konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
-                    </p>
-                    <button onclick="this.closest('div').parentElement.remove()" 
-                            style="padding: 12px 24px; background: #dc3545; color: white; 
-                                   border: none; border-radius: 6px; cursor: pointer;
-                                   font-family: Arial, sans-serif;">
-                        Schließen
-                    </button>
-                </div>
-            </div>
-        `;
+        errorModal.innerHTML = `<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;"><div style="background: white; padding: 40px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);"><div style="font-size: 48px; margin-bottom: 20px;">❌</div><h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">Fehler beim Senden</h3><p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">Das Feedback konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.</p><button onclick="this.closest('div').parentElement.remove()" style="padding: 12px 24px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Schließen</button></div></div>`;
         
         document.body.appendChild(errorModal);
     }
