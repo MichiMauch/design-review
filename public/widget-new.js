@@ -93,32 +93,32 @@
     function createFeedbackButton() {
         const button = document.createElement('button');
         button.id = 'feedback-widget-button';
-        button.innerHTML = '💬';
+        button.innerHTML = 'Feedback';
         button.style.cssText = `
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
             background: #007bff;
             color: white;
             border: none;
-            font-size: 24px;
+            padding: 10px 16px;
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+            box-shadow: -2px 0 8px rgba(0,0,0,0.2);
             z-index: 9999;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s ease;
         `;
         
         button.addEventListener('mouseenter', () => {
-            button.style.transform = 'scale(1.1)';
-            button.style.boxShadow = '0 6px 20px rgba(0,123,255,0.4)';
+            button.style.background = '#0056b3';
         });
         
         button.addEventListener('mouseleave', () => {
-            button.style.transform = 'scale(1)';
-            button.style.boxShadow = '0 4px 12px rgba(0,123,255,0.3)';
+            button.style.background = '#007bff';
         });
         
         button.addEventListener('click', startFeedbackProcess);
@@ -479,7 +479,17 @@
                                 <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 8px 12px; border: 2px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">📱 Rechteck</button>
                                 <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">⭕ Kreis</button>
                                 <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">📏 Linie</button>
-                                <button id="tool-clear" style="padding: 8px 12px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">🗑️ Löschen</button>
+                                <button id="tool-freehand" class="annotation-tool" data-tool="freehand" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">✏️ Stift</button>
+                                <button id="tool-clear" title="Alles löschen" style="width: 38px; height: 38px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-size: 16px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; padding: 0;">🗑️</button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="color-tool" data-color="#ff0000" style="width: 24px; height: 24px; border-radius: 50%; background: #ff0000; border: 2px solid #000; cursor: pointer;"></button>
+                                <button class="color-tool" data-color="#0000ff" style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 2px solid #fff; cursor: pointer;"></button>
+                                <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
+                                <button class="color-tool" data-color="#ffff00" style="width: 24px; height: 24px; border-radius: 50%; background: #ffff00; border: 2px solid #fff; cursor: pointer;"></button>
                             </div>
                         </div>
                     </div>
@@ -507,7 +517,10 @@
                     <div style="padding: 16px; border-top: 1px solid #e0e0e0; background: #f8f9fa;">
                         <div style="display: flex; gap: 8px;">
                             <button id="annotation-cancel" style="flex: 1; padding: 12px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; transition: all 0.2s;">Abbrechen</button>
-                            <button id="annotation-submit" style="flex: 2; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; transition: all 0.2s;">📤 Feedback senden</button>
+                            <button id="annotation-submit" style="flex: 2; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <span id="submit-text">📤 Feedback senden</span>
+                                <div id="submit-spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #ffffff80; border-top: 2px solid #fff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -990,7 +1003,9 @@
         let isDrawing = false;
         let startX, startY;
         let annotations = [];
+        let currentPath = [];
         let currentTool = 'rectangle';
+        let currentColor = '#ff0000';
         const ctx = canvas.getContext('2d');
 
         // Wait for image to load
@@ -1021,6 +1036,18 @@
             });
         });
 
+        // Color selection
+        document.querySelectorAll('.color-tool').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                currentColor = e.target.dataset.color;
+                // Update active color
+                document.querySelectorAll('.color-tool').forEach(b => {
+                    b.style.border = '2px solid #fff';
+                });
+                e.target.style.border = '2px solid #000';
+            });
+        });
+
         // Clear annotations
         document.getElementById('tool-clear').addEventListener('click', () => {
             annotations = [];
@@ -1033,6 +1060,9 @@
             startX = e.clientX - rect.left;
             startY = e.clientY - rect.top;
             isDrawing = true;
+            if (currentTool === 'freehand') {
+                currentPath = [{x: startX, y: startY}];
+            }
         });
 
         canvas.addEventListener('mousemove', (e) => {
@@ -1040,8 +1070,15 @@
             const rect = canvas.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
+            if (currentTool === 'freehand') {
+                currentPath.push({x: currentX, y: currentY});
+            }
             redrawAnnotations();
-            drawShape(startX, startY, currentX, currentY, currentTool);
+            if (currentTool === 'freehand') {
+                drawFreehand(currentPath, currentColor);
+            } else {
+                drawShape(startX, startY, currentX, currentY, currentTool, currentColor);
+            }
         });
 
         canvas.addEventListener('mouseup', (e) => {
@@ -1050,19 +1087,28 @@
             const endX = e.clientX - rect.left;
             const endY = e.clientY - rect.top;
             // Save annotation
-            annotations.push({
-                tool: currentTool,
-                startX: startX,
-                startY: startY,
-                endX: endX,
-                endY: endY
-            });
+            if (currentTool === 'freehand') {
+                annotations.push({
+                    tool: 'freehand',
+                    color: currentColor,
+                    path: currentPath
+                });
+            } else {
+                annotations.push({
+                    tool: currentTool,
+                    color: currentColor,
+                    startX: startX,
+                    startY: startY,
+                    endX: endX,
+                    endY: endY
+                });
+            }
             redrawAnnotations();
             isDrawing = false;
         });
 
-        function drawShape(x1, y1, x2, y2, tool) {
-            ctx.strokeStyle = '#ff0000';
+        function drawShape(x1, y1, x2, y2, tool, color) {
+            ctx.strokeStyle = color || '#ff0000';
             ctx.lineWidth = 3;
             ctx.beginPath();
             switch (tool) {
@@ -1083,11 +1129,26 @@
             ctx.stroke();
         }
 
+        function drawFreehand(path, color) {
+            ctx.strokeStyle = color || '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i].x, path[i].y);
+            }
+            ctx.stroke();
+        }
+
         // Redraw all annotations
         function redrawAnnotations() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             annotations.forEach(annotation => {
-                drawShape(annotation.startX, annotation.startY, annotation.endX, annotation.endY, annotation.tool);
+                if (annotation.tool === 'freehand') {
+                    drawFreehand(annotation.path, annotation.color);
+                } else {
+                    drawShape(annotation.startX, annotation.startY, annotation.endX, annotation.endY, annotation.tool, annotation.color);
+                }
             });
         }
     // Ende initializeAnnotation
@@ -1112,6 +1173,7 @@
             // Save annotation
             annotations.push({
                 tool: currentTool,
+                color: currentColor,
                 startX: startX,
                 startY: startY,
                 endX: endX,
@@ -1133,6 +1195,10 @@
     
     // Submit annotated feedback
     async function submitAnnotatedFeedback() {
+        const submitBtn = document.getElementById('annotation-submit');
+        const submitText = document.getElementById('submit-text');
+        const submitSpinner = document.getElementById('submit-spinner');
+
         const title = document.getElementById('annotation-feedback-title').value.trim();
         const description = document.getElementById('annotation-feedback-text').value.trim();
         const createJira = document.getElementById('annotation-create-jira').checked;
@@ -1146,6 +1212,12 @@
             alert('Bitte geben Sie eine Beschreibung ein.');
             return;
         }
+
+        // Show spinner and disable button
+        submitBtn.disabled = true;
+        submitText.style.display = 'none';
+        submitSpinner.style.display = 'block';
+
         try {
             // Get annotated screenshot
             const img = document.getElementById('screenshot-image');
@@ -1192,6 +1264,11 @@
             console.error('Widget: Failed to create annotated screenshot:', error);
             await submitFeedback(title, description, null);
             closeAnnotationInterface();
+        } finally {
+            // Hide spinner and re-enable button
+            submitBtn.disabled = false;
+            submitText.style.display = 'inline';
+            submitSpinner.style.display = 'none';
         }
     }
     
