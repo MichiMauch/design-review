@@ -141,11 +141,18 @@
                 if (width > 10 && height > 10) {
                     // Use viewport-relative coordinates and add scroll offset
                     const left = Math.min(e.clientX, startX);
+                    const left = Math.min(e.clientX, startX);
                     const top = Math.min(e.clientY, startY);
 
+                    // Add scroll offset to get absolute coordinates from page top
+                    const scrollX = window.scrollX || window.pageXOffset;
+                    const scrollY = window.scrollY || window.pageYOffset;
+                    const absoluteX = left + scrollX;
+                    const absoluteY = top + scrollY;
+
                     selectionArea = {
-                        x: left, 
-                        y: top,
+                        x: absoluteX,
+                        y: absoluteY,
                         width: width,
                         height: height,
                         viewportX: left,
@@ -154,9 +161,9 @@
                     
                     console.log('=== SELECTION DEBUG ===');
                     console.log('Widget: Area selected (viewport coordinates):', {x: left, y: top, width, height});
-                    console.log('Widget: Area selected (final):', selectionArea);
+                    console.log('Widget: Area selected (absolute coordinates):', selectionArea);
                     console.log('Widget: Viewport size:', window.innerWidth, 'x', window.innerHeight);
-                    console.log('Widget: Scroll position:', window.scrollX, 'x', window.scrollY);
+                    console.log('Widget: Scroll position:', scrollX, 'x', scrollY);
                     console.log('=== END SELECTION DEBUG ===');
                     
                     removeSelectionOverlay();
@@ -226,29 +233,15 @@
             // Import html-to-image dynamisch
             const { toPng } = await import('https://unpkg.com/html-to-image@1.11.11/es/index.js');
             console.log('Widget: html-to-image loaded successfully');
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Temporarily move the body to the top to capture the scrolled content
-            const scrollX = window.scrollX;
-            const scrollY = window.scrollY;
-            const originalTransform = document.body.style.transform;
-            
-            document.body.style.transform = `translateY(-${scrollY}px)`;
-            window.scrollTo(0, 0);
-
-            await new Promise(resolve => setTimeout(resolve, 150)); // Wait for rendering
-
-            console.log('Widget: Taking screenshot of the viewport...');
-            const screenshotDataUrl = await toPng(document.body, {
+            // Screenshot von der gesamten Seite machen
+            console.log('Widget: Taking screenshot of the entire page...');
+            const screenshotDataUrl = await toPng(document.documentElement, {
                 quality: 0.9,
                 pixelRatio: window.devicePixelRatio || 2,
-                backgroundColor: '#ffffff',
-                width: window.innerWidth,
-                height: window.innerHeight,
+                backgroundColor: '#ffffff'
             });
-
-            // Restore body position
-            document.body.style.transform = originalTransform;
-            window.scrollTo(scrollX, scrollY);
 
             console.log('Widget: Screenshot captured successfully, data URL length:', screenshotDataUrl.length);
             
@@ -291,8 +284,8 @@
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                const scaleX = img.width / window.innerWidth;
-                const scaleY = img.height / window.innerHeight;
+                const scaleX = img.width / document.documentElement.scrollWidth;
+                const scaleY = img.height / document.documentElement.scrollHeight;
                 console.log('Scale factors:', { scaleX, scaleY });
 
                 const cropX = selectionArea.x * scaleX;
@@ -300,8 +293,8 @@
                 const cropWidth = selectionArea.width * scaleX;
                 const cropHeight = selectionArea.height * scaleY;
 
-                console.log('Using VIEWPORT coordinates for cropping:');
-                console.log('Viewport coords:', {
+                console.log('Using ABSOLUTE coordinates for cropping:');
+                console.log('Absolute coords:', {
                     x: selectionArea.x,
                     y: selectionArea.y,
                     width: selectionArea.width,
