@@ -963,26 +963,82 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
     }
 
     const configData = await configResponse.json();
+    console.log('JIRA Board Configuration:', JSON.stringify(configData, null, 2));
     
-    // Extract swimlane configuration
-    const swimlanes = configData.subQuery?.query || 'Keine Swimlanes';
+    let swimlaneOptions = [{ id: '', name: 'Keine Swimlane' }];
     
-    // If swimlanes are configured, get the actual swimlane values
-    let swimlaneOptions = [];
-    if (swimlanes !== 'Keine Swimlanes' && configData.subQuery) {
-      // For most boards, swimlanes are based on assignee, component, or custom fields
-      // We'll provide common swimlane options
-      swimlaneOptions = [
-        { id: 'assignee', name: 'Nach Bearbeiter' },
-        { id: 'component', name: 'Nach Komponente' },
-        { id: 'priority', name: 'Nach Priorität' },
-        { id: 'none', name: 'Keine Swimlanes' }
-      ];
-    } else {
-      swimlaneOptions = [
-        { id: 'none', name: 'Keine Swimlanes' }
-      ];
+    // Check for swimlane configuration in the board
+    if (configData.subQuery && configData.subQuery.query) {
+      const subQuery = configData.subQuery.query;
+      console.log('JIRA Swimlane SubQuery:', subQuery);
+      
+      // Parse different types of swimlane configurations
+      if (subQuery.includes('assignee')) {
+        // Get assignable users for swimlanes
+        const usersUrl = `${serverUrl}/rest/api/3/user/assignable/search?project=${jiraConfig.projectKey}&maxResults=50`;
+        const usersResponse = await fetch(usersUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json();
+          swimlaneOptions.push(...usersData.map(user => ({
+            id: user.accountId,
+            name: `${user.displayName} (${user.emailAddress || user.name})`
+          })));
+        }
+      } else if (subQuery.includes('component')) {
+        // Get project components for swimlanes
+        const componentsUrl = `${serverUrl}/rest/api/3/project/${jiraConfig.projectKey}/components`;
+        const componentsResponse = await fetch(componentsUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (componentsResponse.ok) {
+          const componentsData = await componentsResponse.json();
+          swimlaneOptions.push(...componentsData.map(component => ({
+            id: component.id,
+            name: component.name
+          })));
+        }
+      } else if (subQuery.includes('priority')) {
+        // Get priorities for swimlanes
+        const prioritiesUrl = `${serverUrl}/rest/api/3/priority`;
+        const prioritiesResponse = await fetch(prioritiesUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (prioritiesResponse.ok) {
+          const prioritiesData = await prioritiesResponse.json();
+          swimlaneOptions.push(...prioritiesData.map(priority => ({
+            id: priority.id,
+            name: priority.name
+          })));
+        }
+      } else {
+        // Generic custom field or other swimlane types
+        // Add some common fallback options
+        swimlaneOptions.push(
+          { id: 'epic', name: 'Nach Epic' },
+          { id: 'fixVersion', name: 'Nach Fix Version' },
+          { id: 'assignee', name: 'Nach Assignee' }
+        );
+      }
     }
+    
+    console.log('JIRA Swimlanes found:', swimlaneOptions.length);
     
     return NextResponse.json({
       success: true,
