@@ -246,6 +246,7 @@
             if (overlay) overlay.style.display = 'block'; // Ensure overlay is visible on error
             showErrorModal('Bildschirmaufnahme wurde abgebrochen oder ist fehlgeschlagen.');
         }
+    }
     
     async function cropScreenshotToSelection(screenshotDataUrl, selection) {
         return new Promise((resolve) => {
