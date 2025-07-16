@@ -252,10 +252,13 @@
                 const dpr = window.devicePixelRatio || 1;
                 const canvas = document.createElement('canvas');
 
+                // Absolute screen coordinates
+                const screenX = window.screenX * dpr;
+                const screenY = window.screenY * dpr;
                 const browserUIOffset = (window.outerHeight - window.innerHeight) * dpr;
 
-                const cropX = selection.viewportX * dpr;
-                const cropY = (selection.viewportY * dpr) + browserUIOffset;
+                const cropX = screenX + (selection.viewportX * dpr);
+                const cropY = screenY + browserUIOffset + (selection.viewportY * dpr);
                 const cropWidth = selection.width * dpr;
                 const cropHeight = selection.height * dpr;
 
