@@ -144,8 +144,9 @@
                     const top = Math.min(e.clientY, startY);
                     
                     // Add scroll offset to get absolute coordinates from page top
-                    const scrollX = window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft;
-                    const scrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+                    const scrollElement = document.scrollingElement || document.documentElement;
+                    const scrollX = scrollElement.scrollLeft;
+                    const scrollY = scrollElement.scrollTop;
                     const absoluteX = left + scrollX;
                     const absoluteY = top + scrollY;
                     
