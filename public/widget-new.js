@@ -678,13 +678,18 @@
                         }
                     };
                     
+                    console.log('Widget: Sending JIRA payload:', jiraPayload);
+                    
                     const jiraRes = await fetch(`${baseUrl}/api/jira`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(jiraPayload)
                     });
                     
+                    console.log('Widget: JIRA response status:', jiraRes.status);
+                    
                     const jiraResult = await jiraRes.json();
+                    console.log('Widget: JIRA response:', jiraResult);
                     
                     if (jiraRes.ok && jiraResult.success) {
                         jiraStatusMessage.style.color = '#28a745';

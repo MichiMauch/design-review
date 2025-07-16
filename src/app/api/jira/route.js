@@ -20,7 +20,10 @@ export async function OPTIONS() {
 // JIRA API Integration
 export async function POST(request) {
   try {
-    const { action, ...data } = await request.json();
+    const requestBody = await request.json();
+    console.log('JIRA API received:', requestBody);
+    
+    const { action, ...data } = requestBody;
     let result;
     switch (action) {
       case 'createTicket':
@@ -38,6 +41,7 @@ export async function POST(request) {
     return withCORS(result);
   } catch (error) {
     console.error('JIRA API Error:', error);
+    console.error('Error details:', error.stack);
     const errorResponse = NextResponse.json({ 
       success: false, 
       error: error.message 
