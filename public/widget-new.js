@@ -99,7 +99,7 @@
             top: 50%;
             right: 0;
             transform: translateY(-50%);
-            background: #007bff;
+            background: #28a745;
             color: white;
             border: none;
             padding: 10px 16px;
@@ -108,17 +108,19 @@
             font-family: Arial, sans-serif;
             font-size: 16px;
             cursor: pointer;
-            box-shadow: -2px 0 8px rgba(0,0,0,0.2);
+            box-shadow: -2px 2px 8px rgba(0,0,0,0.3);
             z-index: 9999;
-            transition: background-color 0.3s ease;
+            transition: all 0.2s ease;
         `;
         
         button.addEventListener('mouseenter', () => {
-            button.style.background = '#0056b3';
+            button.style.background = '#218838';
+            button.style.boxShadow = '-2px 4px 12px rgba(0,0,0,0.4)';
         });
         
         button.addEventListener('mouseleave', () => {
-            button.style.background = '#007bff';
+            button.style.background = '#28a745';
+            button.style.boxShadow = '-2px 2px 8px rgba(0,0,0,0.3)';
         });
         
         button.addEventListener('click', startFeedbackProcess);
@@ -490,6 +492,14 @@
                                 <button class="color-tool" data-color="#0000ff" style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 2px solid #fff; cursor: pointer;"></button>
                                 <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
                                 <button class="color-tool" data-color="#ffff00" style="width: 24px; height: 24px; border-radius: 50%; background: #ffff00; border: 2px solid #fff; cursor: pointer;"></button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Liniendicke:</label>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="thickness-tool" data-thickness="2" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #000; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">2</button>
+                                <button class="thickness-tool" data-thickness="4" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">4</button>
+                                <button class="thickness-tool" data-thickness="6" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">6</button>
                             </div>
                         </div>
                     </div>
@@ -1006,6 +1016,7 @@
         let currentPath = [];
         let currentTool = 'rectangle';
         let currentColor = '#ff0000';
+        let currentThickness = 3;
         const ctx = canvas.getContext('2d');
 
         // Wait for image to load
@@ -1042,6 +1053,18 @@
                 currentColor = e.target.dataset.color;
                 // Update active color
                 document.querySelectorAll('.color-tool').forEach(b => {
+                    b.style.border = '2px solid #fff';
+                });
+                e.target.style.border = '2px solid #000';
+            });
+        });
+
+        // Thickness selection
+        document.querySelectorAll('.thickness-tool').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                currentThickness = parseInt(e.target.dataset.thickness);
+                // Update active thickness
+                document.querySelectorAll('.thickness-tool').forEach(b => {
                     b.style.border = '2px solid #fff';
                 });
                 e.target.style.border = '2px solid #000';
@@ -1091,12 +1114,14 @@
                 annotations.push({
                     tool: 'freehand',
                     color: currentColor,
+                    thickness: currentThickness,
                     path: currentPath
                 });
             } else {
                 annotations.push({
                     tool: currentTool,
                     color: currentColor,
+                    thickness: currentThickness,
                     startX: startX,
                     startY: startY,
                     endX: endX,
@@ -1107,9 +1132,9 @@
             isDrawing = false;
         });
 
-        function drawShape(x1, y1, x2, y2, tool, color) {
+        function drawShape(x1, y1, x2, y2, tool, color, thickness) {
             ctx.strokeStyle = color || '#ff0000';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = thickness || 3;
             ctx.beginPath();
             switch (tool) {
                 case 'rectangle':
@@ -1129,9 +1154,9 @@
             ctx.stroke();
         }
 
-        function drawFreehand(path, color) {
+        function drawFreehand(path, color, thickness) {
             ctx.strokeStyle = color || '#ff0000';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = thickness || 3;
             ctx.beginPath();
             ctx.moveTo(path[0].x, path[0].y);
             for (let i = 1; i < path.length; i++) {
@@ -1145,9 +1170,9 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             annotations.forEach(annotation => {
                 if (annotation.tool === 'freehand') {
-                    drawFreehand(annotation.path, annotation.color);
+                    drawFreehand(annotation.path, annotation.color, annotation.thickness);
                 } else {
-                    drawShape(annotation.startX, annotation.startY, annotation.endX, annotation.endY, annotation.tool, annotation.color);
+                    drawShape(annotation.startX, annotation.startY, annotation.endX, annotation.endY, annotation.tool, annotation.color, annotation.thickness);
                 }
             });
         }
