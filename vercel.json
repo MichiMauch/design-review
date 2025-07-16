@@ -2,7 +2,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run build && ./install-browsers.sh",
   "devCommand": "npm run dev",
-  "installCommand": "npm install",
+  "installCommand": "apt-get update && apt-get install -y libnspr4 libnss3 libgbm1 && npm install",
   "regions": ["fra1"],
   "functions": {
     "src/app/api/screenshot/route.js": {

@@ -106,8 +106,6 @@
         let startX, startY, selectionBox;
         
         overlay.addEventListener('mousedown', (e) => {
-            if (e.target !== overlay) return;
-            
             // Use clientX/clientY since we're taking viewport screenshots
             startX = e.clientX;
             startY = e.clientY;
@@ -239,8 +237,8 @@
             // Warte kurz, damit Animationen abgeschlossen sind
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Screenshot direkt vom sichtbaren Bereich (Viewport) machen
-            console.log('Widget: Taking screenshot of current viewport (window)...');
+            // Screenshot von der gesamten Seite machen
+            console.log('Widget: Taking screenshot of the entire page...');
             // Temporär Feedback-Overlays ausblenden
             const overlays = document.querySelectorAll('[id*="feedback"], [id*="annotation"]');
             const prevDisplay = [];
@@ -249,17 +247,11 @@
                 el.style.display = 'none';
             });
 
-            // Screenshot vom sichtbaren Bereich (Viewport)
+            // Screenshot von der gesamten Seite machen
             const screenshotDataUrl = await toPng(document.documentElement, {
                 quality: 0.9,
-                pixelRatio: 2,
-                backgroundColor: '#ffffff',
-                width: window.innerWidth,
-                height: window.innerHeight,
-                style: {
-                    // Nur den sichtbaren Bereich rendern
-                    transform: `translate(-${window.scrollX}px, -${window.scrollY}px)`
-                }
+                pixelRatio: 2, // Using a pixelRatio for better quality on high-res screens
+                backgroundColor: '#ffffff'
             });
 
             // Overlays wieder einblenden
@@ -308,23 +300,22 @@
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Calculate scale factors
-                const scaleX = img.width / window.innerWidth;
-                const scaleY = img.height / window.innerHeight;
+                // Calculate scale factors based on the full document size
+                const scaleX = img.width / document.documentElement.scrollWidth;
+                const scaleY = img.height / document.documentElement.scrollHeight;
                 
                 console.log('Scale factors:', { scaleX, scaleY });
                 
-                // WICHTIG: Für html-to-image verwenden wir VIEWPORT-Koordinaten,
-                // nicht absolute Koordinaten, da das Screenshot nur den Viewport zeigt!
-                const cropX = selectionArea.viewportX * scaleX;
-                const cropY = selectionArea.viewportY * scaleY;
+                // Verwenden Sie die absoluten Koordinaten für den Zuschnitt
+                const cropX = selectionArea.x * scaleX;
+                const cropY = selectionArea.y * scaleY;
                 const cropWidth = selectionArea.width * scaleX;
                 const cropHeight = selectionArea.height * scaleY;
                 
-                console.log('Using VIEWPORT coordinates for cropping:');
-                console.log('Viewport coords:', {
-                    x: selectionArea.viewportX,
-                    y: selectionArea.viewportY,
+                console.log('Using ABSOLUTE coordinates for cropping:');
+                console.log('Absolute coords:', {
+                    x: selectionArea.x,
+                    y: selectionArea.y,
                     width: selectionArea.width,
                     height: selectionArea.height
                 });
