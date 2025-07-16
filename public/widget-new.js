@@ -296,34 +296,63 @@
                     console.log('Device pixel ratio:', dpr);
                     console.log('Selection (viewport):', selection.viewportX, selection.viewportY, selection.width, selection.height);
 
-                    // Calculate browser chrome and UI elements
-                    const windowChrome = {
-                        top: window.outerHeight - window.innerHeight - (window.outerWidth - window.innerWidth),
-                        left: (window.outerWidth - window.innerWidth) / 2
+                    // Calculate browser chrome height with multiple detection methods
+                    const methods = {
+                        // Method 1: Standard calculation
+                        standard: window.outerHeight - window.innerHeight,
+                        
+                        // Method 2: More conservative estimate
+                        conservative: Math.max(window.outerHeight - window.innerHeight, 100),
+                        
+                        // Method 3: Based on common browser UI heights
+                        estimated: screen.height > 1080 ? 120 : 80,
+                        
+                        // Method 4: Try to detect if we're in fullscreen
+                        fullscreen: window.outerHeight === screen.height ? 0 : window.outerHeight - window.innerHeight
                     };
 
-                    // For display media capture, the screenshot typically includes:
-                    // - Browser title bar and tabs
-                    // - Address bar and toolbar
-                    // - The actual page content
+                    // Choose the most reasonable chrome height
+                    let chromeHeight = methods.standard;
                     
-                    // More accurate chrome height calculation
-                    // This accounts for title bar, tabs, address bar, etc.
-                    const estimatedChromeHeight = Math.max(
-                        windowChrome.top,
-                        window.outerHeight - window.innerHeight,
-                        80 // Minimum fallback for typical browser chrome
-                    );
+                    // If standard seems too small or too large, use conservative
+                    if (chromeHeight < 50 || chromeHeight > 200) {
+                        chromeHeight = methods.conservative;
+                    }
 
-                    // Calculate the actual crop coordinates in screenshot space
-                    // The screenshot coordinate system starts from the top-left of the browser window
-                    const cropX = (selection.viewportX + windowChrome.left) * dpr;
-                    const cropY = (selection.viewportY + estimatedChromeHeight) * dpr;
+                    console.log('Chrome height detection methods:', methods);
+                    console.log('Selected chrome height:', chromeHeight);
+
+                    // Try multiple coordinate calculation strategies
+                    const strategies = [
+                        {
+                            name: 'viewport_with_chrome',
+                            cropX: selection.viewportX * dpr,
+                            cropY: (selection.viewportY + chromeHeight) * dpr
+                        },
+                        {
+                            name: 'viewport_only',
+                            cropX: selection.viewportX * dpr,
+                            cropY: selection.viewportY * dpr
+                        },
+                        {
+                            name: 'page_coordinates',
+                            cropX: (selection.pageX - selection.scroll.x) * dpr,
+                            cropY: (selection.pageY - selection.scroll.y + chromeHeight) * dpr
+                        }
+                    ];
+
+                    console.log('Crop strategies to try:', strategies);
+
+                    // Start with the first strategy
+                    const primaryStrategy = strategies[0];
+                    const cropX = primaryStrategy.cropX;
+                    const cropY = primaryStrategy.cropY;
                     const cropWidth = selection.width * dpr;
                     const cropHeight = selection.height * dpr;
 
-                    console.log('Estimated chrome height:', estimatedChromeHeight);
-                    console.log('Crop coordinates (screenshot space):', {
+                    console.log('Estimated chrome height:', chromeHeight);
+                    console.log('Primary crop coordinates (screenshot space):', {
+                        strategy: primaryStrategy.name,
                         x: cropX,
                         y: cropY,
                         width: cropWidth,
@@ -357,44 +386,52 @@
                     canvas.width = finalCropWidth;
                     canvas.height = finalCropHeight;
                     
-                    // Strategy 1: Direct crop (most common case)
-                    try {
-                        ctx.drawImage(
-                            img,
-                            safeCropX, safeCropY, finalCropWidth, finalCropHeight,
-                            0, 0, finalCropWidth, finalCropHeight
-                        );
-                        console.log('Crop completed successfully with direct method');
-                    } catch (directError) {
-                        console.warn('Direct crop failed, trying alternative method:', directError);
-                        
-                        // Strategy 2: Try with adjusted coordinates if scroll position might be wrong
-                        const altCropY = Math.max(0, Math.min(selection.viewportY * dpr, img.height - finalCropHeight));
-                        const altCropX = Math.max(0, Math.min(selection.viewportX * dpr, img.width - finalCropWidth));
+                    let cropSuccess = false;
+                    
+                    // Try each strategy until one works
+                    for (let i = 0; i < strategies.length && !cropSuccess; i++) {
+                        const strategy = strategies[i];
+                        const strategyCropX = Math.max(0, Math.min(strategy.cropX, img.width - finalCropWidth));
+                        const strategyCropY = Math.max(0, Math.min(strategy.cropY, img.height - finalCropHeight));
                         
                         try {
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            ctx.drawImage(
-                                img,
-                                altCropX, altCropY, finalCropWidth, finalCropHeight,
-                                0, 0, finalCropWidth, finalCropHeight
-                            );
-                            console.log('Crop completed with alternative coordinates');
-                        } catch (altError) {
-                            console.warn('Alternative crop also failed, using center crop:', altError);
-                            
-                            // Strategy 3: Center crop as last resort
-                            const centerX = Math.max(0, (img.width - finalCropWidth) / 2);
-                            const centerY = Math.max(0, (img.height - finalCropHeight) / 2);
+                            console.log(`Trying strategy ${i + 1}: ${strategy.name}`, {
+                                x: strategyCropX,
+                                y: strategyCropY,
+                                width: finalCropWidth,
+                                height: finalCropHeight
+                            });
                             
                             ctx.clearRect(0, 0, canvas.width, canvas.height);
                             ctx.drawImage(
                                 img,
-                                centerX, centerY, finalCropWidth, finalCropHeight,
+                                strategyCropX, strategyCropY, finalCropWidth, finalCropHeight,
                                 0, 0, finalCropWidth, finalCropHeight
                             );
-                            console.log('Used center crop as fallback');
+                            
+                            console.log(`Strategy ${strategy.name} succeeded!`);
+                            cropSuccess = true;
+                            break;
+                            
+                        } catch (strategyError) {
+                            console.warn(`Strategy ${strategy.name} failed:`, strategyError);
+                            continue;
                         }
+                    }
+                    
+                    // If all strategies failed, use center crop
+                    if (!cropSuccess) {
+                        console.warn('All strategies failed, using center crop as final fallback');
+                        const centerX = Math.max(0, (img.width - finalCropWidth) / 2);
+                        const centerY = Math.max(0, (img.height - finalCropHeight) / 2);
+                        
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(
+                            img,
+                            centerX, centerY, finalCropWidth, finalCropHeight,
+                            0, 0, finalCropWidth, finalCropHeight
+                        );
+                        console.log('Used center crop as final fallback');
                     }
 
                     console.log('Crop completed successfully');
