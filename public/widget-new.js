@@ -144,9 +144,8 @@
                     const top = Math.min(e.clientY, startY);
                     
                     // Add scroll offset to get absolute coordinates from page top
-                    const scrollElement = document.scrollingElement || document.documentElement;
-                    const scrollX = scrollElement.scrollLeft;
-                    const scrollY = scrollElement.scrollTop;
+                    const scrollX = window.scrollX || window.pageXOffset;
+                    const scrollY = window.scrollY || window.pageYOffset;
                     const absoluteX = left + scrollX;
                     const absoluteY = top + scrollY;
                     
@@ -306,9 +305,9 @@
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Calculate scale factors based on the body size
-                const scaleX = img.width / document.body.scrollWidth;
-                const scaleY = img.height / document.body.scrollHeight;
+                // Calculate scale factors based on the documentElement size for consistency with screenshot
+                const scaleX = img.width / document.documentElement.scrollWidth;
+                const scaleY = img.height / document.documentElement.scrollHeight;
                 
                 console.log('Scale factors:', { scaleX, scaleY });
                 
