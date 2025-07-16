@@ -144,8 +144,10 @@
                     const top = Math.min(e.clientY, startY);
                     
                     // Add scroll offset to get absolute coordinates from page top
-                    const absoluteX = left + window.scrollX;
-                    const absoluteY = top + window.scrollY;
+                    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+                    const scrollY = window.scrollY || document.documentElement.scrollTop;
+                    const absoluteX = left + scrollX;
+                    const absoluteY = top + scrollY;
                     
                     // Ensure coordinates are within bounds
                     const clampedLeft = Math.max(0, absoluteX);
@@ -167,7 +169,7 @@
                     console.log('Widget: Area selected (viewport coordinates):', {x: left, y: top, width, height});
                     console.log('Widget: Area selected (absolute coordinates):', selectionArea);
                     console.log('Widget: Viewport size:', window.innerWidth, 'x', window.innerHeight);
-                    console.log('Widget: Scroll position:', window.scrollX, 'x', window.scrollY);
+                    console.log('Widget: Scroll position:', scrollX, 'x', scrollY);
                     console.log('=== END SELECTION DEBUG ===');
                     
                     removeSelectionOverlay();
