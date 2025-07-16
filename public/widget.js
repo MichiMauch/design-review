@@ -1,9 +1,11 @@
-// Proxy: Lädt immer die aktuelle Widget-Logik aus widget-new.js
-// Dies stellt sicher, dass /public/widget.js immer die aktuelle Version verwendet
+// Proxy: Lädt die einfache Widget-Version ohne komplexe Crop-Logik
+// Umschalten zwischen widget-new.js (komplex) und widget-simple.js (einfach)
 (function() {
+  // Einfache Version laden (ohne Screenshot-Crop-Probleme)
   var script = document.createElement('script');
-  script.src = (document.currentScript && document.currentScript.src.replace(/widget\.js$/, 'widget-new.js')) || '/public/widget-new.js';
+  script.src = (document.currentScript && document.currentScript.src.replace(/widget\.js$/, 'widget-simple.js')) || '/public/widget-simple.js';
   script.async = false;
+  
   // Attribute wie data-project-id übernehmen
   if (document.currentScript) {
     Array.from(document.currentScript.attributes).forEach(function(attr) {
@@ -12,5 +14,6 @@
       }
     });
   }
+  
   document.currentScript.parentNode.insertBefore(script, document.currentScript.nextSibling);
 })();
