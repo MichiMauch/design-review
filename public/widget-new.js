@@ -207,20 +207,17 @@
         try {
             console.log('Widget: Starting screen capture with getDisplayMedia...');
             
-            // Hide overlay before starting capture
             if (overlay) overlay.style.display = 'none';
 
             const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
             const track = stream.getVideoTracks()[0];
             const imageCapture = new ImageCapture(track);
 
-            // Wait a moment for the stream to stabilize
             await new Promise(resolve => setTimeout(resolve, 200));
 
             const bitmap = await imageCapture.grabFrame();
-            track.stop(); // Stop the screen sharing stream
+            track.stop();
 
-            // Restore overlay if it was hidden
             if (overlay) overlay.style.display = 'block';
 
             const canvas = document.createElement('canvas');
@@ -243,11 +240,11 @@
 
         } catch (error) {
             console.error('Widget: Screen capture failed:', error);
-            if (overlay) overlay.style.display = 'block'; // Ensure overlay is visible on error
+            if (overlay) overlay.style.display = 'block';
             showErrorModal('Bildschirmaufnahme wurde abgebrochen oder ist fehlgeschlagen.');
         }
     }
-    
+
     async function cropScreenshotToSelection(screenshotDataUrl, selection) {
         return new Promise((resolve) => {
             const img = new Image();
@@ -255,7 +252,6 @@
                 const dpr = window.devicePixelRatio || 1;
                 const canvas = document.createElement('canvas');
                 
-                // Use the viewport coordinates from the selection
                 const cropX = selection.viewportX * dpr;
                 const cropY = selection.viewportY * dpr;
                 const cropWidth = selection.width * dpr;
