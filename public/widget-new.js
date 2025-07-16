@@ -346,38 +346,38 @@
                     console.log('Chrome height detection methods:', methods);
                     console.log('Selected chrome height:', chromeHeight);
 
-                    // Try multiple coordinate calculation strategies with screenshot scaling
+                    // SIMPLE FIX: Try direct 1:1 mapping first (often works best)
                     const strategies = [
                         {
-                            name: 'screenshot_scaled_viewport',
-                            cropX: (selection.viewportX - coordAdjustment.x) * screenshotToWindowScale.x * dpr,
-                            cropY: (selection.viewportY + chromeHeight - coordAdjustment.y) * screenshotToWindowScale.y * dpr
+                            name: 'direct_1to1_mapping',
+                            cropX: selection.viewportX,
+                            cropY: selection.viewportY
                         },
                         {
-                            name: 'direct_viewport_scaled',
-                            cropX: selection.viewportX * screenshotToWindowScale.x * dpr,
-                            cropY: selection.viewportY * screenshotToWindowScale.y * dpr
+                            name: 'scaled_proportional',
+                            cropX: selection.viewportX * screenshotToWindowScale.x,
+                            cropY: selection.viewportY * screenshotToWindowScale.y
                         },
                         {
-                            name: 'viewport_with_chrome_scaled',
-                            cropX: selection.viewportX * screenshotToWindowScale.x * dpr,
-                            cropY: (selection.viewportY + chromeHeight) * screenshotToWindowScale.y * dpr
+                            name: 'adjusted_scaled',
+                            cropX: (selection.viewportX - coordAdjustment.x) * screenshotToWindowScale.x,
+                            cropY: (selection.viewportY - coordAdjustment.y) * screenshotToWindowScale.y
                         },
                         {
-                            name: 'original_viewport_only',
-                            cropX: selection.viewportX * dpr,
-                            cropY: selection.viewportY * dpr
+                            name: 'center_based_estimation',
+                            cropX: selection.viewportX * (img.width / window.innerWidth),
+                            cropY: selection.viewportY * (img.height / window.innerHeight)
                         }
                     ];
 
                     console.log('Crop strategies to try:', strategies);
 
-                    // Start with the first strategy
+                    // Start with the first strategy (direct 1:1)
                     const primaryStrategy = strategies[0];
                     const cropX = primaryStrategy.cropX;
                     const cropY = primaryStrategy.cropY;
-                    const cropWidth = selection.width * screenshotToWindowScale.x * dpr;
-                    const cropHeight = selection.height * screenshotToWindowScale.y * dpr;
+                    const cropWidth = selection.width;
+                    const cropHeight = selection.height;
 
                     console.log('Estimated chrome height:', chromeHeight);
                     console.log('Primary crop coordinates (screenshot space):', {
@@ -423,33 +423,40 @@
                     for (let i = 0; i < strategies.length && !cropSuccess; i++) {
                         const strategy = strategies[i];
                         
-                        // Calculate strategy-specific crop dimensions
-                        const strategyCropWidth = strategy.name.includes('scaled') ? 
-                            selection.width * screenshotToWindowScale.x * dpr : 
-                            selection.width * dpr;
-                        const strategyCropHeight = strategy.name.includes('scaled') ? 
-                            selection.height * screenshotToWindowScale.y * dpr : 
-                            selection.height * dpr;
+                        // Use different crop dimensions for different strategies
+                        let strategyCropWidth, strategyCropHeight;
+                        
+                        if (strategy.name === 'direct_1to1_mapping') {
+                            strategyCropWidth = selection.width;
+                            strategyCropHeight = selection.height;
+                        } else {
+                            strategyCropWidth = selection.width * screenshotToWindowScale.x;
+                            strategyCropHeight = selection.height * screenshotToWindowScale.y;
+                        }
                             
                         const strategyCropX = Math.max(0, Math.min(strategy.cropX, img.width - strategyCropWidth));
                         const strategyCropY = Math.max(0, Math.min(strategy.cropY, img.height - strategyCropHeight));
                         
                         try {
-                            console.log(`Trying strategy ${i + 1}: ${strategy.name}`, {
-                                x: strategyCropX,
-                                y: strategyCropY,
-                                width: strategyCropWidth,
-                                height: strategyCropHeight
+                            console.log(`🔍 Trying strategy ${i + 1}: ${strategy.name}`, {
+                                original_selection: { x: selection.viewportX, y: selection.viewportY, w: selection.width, h: selection.height },
+                                calculated_crop: { x: strategy.cropX, y: strategy.cropY },
+                                safe_crop: { x: strategyCropX, y: strategyCropY, width: strategyCropWidth, height: strategyCropHeight },
+                                will_fit: strategyCropX + strategyCropWidth <= img.width && strategyCropY + strategyCropHeight <= img.height
                             });
+                            
+                            // Ensure canvas is right size
+                            canvas.width = strategyCropWidth;
+                            canvas.height = strategyCropHeight;
                             
                             ctx.clearRect(0, 0, canvas.width, canvas.height);
                             ctx.drawImage(
                                 img,
                                 strategyCropX, strategyCropY, strategyCropWidth, strategyCropHeight,
-                                0, 0, finalCropWidth, finalCropHeight
+                                0, 0, strategyCropWidth, strategyCropHeight
                             );
                             
-                            console.log(`✅ Strategy ${strategy.name} succeeded!`);
+                            console.log(`✅ Strategy ${strategy.name} SUCCESS!`);
                             cropSuccess = true;
                             break;
                             
