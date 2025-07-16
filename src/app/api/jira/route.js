@@ -210,12 +210,7 @@ async function createJiraTicket({ feedback, jiraConfig }) {
     }
   };
 
-  // Set status if column is selected
-  if (selectedColumn && selectedColumn.trim()) {
-    issueData.fields.status = {
-      id: selectedColumn.trim()
-    };
-  }
+  // Note: Status cannot be set during creation, will be set after creation
 
   // Labels nur hinzufügen wenn sie existieren
   if (labels && labels.length > 0) {
@@ -328,6 +323,22 @@ async function createJiraTicket({ feedback, jiraConfig }) {
     } catch (error) {
       console.warn('Sprint assignment failed:', error);
       // Ticket wurde erstellt, nur Sprint-Zuweisung fehlgeschlagen
+    }
+  }
+
+  // Status-Änderung falls Spalte ausgewählt wurde
+  if (selectedColumn && selectedColumn.trim() && responseData.key) {
+    try {
+      await changeIssueStatus({
+        serverUrl,
+        username,
+        apiToken,
+        issueKey: responseData.key,
+        statusId: selectedColumn.trim()
+      });
+    } catch (error) {
+      console.warn('Status change failed:', error);
+      // Ticket wurde erstellt, nur Status-Änderung fehlgeschlagen
     }
   }
 
@@ -1145,5 +1156,62 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
       success: false, 
       error: error.message 
     }, { status: 500 });
+  }
+}
+
+async function changeIssueStatus({ serverUrl, username, apiToken, issueKey, statusId }) {
+  try {
+    // First, get available transitions for the issue
+    const transitionsResponse = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}/transitions`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!transitionsResponse.ok) {
+      throw new Error(`Failed to get transitions: ${transitionsResponse.status}`);
+    }
+
+    const transitionsData = await transitionsResponse.json();
+    console.log('Available transitions:', transitionsData.transitions);
+
+    // Find a transition that leads to the desired status
+    const targetTransition = transitionsData.transitions.find(
+      transition => transition.to && transition.to.id === statusId
+    );
+
+    if (!targetTransition) {
+      console.warn(`No transition found to status ${statusId}. Available transitions:`, 
+        transitionsData.transitions.map(t => ({ id: t.id, name: t.name, to: t.to })));
+      return;
+    }
+
+    // Execute the transition
+    const transitionResponse = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}/transitions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        transition: {
+          id: targetTransition.id
+        }
+      })
+    });
+
+    if (!transitionResponse.ok) {
+      const errorData = await transitionResponse.json();
+      throw new Error(`Transition failed: ${errorData.errorMessages?.join(', ') || transitionResponse.statusText}`);
+    }
+
+    console.log(`Successfully transitioned issue ${issueKey} to status ${statusId}`);
+    
+  } catch (error) {
+    console.error('Status change error:', error);
+    throw error;
   }
 }
