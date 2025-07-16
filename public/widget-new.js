@@ -139,30 +139,41 @@
                 const height = Math.abs(e.clientY - startY);
                 
                 if (width > 10 && height > 10) {
-                    // Use viewport-relative coordinates and add scroll offset
+                    // Use viewport-relative coordinates
                     const left = Math.min(e.clientX, startX);
                     const top = Math.min(e.clientY, startY);
 
-                    // Add scroll offset to get absolute coordinates from page top
+                    // Store both viewport and page coordinates for better debugging
                     const scrollX = window.scrollX || window.pageXOffset;
                     const scrollY = window.scrollY || window.pageYOffset;
-                    const absoluteX = left + scrollX;
-                    const absoluteY = top + scrollY;
 
                     selectionArea = {
-                        x: absoluteX,
-                        y: absoluteY,
+                        // Viewport coordinates (relative to visible area)
+                        viewportX: left,
+                        viewportY: top,
                         width: width,
                         height: height,
-                        viewportX: left,
-                        viewportY: top
+                        // Page coordinates (absolute from document top)
+                        pageX: left + scrollX,
+                        pageY: top + scrollY,
+                        // Additional context for debugging
+                        scroll: { x: scrollX, y: scrollY },
+                        viewport: { width: window.innerWidth, height: window.innerHeight },
+                        screen: { width: window.screen.width, height: window.screen.height },
+                        devicePixelRatio: window.devicePixelRatio || 1
                     };
                     
                     console.log('=== SELECTION DEBUG ===');
-                    console.log('Widget: Area selected (viewport coordinates):', {x: left, y: top, width, height});
-                    console.log('Widget: Area selected (absolute coordinates):', selectionArea);
-                    console.log('Widget: Viewport size:', window.innerWidth, 'x', window.innerHeight);
-                    console.log('Widget: Scroll position:', scrollX, 'x', scrollY);
+                    console.log('Selection area (all coordinates):', selectionArea);
+                    console.log('Browser info:', {
+                        innerWidth: window.innerWidth,
+                        innerHeight: window.innerHeight,
+                        outerWidth: window.outerWidth,
+                        outerHeight: window.outerHeight,
+                        scrollX: scrollX,
+                        scrollY: scrollY,
+                        devicePixelRatio: window.devicePixelRatio
+                    });
                     console.log('=== END SELECTION DEBUG ===');
                     
                     removeSelectionOverlay();
@@ -209,11 +220,18 @@
             
             if (overlay) overlay.style.display = 'none';
 
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                video: { 
+                    mediaSource: 'screen',
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                } 
+            });
             const track = stream.getVideoTracks()[0];
             const imageCapture = new ImageCapture(track);
 
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Wait a bit for the overlay to hide properly
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             const bitmap = await imageCapture.grabFrame();
             track.stop();
@@ -228,12 +246,19 @@
 
             const screenshotDataUrl = canvas.toDataURL('image/png');
             console.log('Widget: Screenshot captured successfully via getDisplayMedia.');
+            console.log('Screenshot dimensions:', bitmap.width, 'x', bitmap.height);
 
             let finalScreenshot = screenshotDataUrl;
             if (selectionArea) {
                 console.log('Widget: Cropping screenshot to selected area...');
-                finalScreenshot = await cropScreenshotToSelection(screenshotDataUrl, selectionArea);
-                console.log('Widget: Screenshot cropped successfully');
+                try {
+                    finalScreenshot = await cropScreenshotToSelection(screenshotDataUrl, selectionArea);
+                    console.log('Widget: Screenshot cropped successfully');
+                } catch (cropError) {
+                    console.warn('Widget: Cropping failed, using original screenshot:', cropError);
+                    // Fallback: use original screenshot if cropping fails
+                    finalScreenshot = screenshotDataUrl;
+                }
             }
 
             showAnnotationInterface(finalScreenshot);
@@ -241,7 +266,17 @@
         } catch (error) {
             console.error('Widget: Screen capture failed:', error);
             if (overlay) overlay.style.display = 'block';
-            showErrorModal('Bildschirmaufnahme wurde abgebrochen oder ist fehlgeschlagen.');
+            
+            // Provide more helpful error messages
+            let errorMessage = 'Bildschirmaufnahme wurde abgebrochen oder ist fehlgeschlagen.';
+            
+            if (error.name === 'NotAllowedError') {
+                errorMessage = 'Bildschirmaufnahme wurde verweigert. Bitte erlauben Sie den Zugriff und versuchen Sie es erneut.';
+            } else if (error.name === 'NotSupportedError') {
+                errorMessage = 'Bildschirmaufnahme wird von Ihrem Browser nicht unterstützt.';
+            }
+            
+            showErrorModal(errorMessage);
         }
     }
 
@@ -254,31 +289,116 @@
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
 
-                    // This is the offset from the top of the window to the top of the viewport
-                    const chromeHeight = window.outerHeight - window.innerHeight;
+                    console.log('=== CROP DEBUG INFO ===');
+                    console.log('Image dimensions:', img.width, 'x', img.height);
+                    console.log('Window dimensions:', window.innerWidth, 'x', window.innerHeight);
+                    console.log('Outer dimensions:', window.outerWidth, 'x', window.outerHeight);
+                    console.log('Device pixel ratio:', dpr);
+                    console.log('Selection (viewport):', selection.viewportX, selection.viewportY, selection.width, selection.height);
 
-                    // The screenshot is of the entire window. We need to calculate the crop
-                    // position based on the selection's position relative to the viewport,
-                    // plus the height of the browser's chrome.
-                    const cropX = selection.viewportX * dpr;
-                    const cropY = (selection.viewportY + chromeHeight) * dpr;
+                    // Calculate browser chrome and UI elements
+                    const windowChrome = {
+                        top: window.outerHeight - window.innerHeight - (window.outerWidth - window.innerWidth),
+                        left: (window.outerWidth - window.innerWidth) / 2
+                    };
+
+                    // For display media capture, the screenshot typically includes:
+                    // - Browser title bar and tabs
+                    // - Address bar and toolbar
+                    // - The actual page content
+                    
+                    // More accurate chrome height calculation
+                    // This accounts for title bar, tabs, address bar, etc.
+                    const estimatedChromeHeight = Math.max(
+                        windowChrome.top,
+                        window.outerHeight - window.innerHeight,
+                        80 // Minimum fallback for typical browser chrome
+                    );
+
+                    // Calculate the actual crop coordinates in screenshot space
+                    // The screenshot coordinate system starts from the top-left of the browser window
+                    const cropX = (selection.viewportX + windowChrome.left) * dpr;
+                    const cropY = (selection.viewportY + estimatedChromeHeight) * dpr;
                     const cropWidth = selection.width * dpr;
                     const cropHeight = selection.height * dpr;
 
-                    // Final check to ensure crop area is within the image bounds
-                    if (cropX + cropWidth > img.width || cropY + cropHeight > img.height) {
-                        console.warn('Widget: Crop area is outside the bounds of the screenshot. Adjusting.');
-                        // Adjust crop area if it exceeds image dimensions
-                        const newCropWidth = Math.min(cropWidth, img.width - cropX);
-                        const newCropHeight = Math.min(cropHeight, img.height - cropY);
-                        canvas.width = newCropWidth;
-                        canvas.height = newCropHeight;
-                        ctx.drawImage(img, cropX, cropY, newCropWidth, newCropHeight, 0, 0, newCropWidth, newCropHeight);
-                    } else {
-                        canvas.width = cropWidth;
-                        canvas.height = cropHeight;
-                        ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+                    console.log('Estimated chrome height:', estimatedChromeHeight);
+                    console.log('Crop coordinates (screenshot space):', {
+                        x: cropX,
+                        y: cropY,
+                        width: cropWidth,
+                        height: cropHeight
+                    });
+
+                    // Ensure crop area is within image bounds with better error handling
+                    const safeCropX = Math.max(0, Math.min(cropX, img.width - 1));
+                    const safeCropY = Math.max(0, Math.min(cropY, img.height - 1));
+                    const safeCropWidth = Math.min(cropWidth, img.width - safeCropX);
+                    const safeCropHeight = Math.min(cropHeight, img.height - safeCropY);
+
+                    // Ensure minimum dimensions
+                    const finalCropWidth = Math.max(10, safeCropWidth);
+                    const finalCropHeight = Math.max(10, safeCropHeight);
+
+                    console.log('Safe crop coordinates:', {
+                        x: safeCropX,
+                        y: safeCropY,
+                        width: finalCropWidth,
+                        height: finalCropHeight
+                    });
+
+                    if (finalCropWidth <= 10 || finalCropHeight <= 10) {
+                        console.warn('Widget: Crop area too small or invalid, using original image');
+                        resolve(screenshotDataUrl);
+                        return;
                     }
+
+                    // Apply the crop with multiple fallback strategies
+                    canvas.width = finalCropWidth;
+                    canvas.height = finalCropHeight;
+                    
+                    // Strategy 1: Direct crop (most common case)
+                    try {
+                        ctx.drawImage(
+                            img,
+                            safeCropX, safeCropY, finalCropWidth, finalCropHeight,
+                            0, 0, finalCropWidth, finalCropHeight
+                        );
+                        console.log('Crop completed successfully with direct method');
+                    } catch (directError) {
+                        console.warn('Direct crop failed, trying alternative method:', directError);
+                        
+                        // Strategy 2: Try with adjusted coordinates if scroll position might be wrong
+                        const altCropY = Math.max(0, Math.min(selection.viewportY * dpr, img.height - finalCropHeight));
+                        const altCropX = Math.max(0, Math.min(selection.viewportX * dpr, img.width - finalCropWidth));
+                        
+                        try {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(
+                                img,
+                                altCropX, altCropY, finalCropWidth, finalCropHeight,
+                                0, 0, finalCropWidth, finalCropHeight
+                            );
+                            console.log('Crop completed with alternative coordinates');
+                        } catch (altError) {
+                            console.warn('Alternative crop also failed, using center crop:', altError);
+                            
+                            // Strategy 3: Center crop as last resort
+                            const centerX = Math.max(0, (img.width - finalCropWidth) / 2);
+                            const centerY = Math.max(0, (img.height - finalCropHeight) / 2);
+                            
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(
+                                img,
+                                centerX, centerY, finalCropWidth, finalCropHeight,
+                                0, 0, finalCropWidth, finalCropHeight
+                            );
+                            console.log('Used center crop as fallback');
+                        }
+                    }
+
+                    console.log('Crop completed successfully');
+                    console.log('=== END CROP DEBUG ===');
 
                     resolve(canvas.toDataURL('image/png'));
                 } catch (error) {
