@@ -608,12 +608,12 @@
                 }
             }
             
-            // Load sprints
-            const sprintsResponse = await fetch(`${baseUrl}/api/jira`, {
+            // Load boards first, then sprints
+            const boardsResponse = await fetch(`${baseUrl}/api/jira`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    action: 'getSprints',
+                    action: 'getBoards',
                     jiraConfig: {
                         serverUrl: projectConfig.jira_server_url,
                         username: projectConfig.jira_username,
@@ -623,11 +623,37 @@
                 })
             });
             
-            if (sprintsResponse.ok) {
-                const sprintsResult = await sprintsResponse.json();
-                if (sprintsResult.success) {
-                    jiraSprints = sprintsResult.data || [];
-                    console.log('Widget: Loaded JIRA sprints:', jiraSprints.length);
+            if (boardsResponse.ok) {
+                const boardsResult = await boardsResponse.json();
+                console.log('Widget: Boards result:', boardsResult);
+                
+                if (boardsResult.success && boardsResult.data && boardsResult.data.length > 0) {
+                    const boardId = boardsResult.data[0].id; // Use first board
+                    console.log('Widget: Using board ID:', boardId);
+                    
+                    // Now load sprints for this board
+                    const sprintsResponse = await fetch(`${baseUrl}/api/jira`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getSprints',
+                            jiraConfig: {
+                                serverUrl: projectConfig.jira_server_url,
+                                username: projectConfig.jira_username,
+                                apiToken: projectConfig.jira_api_token,
+                                projectKey: projectConfig.jira_project_key
+                            },
+                            boardId: boardId
+                        })
+                    });
+                    
+                    if (sprintsResponse.ok) {
+                        const sprintsResult = await sprintsResponse.json();
+                        if (sprintsResult.success) {
+                            jiraSprints = sprintsResult.data || [];
+                            console.log('Widget: Loaded JIRA sprints:', jiraSprints.length);
+                        }
+                    }
                 }
             }
             

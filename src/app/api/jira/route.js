@@ -35,6 +35,9 @@ export async function POST(request) {
       case 'getUsers':
         result = await getJiraUsersForWidget(data);
         break;
+      case 'getBoards':
+        result = await getJiraBoardsForWidget(data);
+        break;
       case 'getSprints':
         result = await getJiraSprintsForWidget(data);
         break;
@@ -809,7 +812,7 @@ async function getJiraUsersForWidget({ jiraConfig }) {
   });
 }
 
-async function getJiraSprintsForWidget({ jiraConfig }) {
+async function getJiraBoardsForWidget({ jiraConfig }) {
   const { serverUrl, username, apiToken, projectKey } = jiraConfig;
   
   if (!serverUrl || !username || !apiToken) {
@@ -820,8 +823,7 @@ async function getJiraSprintsForWidget({ jiraConfig }) {
   }
 
   try {
-    // First get board ID for the project
-    const boardsUrl = `${serverUrl}/rest/agile/1.0/board?projectKeyOrId=${projectKey}&type=scrum&maxResults=1`;
+    const boardsUrl = `${serverUrl}/rest/agile/1.0/board?projectKeyOrId=${projectKey}&maxResults=50`;
     const boardsResponse = await fetch(boardsUrl, {
       method: 'GET',
       headers: {
@@ -841,16 +843,44 @@ async function getJiraSprintsForWidget({ jiraConfig }) {
 
     const boardsData = await boardsResponse.json();
     
-    if (!boardsData.values || boardsData.values.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [] // No scrum boards found
-      });
-    }
+    return NextResponse.json({
+      success: true,
+      data: boardsData.values.map(board => ({
+        id: board.id,
+        name: board.name,
+        type: board.type,
+        projectKey: board.location?.projectKey
+      }))
+    });
 
-    const boardId = boardsData.values[0].id;
+  } catch (error) {
+    console.error('JIRA Boards Error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 });
+  }
+}
 
-    // Now get sprints for the board
+async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
+  const { serverUrl, username, apiToken } = jiraConfig;
+  
+  if (!serverUrl || !username || !apiToken) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'JIRA Konfiguration unvollständig' 
+    }, { status: 400 });
+  }
+  
+  if (!boardId) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Board ID ist erforderlich' 
+    }, { status: 400 });
+  }
+
+  try {
+    // Get sprints for the specific board
     const sprintsUrl = `${serverUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future&maxResults=50`;
     const sprintsResponse = await fetch(sprintsUrl, {
       method: 'GET',
