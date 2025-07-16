@@ -70,7 +70,7 @@
             toast.style.backgroundColor = '#007bff';
         }
         
-        toast.textContent = message;
+        toast.innerHTML = message;
         document.body.appendChild(toast);
         
         // Animate in
@@ -465,43 +465,47 @@
         annotationModal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10001; display: flex; flex-direction: column;">
                 <!-- Header -->
-                <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10002;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif;">Screenshot markieren und Feedback geben</h3>
-                        <button id="annotation-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
+                <div style="background: white; padding: 8px 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10002;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; color: #333; font-family: Arial, sans-serif; font-size: 16px;">Screenshot markieren und Feedback geben</h4>
+                        <button id="annotation-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 0; width: 24px; height: 24px;">×</button>
                     </div>
                     <!-- Toolbar -->
-                    <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 8px 16px; border: 2px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">📱 Rechteck</button>
-                    <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 8px 16px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">⭕ Kreis</button>
-                    <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 8px 16px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">📏 Linie</button>
-                    <div style="border-left: 1px solid #ddd; height: 30px; margin: 0 10px;"></div>
-                    <button id="tool-clear" style="padding: 8px 16px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">🗑️ Löschen</button>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 4px 8px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">📱</button>
+                        <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 4px 8px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">⭕</button>
+                        <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 4px 8px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">📏</button>
+                        <div style="border-left: 1px solid #ddd; height: 20px; margin: 0 4px; align-self: center;"></div>
+                        <button id="tool-clear" style="padding: 4px 8px; border: 1px solid #dc3545; background: white; color: #dc3545; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">🗑️</button>
+                    </div>
                 </div>
                 <!-- Screenshot Container -->
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: auto;">
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: auto;">
                     <div id="screenshot-container" style="position: relative; display: inline-block;">
-                        <img id="screenshot-image" src="${screenshotDataURL}" style="max-width: 90vw; max-height: 70vh; border: 1px solid #ddd;" />
+                        <img id="screenshot-image" src="${screenshotDataURL}" style="max-width: 95vw; max-height: calc(100vh - 200px); border: 1px solid #ddd;" />
                         <canvas id="annotation-canvas" style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
                     </div>
                 </div>
                 <!-- Footer -->
-                <div style="background: white; padding: 20px; box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Titel:</label>
-                        <input id="annotation-feedback-title" placeholder="Geben Sie einen kurzen Titel ein..." style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;" />
+                <div style="background: white; padding: 12px; box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Titel:</label>
+                            <input id="annotation-feedback-title" placeholder="Kurzer Titel..." style="width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Beschreibung:</label>
+                            <textarea id="annotation-feedback-text" placeholder="Was möchten Sie verbessern..." style="width: 100%; height: 50px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box; font-size: 14px;"></textarea>
+                        </div>
                     </div>
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Beschreibung:</label>
-                        <textarea id="annotation-feedback-text" placeholder="Beschreiben Sie, was Sie in den markierten Bereichen verbessern möchten..." style="width: 100%; height: 80px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
+                    <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px;" id="jira-section">
+                        <input type="checkbox" id="annotation-create-jira" style="margin: 0;" />
+                        <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer; font-size: 13px;">Direkt als JIRA-Task anlegen</label>
+                        <span id="jira-status-message" style="color: #28a745; font-size: 12px; display: none;"></span>
                     </div>
-                    <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;" id="jira-section">
-                        <input type="checkbox" id="annotation-create-jira" style="margin-right: 8px;" />
-                        <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer;">Direkt als JIRA-Task anlegen</label>
-                        <span id="jira-status-message" style="margin-left: 10px; color: #28a745; font-size: 14px; display: none;"></span>
-                    </div>
-                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button id="annotation-cancel" style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Abbrechen</button>
-                        <button id="annotation-submit" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">📤 Feedback senden</button>
+                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                        <button id="annotation-cancel" style="padding: 8px 16px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 13px;">Abbrechen</button>
+                        <button id="annotation-submit" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 13px;">📤 Senden</button>
                     </div>
                 </div>
             </div>
@@ -545,10 +549,10 @@
         jiraConfigModal.id = 'jira-config-modal';
         jiraConfigModal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10002; display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; border-radius: 12px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif;">JIRA-Task konfigurieren</h3>
-                        <button id="jira-config-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
+                <div style="background: white; border-radius: 8px; padding: 20px; max-width: 450px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h4 style="margin: 0; color: #333; font-family: Arial, sans-serif; font-size: 18px;">JIRA-Task konfigurieren</h4>
+                        <button id="jira-config-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 0; width: 24px; height: 24px;">×</button>
                     </div>
                     
                     <div id="jira-loading" style="text-align: center; padding: 20px;">
@@ -557,44 +561,42 @@
                     </div>
                     
                     <div id="jira-form" style="display: none;">
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Issue-Typ:</label>
-                            <select id="jira-issue-type" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
-                                <option value="">Wählen Sie einen Issue-Typ...</option>
-                            </select>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Issue-Typ:</label>
+                                <select id="jira-issue-type" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
+                                    <option value="">Issue-Typ...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Zuständig:</label>
+                                <select id="jira-assignee" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
+                                    <option value="">Nicht zugewiesen</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Sprint:</label>
+                                <select id="jira-sprint" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
+                                    <option value="">Kein Sprint</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Board-Spalte:</label>
+                                <select id="jira-column" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
+                                    <option value="">Standard (To Do)</option>
+                                </select>
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Labels:</label>
+                                <input id="jira-labels" placeholder="bug, frontend, ui (durch Komma getrennt)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
+                            </div>
                         </div>
                         
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Zuständig:</label>
-                            <select id="jira-assignee" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
-                                <option value="">Nicht zugewiesen</option>
-                            </select>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Sprint:</label>
-                            <select id="jira-sprint" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
-                                <option value="">Kein Sprint</option>
-                            </select>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Board-Spalte:</label>
-                            <select id="jira-column" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
-                                <option value="">Standard-Spalte (To Do)</option>
-                            </select>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Labels:</label>
-                            <input id="jira-labels" placeholder="bug, frontend, ui (durch Komma getrennt)" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;" />
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                            <button id="jira-config-cancel" style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Abbrechen</button>
-                            <button id="jira-config-create" style="padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                            <button id="jira-config-cancel" style="padding: 8px 16px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 13px;">Abbrechen</button>
+                            <button id="jira-config-create" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; display: flex; align-items: center; gap: 6px; font-size: 13px;">
                                 <span id="jira-create-text">JIRA-Task erstellen</span>
-                                <div id="jira-create-spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                <div id="jira-create-spinner" style="display: none; width: 14px; height: 14px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                             </button>
                         </div>
                     </div>
@@ -880,38 +882,14 @@
             console.log('Widget: JIRA response:', jiraResult);
             
             if (jiraRes.ok && jiraResult.success) {
-                // Success - show success message
-                const successMessage = document.createElement('div');
-                successMessage.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    background: #28a745;
-                    color: white;
-                    padding: 15px 20px;
-                    border-radius: 8px;
-                    z-index: 10003;
-                    font-family: Arial, sans-serif;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                `;
-                
-                if (jiraResult.data && jiraResult.data.key) {
-                    const jiraKey = jiraResult.data.key;
-                    const jiraUrl = `${projectConfig.jira_server_url}/browse/${jiraKey}`;
-                    successMessage.innerHTML = `
-                        ✅ JIRA-Task erfolgreich erstellt!<br>
-                        <a href="${jiraUrl}" target="_blank" style="color: #fff; text-decoration: underline;">${jiraKey}</a>
-                    `;
+                // Success - show toast notification with JIRA link
+                if (jiraResult.ticket && jiraResult.ticket.key) {
+                    const jiraKey = jiraResult.ticket.key;
+                    const jiraUrl = jiraResult.ticket.url;
+                    showToast(`✅ JIRA-Task erstellt: <a href="${jiraUrl}" target="_blank" style="color: #fff; text-decoration: underline; font-weight: bold;">${jiraKey}</a>`, 'success', 6000);
                 } else {
-                    successMessage.textContent = '✅ JIRA-Task erfolgreich erstellt!';
+                    showToast('✅ JIRA-Task erfolgreich erstellt!', 'success', 4000);
                 }
-                
-                document.body.appendChild(successMessage);
-                
-                // Remove success message after 5 seconds
-                setTimeout(() => {
-                    successMessage.remove();
-                }, 5000);
                 
                 // Close modals
                 closeJiraConfigModal();
