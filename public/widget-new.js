@@ -293,78 +293,66 @@
                     console.log('Image dimensions:', img.width, 'x', img.height);
                     console.log('Window dimensions:', window.innerWidth, 'x', window.innerHeight);
                     console.log('Outer dimensions:', window.outerWidth, 'x', window.outerHeight);
+                    console.log('Screen dimensions:', screen.width, 'x', screen.height);
                     console.log('Device pixel ratio:', dpr);
                     console.log('Selection (viewport):', selection.viewportX, selection.viewportY, selection.width, selection.height);
 
-                    // CRITICAL: Calculate the scaling factor between screenshot and actual window
-                    const screenshotToWindowScale = {
-                        x: img.width / window.innerWidth,
-                        y: img.height / window.innerHeight
-                    };
+                    // SMART DETECTION: Figure out what getDisplayMedia actually captured
+                    const isFullScreen = img.width >= screen.width * dpr * 0.9; // 90% threshold
+                    const isMultiMonitor = img.width > screen.width * dpr;
+                    const isBrowserOnly = Math.abs(img.width - window.outerWidth * dpr) < 50;
                     
-                    console.log('Screenshot to window scale factors:', screenshotToWindowScale);
+                    console.log('🔍 Screenshot analysis:', {
+                        isFullScreen,
+                        isMultiMonitor, 
+                        isBrowserOnly,
+                        screenWidthDPR: screen.width * dpr,
+                        outerWidthDPR: window.outerWidth * dpr,
+                        actualScreenshotWidth: img.width
+                    });
+
+                    // Calculate browser window position in screenshot
+                    let browserOffsetX = 0;
+                    let browserOffsetY = 0;
                     
-                    // If screenshot is smaller than window, we need to adjust our coordinates
-                    let coordAdjustment = { x: 0, y: 0 };
-                    
-                    if (img.width < window.innerWidth || img.height < window.innerHeight) {
-                        console.log('⚠️  Screenshot is smaller than window - adjusting coordinates');
+                    if (isFullScreen || isMultiMonitor) {
+                        // Screenshot captured entire screen(s), need to find browser position
+                        // Browser window could be anywhere on screen
+                        browserOffsetX = window.screenX * dpr;
+                        browserOffsetY = window.screenY * dpr;
                         
-                        // Calculate the offset - screenshot might be centered or positioned differently
-                        coordAdjustment.x = Math.max(0, (window.outerWidth - img.width) / 2);
-                        coordAdjustment.y = Math.max(0, (window.outerHeight - img.height) / 2);
-                        
-                        console.log('Coordinate adjustment needed:', coordAdjustment);
+                        console.log('🖥️ Full screen capture detected');
+                        console.log('Browser window position on screen:', {
+                            screenX: window.screenX,
+                            screenY: window.screenY,
+                            offsetX: browserOffsetX,
+                            offsetY: browserOffsetY
+                        });
                     }
 
-                    // Calculate browser chrome height with multiple detection methods
-                    const methods = {
-                        // Method 1: Standard calculation
-                        standard: window.outerHeight - window.innerHeight,
-                        
-                        // Method 2: Based on actual screenshot size
-                        screenshot_based: Math.max(0, window.outerHeight - img.height),
-                        
-                        // Method 3: Conservative estimate
-                        conservative: Math.max(window.outerHeight - window.innerHeight, 80),
-                        
-                        // Method 4: Minimal for cases where screenshot captures differently
-                        minimal: img.height < window.innerHeight ? 0 : window.outerHeight - window.innerHeight
-                    };
+                    // Calculate chrome height
+                    const chromeHeight = window.outerHeight - window.innerHeight;
+                    console.log('Chrome height:', chromeHeight);
 
-                    // Choose the most appropriate chrome height based on screenshot dimensions
-                    let chromeHeight;
-                    if (img.height < window.innerHeight) {
-                        // Screenshot doesn't include full browser chrome
-                        chromeHeight = methods.minimal;
-                        console.log('Using minimal chrome height (screenshot excludes chrome)');
-                    } else {
-                        chromeHeight = methods.standard;
-                        console.log('Using standard chrome height calculation');
-                    }
-
-                    console.log('Chrome height detection methods:', methods);
-                    console.log('Selected chrome height:', chromeHeight);
-
-                    // SIMPLE FIX: Try direct 1:1 mapping first but with DPR correction
+                    // INTELLIGENT CROP STRATEGIES based on what was actually captured
                     const strategies = [
+                        {
+                            name: 'smart_screen_position',
+                            cropX: (browserOffsetX + selection.viewportX * dpr),
+                            cropY: (browserOffsetY + chromeHeight * dpr + selection.viewportY * dpr)
+                        },
+                        {
+                            name: 'browser_window_relative',
+                            cropX: (browserOffsetX + selection.viewportX * dpr),
+                            cropY: (browserOffsetY + selection.viewportY * dpr)
+                        },
                         {
                             name: 'direct_with_dpr',
                             cropX: selection.viewportX * dpr,
                             cropY: selection.viewportY * dpr
                         },
                         {
-                            name: 'direct_1to1_mapping',
-                            cropX: selection.viewportX,
-                            cropY: selection.viewportY
-                        },
-                        {
-                            name: 'scaled_proportional',
-                            cropX: selection.viewportX * screenshotToWindowScale.x,
-                            cropY: selection.viewportY * screenshotToWindowScale.y
-                        },
-                        {
-                            name: 'center_based_estimation',
+                            name: 'proportional_scaling',
                             cropX: selection.viewportX * (img.width / window.innerWidth),
                             cropY: selection.viewportY * (img.height / window.innerHeight)
                         }
@@ -372,12 +360,12 @@
 
                     console.log('Crop strategies to try:', strategies);
 
-                    // Start with the first strategy (direct 1:1)
+                    // Start with the smart strategy
                     const primaryStrategy = strategies[0];
                     const cropX = primaryStrategy.cropX;
                     const cropY = primaryStrategy.cropY;
-                    const cropWidth = selection.width;
-                    const cropHeight = selection.height;
+                    const cropWidth = selection.width * dpr;
+                    const cropHeight = selection.height * dpr;
 
                     console.log('Estimated chrome height:', chromeHeight);
                     console.log('Primary crop coordinates (screenshot space):', {
@@ -423,18 +411,14 @@
                     for (let i = 0; i < strategies.length && !cropSuccess; i++) {
                         const strategy = strategies[i];
                         
-                        // Use different crop dimensions for different strategies
-                        let strategyCropWidth, strategyCropHeight;
+                        // Use consistent DPR-corrected dimensions for all strategies
+                        let strategyCropWidth = selection.width * dpr;
+                        let strategyCropHeight = selection.height * dpr;
                         
-                        if (strategy.name === 'direct_1to1_mapping') {
-                            strategyCropWidth = selection.width;
-                            strategyCropHeight = selection.height;
-                        } else if (strategy.name === 'direct_with_dpr') {
-                            strategyCropWidth = selection.width * dpr;
-                            strategyCropHeight = selection.height * dpr;
-                        } else {
-                            strategyCropWidth = selection.width * screenshotToWindowScale.x;
-                            strategyCropHeight = selection.height * screenshotToWindowScale.y;
+                        // Exception for proportional scaling
+                        if (strategy.name === 'proportional_scaling') {
+                            strategyCropWidth = selection.width * (img.width / window.innerWidth);
+                            strategyCropHeight = selection.height * (img.height / window.innerHeight);
                         }
                             
                         const strategyCropX = Math.max(0, Math.min(strategy.cropX, img.width - strategyCropWidth));
