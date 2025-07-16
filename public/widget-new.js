@@ -28,6 +28,7 @@
     let modal = null;
     let selectionArea = null;
     let annotationModal = null;
+    let projectConfig = null;
     
     // Create feedback button
     function createFeedbackButton() {
@@ -434,7 +435,7 @@
                         <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Beschreibung:</label>
                         <textarea id="annotation-feedback-text" placeholder="Beschreiben Sie, was Sie in den markierten Bereichen verbessern möchten..." style="width: 100%; height: 80px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
                     </div>
-                    <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;" id="jira-section">
                         <input type="checkbox" id="annotation-create-jira" style="margin-right: 8px;" />
                         <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer;">Direkt als JIRA-Task anlegen</label>
                         <span id="jira-status-message" style="margin-left: 10px; color: #28a745; font-size: 14px; display: none;"></span>
@@ -452,9 +453,16 @@
             const closeBtn = document.getElementById('annotation-close');
             const cancelBtn = document.getElementById('annotation-cancel');
             const submitBtn = document.getElementById('annotation-submit');
+            const jiraSection = document.getElementById('jira-section');
+            
             if (closeBtn) closeBtn.onclick = closeAnnotationInterface;
             if (cancelBtn) cancelBtn.onclick = closeAnnotationInterface;
             if (submitBtn) submitBtn.onclick = submitAnnotatedFeedback;
+            
+            // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
+            if (jiraSection) {
+                jiraSection.style.display = projectConfig?.jira_server_url ? 'flex' : 'none';
+            }
         }, 0);
         // Initialize annotation functionality
         initializeAnnotation();
@@ -642,28 +650,46 @@
             // Submit feedback (DB)
             await submitFeedback(title, description, annotatedScreenshot);
             // Optional: JIRA direkt anlegen
-            if (createJira) {
+            if (createJira && projectConfig?.jira_server_url) {
                 jiraStatusMessage.style.display = 'inline';
                 jiraStatusMessage.style.color = '#007bff';
                 jiraStatusMessage.textContent = 'JIRA-Task wird erstellt...';
                 try {
-                    // Verschachtelung von Backticks vermeiden, daher String bauen:
-                    var jiraUrl = baseUrl + '/api/jira';
-                    var jiraBody = JSON.stringify({
-                        project_id: projectId,
-                        title: title,
-                        description: description,
-                        screenshot: annotatedScreenshot,
-                        url: window.location.href
-                    });
-                    const jiraRes = await fetch(jiraUrl, {
+                    const jiraPayload = {
+                        action: 'createTicket',
+                        feedback: {
+                            title: title,
+                            description: description,
+                            screenshot: annotatedScreenshot,
+                            url: window.location.href
+                        },
+                        jiraConfig: {
+                            serverUrl: projectConfig.jira_server_url,
+                            username: projectConfig.jira_username,
+                            apiToken: projectConfig.jira_api_token,
+                            projectKey: projectConfig.jira_project_key,
+                            issueType: 'Bug',
+                            defaultAssignee: projectConfig.jira_username
+                        }
+                    };
+                    
+                    const jiraRes = await fetch(`${baseUrl}/api/jira`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: jiraBody
+                        body: JSON.stringify(jiraPayload)
                     });
-                    if (jiraRes.ok) {
+                    
+                    const jiraResult = await jiraRes.json();
+                    
+                    if (jiraRes.ok && jiraResult.success) {
                         jiraStatusMessage.style.color = '#28a745';
-                        jiraStatusMessage.textContent = 'JIRA-Task erfolgreich erstellt!';
+                        if (jiraResult.data && jiraResult.data.key) {
+                            const jiraKey = jiraResult.data.key;
+                            const jiraUrl = `${projectConfig.jira_server_url}/browse/${jiraKey}`;
+                            jiraStatusMessage.innerHTML = `JIRA-Task erstellt: <a href="${jiraUrl}" target="_blank" style="color: #007bff; text-decoration: underline;">${jiraKey}</a>`;
+                        } else {
+                            jiraStatusMessage.textContent = 'JIRA-Task erfolgreich erstellt!';
+                        }
                     } else {
                         jiraStatusMessage.style.color = '#dc3545';
                         jiraStatusMessage.textContent = 'JIRA-Task konnte nicht erstellt werden.';
@@ -672,7 +698,12 @@
                     jiraStatusMessage.style.color = '#dc3545';
                     jiraStatusMessage.textContent = 'JIRA-Task Fehler.';
                 }
-                setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 4000);
+                setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 8000);
+            } else if (createJira && !projectConfig?.jira_server_url) {
+                jiraStatusMessage.style.display = 'inline';
+                jiraStatusMessage.style.color = '#ffc107';
+                jiraStatusMessage.textContent = 'JIRA ist nicht konfiguriert.';
+                setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 8000);
             }
             // Modal nach erfolgreichem Submit schließen
             closeAnnotationInterface();
@@ -715,6 +746,18 @@
         errorModal.innerHTML = `<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;"><div style="background: white; padding: 40px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);"><div style="font-size: 48px; margin-bottom: 20px;">⚠️</div><h3 style="margin: 0 0 15px 0; color: #333; font-family: Arial, sans-serif;">Screenshot-Problem</h3><p style="color: #666; margin: 0 0 25px 0; font-family: Arial, sans-serif;">${message}</p><div style="display: flex; gap: 10px; justify-content: center;"><button onclick="this.closest('div').parentElement.remove()" style="padding: 12px 24px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Abbrechen</button><button onclick="this.closest('div').parentElement.remove(); window.feedbackWidget.createScreenshotAndAnnotate();" style="padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">Erneut versuchen</button></div></div></div>`;
         
         document.body.appendChild(errorModal);
+    }
+    
+    async function loadProjectConfig() {
+        try {
+            const response = await fetch(`${baseUrl}/api/projects/${projectId}`);
+            if (response.ok) {
+                projectConfig = await response.json();
+                console.log('Widget: Project config loaded', { jiraEnabled: !!projectConfig?.jira_server_url });
+            }
+        } catch (error) {
+            console.error('Widget: Failed to load project config:', error);
+        }
     }
     
     async function submitFeedback(title, description, screenshot) {
@@ -784,11 +827,14 @@
     }
     
     // Initialize widget
-    function initWidget() {
+    async function initWidget() {
         if (document.getElementById('feedback-widget-button')) {
             console.log('Widget: Already initialized');
             return;
         }
+        
+        // Load project configuration first
+        await loadProjectConfig();
         
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', createFeedbackButton);

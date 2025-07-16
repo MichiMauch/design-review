@@ -23,6 +23,57 @@ export async function GET(request, { params }) {
   }
 }
 
+export async function PUT(request, { params }) {
+  try {
+    const resolvedParams = await params;
+    const body = await request.json();
+    await initDatabase();
+    const db = getDb();
+
+    const {
+      name,
+      domain,
+      jira_server_url,
+      jira_username,
+      jira_api_token,
+      jira_project_key,
+      jira_auto_create
+    } = body;
+
+    const result = await db.execute({
+      sql: `UPDATE projects SET 
+            name = ?, 
+            domain = ?, 
+            jira_server_url = ?, 
+            jira_username = ?, 
+            jira_api_token = ?, 
+            jira_project_key = ?, 
+            jira_auto_create = ? 
+            WHERE id = ?`,
+      args: [
+        name,
+        domain,
+        jira_server_url,
+        jira_username,
+        jira_api_token,
+        jira_project_key,
+        jira_auto_create,
+        resolvedParams.id
+      ]
+    });
+
+    if (result.rowsAffected === 0) {
+      return new Response('Projekt nicht gefunden', { status: 404 });
+    }
+
+    return Response.json({ success: true, message: 'Projekt erfolgreich aktualisiert' });
+
+  } catch (error) {
+    console.error('Error updating project:', error);
+    return new Response('Fehler beim Aktualisieren des Projekts', { status: 500 });
+  }
+}
+
 export async function DELETE(request, { params }) {
   try {
     const resolvedParams = await params;

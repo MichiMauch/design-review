@@ -60,6 +60,9 @@ export default function ProjectPage() {
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
+  // Für Rückfrage bei JIRA-Issue nicht gefunden
+  const [showJiraDeleteConfirm, setShowJiraDeleteConfirm] = useState(false);
+  const [taskToDeleteByJira, setTaskToDeleteByJira] = useState(null);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget.js" data-project-id="${project.name}" defer></script>` :
@@ -172,11 +175,28 @@ export default function ProjectPage() {
 
   const loadJiraSettings = async () => {
     try {
+      // First try to load from settings API
       const response = await fetch(`/api/settings?key=jira_config_project_${params.id}`);
       const data = await response.json();
       
       if (data.success && data.setting) {
         setJiraConfig(data.setting.value);
+      } else {
+        // If not found in settings, try to load from project configuration
+        const projectResponse = await fetch(`/api/projects/${params.id}`);
+        if (projectResponse.ok) {
+          const projectData = await projectResponse.json();
+          if (projectData.jira_server_url) {
+            const jiraConfigFromProject = {
+              serverUrl: projectData.jira_server_url,
+              username: projectData.jira_username,
+              apiToken: projectData.jira_api_token,
+              projectKey: projectData.jira_project_key,
+              issueType: 'Task'
+            };
+            setJiraConfig(jiraConfigFromProject);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading JIRA settings:', error);
@@ -337,6 +357,30 @@ export default function ProjectPage() {
     try {
       // Save JIRA config to localStorage
       localStorage.setItem('jiraConfig', JSON.stringify(jiraConfig));
+      
+      // Also save to database for widget access
+      const projectUpdateData = {
+        name: project.name,
+        domain: project.domain,
+        jira_server_url: jiraConfig.serverUrl,
+        jira_username: jiraConfig.username,
+        jira_api_token: jiraConfig.apiToken,
+        jira_project_key: jiraConfig.projectKey,
+        jira_auto_create: false
+      };
+      
+      const response = await fetch(`/api/projects/${params.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectUpdateData)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save JIRA config to database');
+      }
+      
       showToast('JIRA-Konfiguration gespeichert!', 'success');
       setJiraConfigOpen(false);
     } catch (error) {
@@ -400,10 +444,14 @@ export default function ProjectPage() {
         if (data.success) {
           return { taskId: task.id, status: data.status, sprint: data.sprint };
         } else {
-          console.warn(`JIRA status failed for ${task.jira_key}:`, data.error);
+          // Rückfrage anzeigen, ob Task gelöscht werden soll
+          setTaskToDeleteByJira(task);
+          setShowJiraDeleteConfirm(true);
         }
       } catch (error) {
-        console.warn(`Failed to load JIRA status for ${task.jira_key}:`, error);
+        // Auch bei technischem Fehler Rückfrage
+        setTaskToDeleteByJira(task);
+        setShowJiraDeleteConfirm(true);
       }
       return null;
     });
@@ -423,6 +471,69 @@ export default function ProjectPage() {
     setJiraStatuses(statusMap);
     setJiraTaskSprints(sprintMap);
   };
+  // Task löschen, wenn JIRA-Issue fehlt und bestätigt wurde
+  const handleJiraDeleteConfirm = async () => {
+    if (!taskToDeleteByJira) return;
+    setDeletingTask(taskToDeleteByJira.id);
+    try {
+      const response = await fetch(`/api/projects/${params.id}/tasks/${taskToDeleteByJira.id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        showToast('Task wurde gelöscht, da das JIRA-Issue nicht mehr existiert.', 'success');
+        loadTasks();
+      } else {
+        showToast('Fehler beim Löschen der Task', 'error');
+      }
+    } catch (error) {
+      showToast('Fehler beim Löschen der Task', 'error');
+    } finally {
+      setDeletingTask(null);
+      setTaskToDeleteByJira(null);
+      setShowJiraDeleteConfirm(false);
+    }
+  };
+      {/* JIRA-Issue nicht gefunden: Rückfrage-Dialog */}
+      {showJiraDeleteConfirm && taskToDeleteByJira && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Task löschen?</h3>
+            <p className="text-gray-600 mb-6">
+              Das zugehörige JIRA-Issue (<strong>{taskToDeleteByJira.jira_key}</strong>) existiert nicht mehr oder ist nicht erreichbar.<br/>
+              Möchten Sie die Task <strong>&quot;{taskToDeleteByJira.title}&quot;</strong> löschen?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleJiraDeleteConfirm}
+                disabled={deletingTask === taskToDeleteByJira.id}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
+              >
+                {deletingTask === taskToDeleteByJira.id ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Lösche...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4" />
+                    Task löschen
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowJiraDeleteConfirm(false);
+                  setTaskToDeleteByJira(null);
+                }}
+                disabled={deletingTask === taskToDeleteByJira.id}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
   const startEditing = (task) => {
     setEditingTask(task.id);
