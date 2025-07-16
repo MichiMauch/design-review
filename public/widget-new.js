@@ -246,40 +246,49 @@
     }
 
     async function cropScreenshotToSelection(screenshotDataUrl, selection) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
-                const dpr = window.devicePixelRatio || 1;
-                const canvas = document.createElement('canvas');
+                try {
+                    const dpr = window.devicePixelRatio || 1;
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
 
-                // Calculate the vertical offset caused by the browser's UI (address bar, tabs, etc.)
-                const browserChromeY = (window.outerHeight - window.innerHeight);
+                    // This is the offset from the top of the window to the top of the viewport
+                    const chromeHeight = window.outerHeight - window.innerHeight;
 
-                // Calculate the final crop coordinates in physical pixels.
-                // We need to account for the window's position on the screen (screenX/Y),
-                // the browser's own UI (chrome), and the selection's position within the viewport.
-                const cropX = (window.screenX + selection.viewportX) * dpr;
-                const cropY = (window.screenY + browserChromeY + selection.viewportY) * dpr;
-                const cropWidth = selection.width * dpr;
-                const cropHeight = selection.height * dpr;
+                    // The screenshot is of the entire window. We need to calculate the crop
+                    // position based on the selection's position relative to the viewport,
+                    // plus the height of the browser's chrome.
+                    const cropX = selection.viewportX * dpr;
+                    const cropY = (selection.viewportY + chromeHeight) * dpr;
+                    const cropWidth = selection.width * dpr;
+                    const cropHeight = selection.height * dpr;
 
-                canvas.width = cropWidth;
-                canvas.height = cropHeight;
-                const ctx = canvas.getContext('2d');
+                    // Final check to ensure crop area is within the image bounds
+                    if (cropX + cropWidth > img.width || cropY + cropHeight > img.height) {
+                        console.warn('Widget: Crop area is outside the bounds of the screenshot. Adjusting.');
+                        // Adjust crop area if it exceeds image dimensions
+                        const newCropWidth = Math.min(cropWidth, img.width - cropX);
+                        const newCropHeight = Math.min(cropHeight, img.height - cropY);
+                        canvas.width = newCropWidth;
+                        canvas.height = newCropHeight;
+                        ctx.drawImage(img, cropX, cropY, newCropWidth, newCropHeight, 0, 0, newCropWidth, newCropHeight);
+                    } else {
+                        canvas.width = cropWidth;
+                        canvas.height = cropHeight;
+                        ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+                    }
 
-                ctx.drawImage(
-                    img,
-                    cropX,
-                    cropY,
-                    cropWidth,
-                    cropHeight,
-                    0,
-                    0,
-                    cropWidth,
-                    cropHeight
-                );
-
-                resolve(canvas.toDataURL('image/png'));
+                    resolve(canvas.toDataURL('image/png'));
+                } catch (error) {
+                    console.error('Error during screenshot cropping:', error);
+                    reject(error);
+                }
+            };
+            img.onerror = (error) => {
+                console.error('Could not load screenshot image for cropping:', error);
+                reject(new Error('Image loading failed'));
             };
             img.src = screenshotDataUrl;
         });
