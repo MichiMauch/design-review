@@ -291,8 +291,8 @@
                 // Use viewport coordinates directly for cropping
                 const cropX = selectionArea.viewportX * scaleX;
                 const cropY = selectionArea.viewportY * scaleY;
-                const cropWidth = selection.width * scaleX;
-                const cropHeight = selection.height * scaleY;
+                const cropWidth = selectionArea.width * scaleX;
+                const cropHeight = selectionArea.height * scaleY;
                 
                 console.log('Using ABSOLUTE coordinates for cropping:');
                 console.log('Absolute coords:', {
