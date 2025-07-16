@@ -346,8 +346,13 @@
                     console.log('Chrome height detection methods:', methods);
                     console.log('Selected chrome height:', chromeHeight);
 
-                    // SIMPLE FIX: Try direct 1:1 mapping first (often works best)
+                    // SIMPLE FIX: Try direct 1:1 mapping first but with DPR correction
                     const strategies = [
+                        {
+                            name: 'direct_with_dpr',
+                            cropX: selection.viewportX * dpr,
+                            cropY: selection.viewportY * dpr
+                        },
                         {
                             name: 'direct_1to1_mapping',
                             cropX: selection.viewportX,
@@ -357,11 +362,6 @@
                             name: 'scaled_proportional',
                             cropX: selection.viewportX * screenshotToWindowScale.x,
                             cropY: selection.viewportY * screenshotToWindowScale.y
-                        },
-                        {
-                            name: 'adjusted_scaled',
-                            cropX: (selection.viewportX - coordAdjustment.x) * screenshotToWindowScale.x,
-                            cropY: (selection.viewportY - coordAdjustment.y) * screenshotToWindowScale.y
                         },
                         {
                             name: 'center_based_estimation',
@@ -429,6 +429,9 @@
                         if (strategy.name === 'direct_1to1_mapping') {
                             strategyCropWidth = selection.width;
                             strategyCropHeight = selection.height;
+                        } else if (strategy.name === 'direct_with_dpr') {
+                            strategyCropWidth = selection.width * dpr;
+                            strategyCropHeight = selection.height * dpr;
                         } else {
                             strategyCropWidth = selection.width * screenshotToWindowScale.x;
                             strategyCropHeight = selection.height * screenshotToWindowScale.y;
