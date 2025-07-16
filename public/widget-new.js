@@ -463,52 +463,92 @@
         annotationModal = document.createElement('div');
         annotationModal.id = 'feedback-annotation-modal';
         annotationModal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10001; display: flex; flex-direction: column;">
-                <!-- Header -->
-                <div style="background: white; padding: 8px 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10002;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <h4 style="margin: 0; color: #333; font-family: Arial, sans-serif; font-size: 16px;">Screenshot markieren und Feedback geben</h4>
-                        <button id="annotation-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 0; width: 24px; height: 24px;">×</button>
+            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10001; display: flex;">
+                <!-- Sidebar -->
+                <div class="sidebar" style="width: 320px; background: white; display: flex; flex-direction: column; box-shadow: 2px 0 8px rgba(0,0,0,0.2);">
+                    <!-- Sidebar Header -->
+                    <div style="padding: 16px; border-bottom: 1px solid #e0e0e0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif; font-size: 18px;">Feedback-Tool</h3>
+                            <button id="annotation-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 4px; border-radius: 3px; transition: background 0.2s;">×</button>
+                        </div>
+                        <!-- Toolbar -->
+                        <div style="margin-bottom: 12px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Zeichenwerkzeuge:</label>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 8px 12px; border: 2px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">📱 Rechteck</button>
+                                <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">⭕ Kreis</button>
+                                <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">📏 Linie</button>
+                                <button id="tool-clear" style="padding: 8px 12px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">🗑️ Löschen</button>
+                            </div>
+                        </div>
                     </div>
-                    <!-- Toolbar -->
-                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                        <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 4px 8px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">📱</button>
-                        <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 4px 8px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">⭕</button>
-                        <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 4px 8px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">📏</button>
-                        <div style="border-left: 1px solid #ddd; height: 20px; margin: 0 4px; align-self: center;"></div>
-                        <button id="tool-clear" style="padding: 4px 8px; border: 1px solid #dc3545; background: white; color: #dc3545; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px;">🗑️</button>
+                    
+                    <!-- Sidebar Content -->
+                    <div style="flex: 1; padding: 16px; overflow-y: auto;">
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Titel:</label>
+                            <input id="annotation-feedback-title" placeholder="Kurzer, aussagekräftiger Titel..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Beschreibung:</label>
+                            <textarea id="annotation-feedback-text" placeholder="Beschreiben Sie detailliert, was Sie in den markierten Bereichen verbessern möchten..." style="width: 100%; height: 120px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box; font-size: 14px;"></textarea>
+                        </div>
+                        <div style="margin-bottom: 20px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;" id="jira-section">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <input type="checkbox" id="annotation-create-jira" style="margin: 0;" />
+                                <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer; font-size: 14px;">Direkt als JIRA-Task anlegen</label>
+                            </div>
+                            <span id="jira-status-message" style="color: #28a745; font-size: 12px; display: none;"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Sidebar Footer -->
+                    <div style="padding: 16px; border-top: 1px solid #e0e0e0; background: #f8f9fa;">
+                        <div style="display: flex; gap: 8px;">
+                            <button id="annotation-cancel" style="flex: 1; padding: 12px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; transition: all 0.2s;">Abbrechen</button>
+                            <button id="annotation-submit" style="flex: 2; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; transition: all 0.2s;">📤 Feedback senden</button>
+                        </div>
                     </div>
                 </div>
-                <!-- Screenshot Container -->
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: auto;">
+                
+                <!-- Screenshot Container (Full Height) -->
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: auto;">
                     <div id="screenshot-container" style="position: relative; display: inline-block;">
-                        <img id="screenshot-image" src="${screenshotDataURL}" style="max-width: 95vw; max-height: calc(100vh - 200px); border: 1px solid #ddd;" />
+                        <img id="screenshot-image" src="${screenshotDataURL}" style="max-width: calc(100vw - 360px); max-height: calc(100vh - 40px); border: 2px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
                         <canvas id="annotation-canvas" style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
                     </div>
                 </div>
-                <!-- Footer -->
-                <div style="background: white; padding: 12px; box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Titel:</label>
-                            <input id="annotation-feedback-title" placeholder="Kurzer Titel..." style="width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
-                        </div>
-                        <div style="grid-column: span 2;">
-                            <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 12px;">Beschreibung:</label>
-                            <textarea id="annotation-feedback-text" placeholder="Was möchten Sie verbessern..." style="width: 100%; height: 50px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box; font-size: 14px;"></textarea>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px;" id="jira-section">
-                        <input type="checkbox" id="annotation-create-jira" style="margin: 0;" />
-                        <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer; font-size: 13px;">Direkt als JIRA-Task anlegen</label>
-                        <span id="jira-status-message" style="color: #28a745; font-size: 12px; display: none;"></span>
-                    </div>
-                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                        <button id="annotation-cancel" style="padding: 8px 16px; border: 1px solid #ddd; background: #f8f9fa; color: #666; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 13px;">Abbrechen</button>
-                        <button id="annotation-submit" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 13px;">📤 Senden</button>
-                    </div>
-                </div>
             </div>
+            
+            <!-- Mobile Toggle Button -->
+            <button id="sidebar-toggle" style="display: none; position: absolute; top: 16px; left: 16px; z-index: 10003; background: white; border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-family: Arial, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">☰ Tools</button>
+            
+            <style>
+                @media (max-width: 768px) {
+                    #feedback-annotation-modal .sidebar { 
+                        position: absolute !important; 
+                        z-index: 10004 !important; 
+                        transform: translateX(-100%) !important; 
+                        transition: transform 0.3s ease !important;
+                    }
+                    #feedback-annotation-modal .sidebar.open { 
+                        transform: translateX(0) !important; 
+                    }
+                    #sidebar-toggle { 
+                        display: block !important; 
+                    }
+                    #screenshot-image { 
+                        max-width: calc(100vw - 40px) !important; 
+                    }
+                }
+                
+                /* Hover-Effekte */
+                #annotation-close:hover { background: #f0f0f0 !important; }
+                .annotation-tool:hover { transform: translateY(-1px) !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important; }
+                #annotation-cancel:hover { background: #e9ecef !important; }
+                #annotation-submit:hover { background: #218838 !important; transform: translateY(-1px) !important; }
+            </style>
         `;
         document.body.appendChild(annotationModal);
         // Schließen-Button und Cancel-Button korrekt anbinden (vorherige Listener entfernen, falls mehrfach geladen)
@@ -522,6 +562,16 @@
             if (cancelBtn) cancelBtn.onclick = closeAnnotationInterface;
             if (submitBtn) submitBtn.onclick = submitAnnotatedFeedback;
             
+            // Mobile Sidebar Toggle
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.onclick = () => {
+                    sidebar.classList.toggle('open');
+                    sidebarToggle.textContent = sidebar.classList.contains('open') ? '✕ Schließen' : '☰ Tools';
+                };
+            }
+            
             // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
             if (jiraSection) {
                 console.log('Widget: Setting JIRA section visibility:', {
@@ -529,7 +579,7 @@
                     jiraServerUrl: projectConfig?.jira_server_url,
                     shouldShow: !!projectConfig?.jira_server_url
                 });
-                jiraSection.style.display = projectConfig?.jira_server_url ? 'flex' : 'none';
+                jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
             }
         }, 0);
         // Initialize annotation functionality
