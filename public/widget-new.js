@@ -296,48 +296,77 @@
                     console.log('Device pixel ratio:', dpr);
                     console.log('Selection (viewport):', selection.viewportX, selection.viewportY, selection.width, selection.height);
 
+                    // CRITICAL: Calculate the scaling factor between screenshot and actual window
+                    const screenshotToWindowScale = {
+                        x: img.width / window.innerWidth,
+                        y: img.height / window.innerHeight
+                    };
+                    
+                    console.log('Screenshot to window scale factors:', screenshotToWindowScale);
+                    
+                    // If screenshot is smaller than window, we need to adjust our coordinates
+                    let coordAdjustment = { x: 0, y: 0 };
+                    
+                    if (img.width < window.innerWidth || img.height < window.innerHeight) {
+                        console.log('⚠️  Screenshot is smaller than window - adjusting coordinates');
+                        
+                        // Calculate the offset - screenshot might be centered or positioned differently
+                        coordAdjustment.x = Math.max(0, (window.outerWidth - img.width) / 2);
+                        coordAdjustment.y = Math.max(0, (window.outerHeight - img.height) / 2);
+                        
+                        console.log('Coordinate adjustment needed:', coordAdjustment);
+                    }
+
                     // Calculate browser chrome height with multiple detection methods
                     const methods = {
                         // Method 1: Standard calculation
                         standard: window.outerHeight - window.innerHeight,
                         
-                        // Method 2: More conservative estimate
-                        conservative: Math.max(window.outerHeight - window.innerHeight, 100),
+                        // Method 2: Based on actual screenshot size
+                        screenshot_based: Math.max(0, window.outerHeight - img.height),
                         
-                        // Method 3: Based on common browser UI heights
-                        estimated: screen.height > 1080 ? 120 : 80,
+                        // Method 3: Conservative estimate
+                        conservative: Math.max(window.outerHeight - window.innerHeight, 80),
                         
-                        // Method 4: Try to detect if we're in fullscreen
-                        fullscreen: window.outerHeight === screen.height ? 0 : window.outerHeight - window.innerHeight
+                        // Method 4: Minimal for cases where screenshot captures differently
+                        minimal: img.height < window.innerHeight ? 0 : window.outerHeight - window.innerHeight
                     };
 
-                    // Choose the most reasonable chrome height
-                    let chromeHeight = methods.standard;
-                    
-                    // If standard seems too small or too large, use conservative
-                    if (chromeHeight < 50 || chromeHeight > 200) {
-                        chromeHeight = methods.conservative;
+                    // Choose the most appropriate chrome height based on screenshot dimensions
+                    let chromeHeight;
+                    if (img.height < window.innerHeight) {
+                        // Screenshot doesn't include full browser chrome
+                        chromeHeight = methods.minimal;
+                        console.log('Using minimal chrome height (screenshot excludes chrome)');
+                    } else {
+                        chromeHeight = methods.standard;
+                        console.log('Using standard chrome height calculation');
                     }
 
                     console.log('Chrome height detection methods:', methods);
                     console.log('Selected chrome height:', chromeHeight);
 
-                    // Try multiple coordinate calculation strategies
+                    // Try multiple coordinate calculation strategies with screenshot scaling
                     const strategies = [
                         {
-                            name: 'viewport_with_chrome',
-                            cropX: selection.viewportX * dpr,
-                            cropY: (selection.viewportY + chromeHeight) * dpr
+                            name: 'screenshot_scaled_viewport',
+                            cropX: (selection.viewportX - coordAdjustment.x) * screenshotToWindowScale.x * dpr,
+                            cropY: (selection.viewportY + chromeHeight - coordAdjustment.y) * screenshotToWindowScale.y * dpr
                         },
                         {
-                            name: 'viewport_only',
+                            name: 'direct_viewport_scaled',
+                            cropX: selection.viewportX * screenshotToWindowScale.x * dpr,
+                            cropY: selection.viewportY * screenshotToWindowScale.y * dpr
+                        },
+                        {
+                            name: 'viewport_with_chrome_scaled',
+                            cropX: selection.viewportX * screenshotToWindowScale.x * dpr,
+                            cropY: (selection.viewportY + chromeHeight) * screenshotToWindowScale.y * dpr
+                        },
+                        {
+                            name: 'original_viewport_only',
                             cropX: selection.viewportX * dpr,
                             cropY: selection.viewportY * dpr
-                        },
-                        {
-                            name: 'page_coordinates',
-                            cropX: (selection.pageX - selection.scroll.x) * dpr,
-                            cropY: (selection.pageY - selection.scroll.y + chromeHeight) * dpr
                         }
                     ];
 
@@ -347,8 +376,8 @@
                     const primaryStrategy = strategies[0];
                     const cropX = primaryStrategy.cropX;
                     const cropY = primaryStrategy.cropY;
-                    const cropWidth = selection.width * dpr;
-                    const cropHeight = selection.height * dpr;
+                    const cropWidth = selection.width * screenshotToWindowScale.x * dpr;
+                    const cropHeight = selection.height * screenshotToWindowScale.y * dpr;
 
                     console.log('Estimated chrome height:', chromeHeight);
                     console.log('Primary crop coordinates (screenshot space):', {
@@ -356,7 +385,9 @@
                         x: cropX,
                         y: cropY,
                         width: cropWidth,
-                        height: cropHeight
+                        height: cropHeight,
+                        scaleFactors: screenshotToWindowScale,
+                        adjustment: coordAdjustment
                     });
 
                     // Ensure crop area is within image bounds with better error handling
@@ -391,30 +422,39 @@
                     // Try each strategy until one works
                     for (let i = 0; i < strategies.length && !cropSuccess; i++) {
                         const strategy = strategies[i];
-                        const strategyCropX = Math.max(0, Math.min(strategy.cropX, img.width - finalCropWidth));
-                        const strategyCropY = Math.max(0, Math.min(strategy.cropY, img.height - finalCropHeight));
+                        
+                        // Calculate strategy-specific crop dimensions
+                        const strategyCropWidth = strategy.name.includes('scaled') ? 
+                            selection.width * screenshotToWindowScale.x * dpr : 
+                            selection.width * dpr;
+                        const strategyCropHeight = strategy.name.includes('scaled') ? 
+                            selection.height * screenshotToWindowScale.y * dpr : 
+                            selection.height * dpr;
+                            
+                        const strategyCropX = Math.max(0, Math.min(strategy.cropX, img.width - strategyCropWidth));
+                        const strategyCropY = Math.max(0, Math.min(strategy.cropY, img.height - strategyCropHeight));
                         
                         try {
                             console.log(`Trying strategy ${i + 1}: ${strategy.name}`, {
                                 x: strategyCropX,
                                 y: strategyCropY,
-                                width: finalCropWidth,
-                                height: finalCropHeight
+                                width: strategyCropWidth,
+                                height: strategyCropHeight
                             });
                             
                             ctx.clearRect(0, 0, canvas.width, canvas.height);
                             ctx.drawImage(
                                 img,
-                                strategyCropX, strategyCropY, finalCropWidth, finalCropHeight,
+                                strategyCropX, strategyCropY, strategyCropWidth, strategyCropHeight,
                                 0, 0, finalCropWidth, finalCropHeight
                             );
                             
-                            console.log(`Strategy ${strategy.name} succeeded!`);
+                            console.log(`✅ Strategy ${strategy.name} succeeded!`);
                             cropSuccess = true;
                             break;
                             
                         } catch (strategyError) {
-                            console.warn(`Strategy ${strategy.name} failed:`, strategyError);
+                            console.warn(`❌ Strategy ${strategy.name} failed:`, strategyError);
                             continue;
                         }
                     }
