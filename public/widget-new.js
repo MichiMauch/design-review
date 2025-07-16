@@ -397,6 +397,9 @@
     
     // Show annotation interface
     function showAnnotationInterface(screenshotDataURL) {
+        // Vorherige Instanz entfernen, falls noch offen
+        const oldModal = document.getElementById('feedback-annotation-modal');
+        if (oldModal) oldModal.remove();
         annotationModal = document.createElement('div');
         annotationModal.id = 'feedback-annotation-modal';
         annotationModal.innerHTML = `
@@ -444,6 +447,15 @@
             </div>
         `;
         document.body.appendChild(annotationModal);
+        // Schließen-Button und Cancel-Button korrekt anbinden (vorherige Listener entfernen, falls mehrfach geladen)
+        setTimeout(() => {
+            const closeBtn = document.getElementById('annotation-close');
+            const cancelBtn = document.getElementById('annotation-cancel');
+            const submitBtn = document.getElementById('annotation-submit');
+            if (closeBtn) closeBtn.onclick = closeAnnotationInterface;
+            if (cancelBtn) cancelBtn.onclick = closeAnnotationInterface;
+            if (submitBtn) submitBtn.onclick = submitAnnotatedFeedback;
+        }, 0);
         // Initialize annotation functionality
         initializeAnnotation();
         console.log('Widget: Annotation interface shown');
@@ -662,9 +674,12 @@
                 }
                 setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 4000);
             }
+            // Modal nach erfolgreichem Submit schließen
+            closeAnnotationInterface();
         } catch (error) {
             console.error('Widget: Failed to create annotated screenshot:', error);
             await submitFeedback(title, description, null);
+            closeAnnotationInterface();
         }
     }
     
