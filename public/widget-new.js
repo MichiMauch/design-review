@@ -756,7 +756,8 @@
     async function loadProjectConfig() {
         try {
             console.log('Widget: Loading project config for project ID:', projectId);
-            const response = await fetch(`${baseUrl}/api/projects/${projectId}`);
+            // Try to load by name first (for backward compatibility)
+            const response = await fetch(`${baseUrl}/api/projects/by-name/${encodeURIComponent(projectId)}`);
             console.log('Widget: Project config response status:', response.status);
             if (response.ok) {
                 projectConfig = await response.json();
