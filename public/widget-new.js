@@ -141,7 +141,6 @@
                 if (width > 10 && height > 10) {
                     // Use viewport-relative coordinates and add scroll offset
                     const left = Math.min(e.clientX, startX);
-                    const left = Math.min(e.clientX, startX);
                     const top = Math.min(e.clientY, startY);
 
                     // Add scroll offset to get absolute coordinates from page top
