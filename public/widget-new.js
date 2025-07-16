@@ -142,9 +142,9 @@
                     // Use viewport-relative coordinates and add scroll offset
                     const left = Math.min(e.clientX, startX);
                     const top = Math.min(e.clientY, startY);
-                    
+
                     selectionArea = {
-                        x: left,
+                        x: left, 
                         y: top,
                         width: width,
                         height: height,
@@ -154,9 +154,9 @@
                     
                     console.log('=== SELECTION DEBUG ===');
                     console.log('Widget: Area selected (viewport coordinates):', {x: left, y: top, width, height});
-                    console.log('Widget: Area selected (absolute coordinates):', selectionArea);
+                    console.log('Widget: Area selected (final):', selectionArea);
                     console.log('Widget: Viewport size:', window.innerWidth, 'x', window.innerHeight);
-                    console.log('Widget: Scroll position:', scrollX, 'x', scrollY);
+                    console.log('Widget: Scroll position:', window.scrollX, 'x', window.scrollY);
                     console.log('=== END SELECTION DEBUG ===');
                     
                     removeSelectionOverlay();
@@ -226,21 +226,29 @@
             // Import html-to-image dynamisch
             const { toPng } = await import('https://unpkg.com/html-to-image@1.11.11/es/index.js');
             console.log('Widget: html-to-image loaded successfully');
-            // Warte kurz, damit Animationen abgeschlossen sind
-            await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Screenshot von der gesamten Seite machen
+            // Temporarily move the body to the top to capture the scrolled content
+            const scrollX = window.scrollX;
+            const scrollY = window.scrollY;
+            const originalTransform = document.body.style.transform;
+            
+            document.body.style.transform = `translateY(-${scrollY}px)`;
+            window.scrollTo(0, 0);
+
+            await new Promise(resolve => setTimeout(resolve, 150)); // Wait for rendering
+
             console.log('Widget: Taking screenshot of the viewport...');
-
             const screenshotDataUrl = await toPng(document.body, {
                 quality: 0.9,
-                pixelRatio: 2,
+                pixelRatio: window.devicePixelRatio || 2,
                 backgroundColor: '#ffffff',
                 width: window.innerWidth,
                 height: window.innerHeight,
-                scrollX: window.scrollX,
-                scrollY: window.scrollY
             });
+
+            // Restore body position
+            document.body.style.transform = originalTransform;
+            window.scrollTo(scrollX, scrollY);
 
             console.log('Widget: Screenshot captured successfully, data URL length:', screenshotDataUrl.length);
             
@@ -285,17 +293,15 @@
                 
                 const scaleX = img.width / window.innerWidth;
                 const scaleY = img.height / window.innerHeight;
-
                 console.log('Scale factors:', { scaleX, scaleY });
 
-                // Use viewport coordinates directly for cropping
-                const cropX = selectionArea.viewportX * scaleX;
-                const cropY = selectionArea.viewportY * scaleY;
+                const cropX = selectionArea.x * scaleX;
+                const cropY = selectionArea.y * scaleY;
                 const cropWidth = selectionArea.width * scaleX;
                 const cropHeight = selectionArea.height * scaleY;
-                
-                console.log('Using ABSOLUTE coordinates for cropping:');
-                console.log('Absolute coords:', {
+
+                console.log('Using VIEWPORT coordinates for cropping:');
+                console.log('Viewport coords:', {
                     x: selectionArea.x,
                     y: selectionArea.y,
                     width: selectionArea.width,
