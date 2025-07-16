@@ -221,13 +221,16 @@
                 width: window.innerWidth,
                 height: window.innerHeight
             });
-            console.log('Current scroll position:', {
-                x: window.scrollX,
-                y: window.scrollY
-            });
-            console.log('Document dimensions:', {
+            console.log('Current scroll position (window):', { x: window.scrollX, y: window.scrollY });
+            const scrollElement = document.scrollingElement || document.documentElement;
+            console.log('Current scroll position (scrollingElement):', { x: scrollElement.scrollLeft, y: scrollElement.scrollTop });
+            console.log('Document dimensions (documentElement):', {
                 width: document.documentElement.scrollWidth,
                 height: document.documentElement.scrollHeight
+            });
+            console.log('Document dimensions (body):', {
+                width: document.body.scrollWidth,
+                height: document.body.scrollHeight
             });
             
             // Show loading modal
