@@ -1,27 +1,48 @@
 import { NextResponse } from 'next/server';
 
+// Hilfsfunktion für CORS-Header
+function withCORS(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
+export async function OPTIONS() {
+  // Preflight-Response für CORS
+  const response = NextResponse.json({}, { status: 200 });
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
 // JIRA API Integration
 export async function POST(request) {
   try {
     const { action, ...data } = await request.json();
-    
+    let result;
     switch (action) {
       case 'createTicket':
-        return await createJiraTicket(data);
+        result = await createJiraTicket(data);
+        break;
       case 'testConnection':
-        return await testJiraConnection(data);
+        result = await testJiraConnection(data);
+        break;
       default:
-        return NextResponse.json({ 
+        result = NextResponse.json({ 
           success: false, 
           error: 'Invalid action' 
         }, { status: 400 });
     }
+    return withCORS(result);
   } catch (error) {
     console.error('JIRA API Error:', error);
-    return NextResponse.json({ 
+    const errorResponse = NextResponse.json({ 
       success: false, 
       error: error.message 
     }, { status: 500 });
+    return withCORS(errorResponse);
   }
 }
 
