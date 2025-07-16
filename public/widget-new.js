@@ -203,138 +203,80 @@
         isSelecting = false;
     }
     
-    // Create screenshot and show annotation interface
     async function createScreenshotAndAnnotate() {
         try {
-            console.log('=== SCREENSHOT DEBUG START ===');
-            console.log('Widget: Creating client-side screenshot for annotation...');
-            console.log('Selection area:', selectionArea);
-            console.log('Current viewport:', {
-                width: window.innerWidth,
-                height: window.innerHeight
-            });
-            console.log('Current scroll position (window):', { x: window.scrollX, y: window.scrollY });
-            const scrollElement = document.scrollingElement || document.documentElement;
-            console.log('Current scroll position (scrollingElement):', { x: scrollElement.scrollLeft, y: scrollElement.scrollTop });
-            console.log('Document dimensions (documentElement):', {
-                width: document.documentElement.scrollWidth,
-                height: document.documentElement.scrollHeight
-            });
-            console.log('Document dimensions (body):', {
-                width: document.body.scrollWidth,
-                height: document.body.scrollHeight
-            });
+            console.log('Widget: Starting screen capture with getDisplayMedia...');
             
-            // Show loading modal
-            showLoadingModal();
-            
+            // Hide overlay before starting capture
+            if (overlay) overlay.style.display = 'none';
 
-            // Import html-to-image dynamisch
-            const { toPng } = await import('https://unpkg.com/html-to-image@1.11.11/es/index.js');
-            console.log('Widget: html-to-image loaded successfully');
-            await new Promise(resolve => setTimeout(resolve, 100));
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const track = stream.getVideoTracks()[0];
+            const imageCapture = new ImageCapture(track);
 
-            // Screenshot von der gesamten Seite machen
-            console.log('Widget: Taking screenshot of the entire page...');
-            const screenshotDataUrl = await toPng(document.documentElement, {
-                quality: 0.9,
-                pixelRatio: window.devicePixelRatio || 2,
-                backgroundColor: '#ffffff'
-            });
+            // Wait a moment for the stream to stabilize
+            await new Promise(resolve => setTimeout(resolve, 200));
 
-            console.log('Widget: Screenshot captured successfully, data URL length:', screenshotDataUrl.length);
-            
-            // Crop screenshot to selected area if we have one
+            const bitmap = await imageCapture.grabFrame();
+            track.stop(); // Stop the screen sharing stream
+
+            // Restore overlay if it was hidden
+            if (overlay) overlay.style.display = 'block';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0);
+
+            const screenshotDataUrl = canvas.toDataURL('image/png');
+            console.log('Widget: Screenshot captured successfully via getDisplayMedia.');
+
             let finalScreenshot = screenshotDataUrl;
             if (selectionArea) {
                 console.log('Widget: Cropping screenshot to selected area...');
                 finalScreenshot = await cropScreenshotToSelection(screenshotDataUrl, selectionArea);
                 console.log('Widget: Screenshot cropped successfully');
             }
-            
-            // Close loading modal and show annotation interface
-            closeLoadingModal();
+
             showAnnotationInterface(finalScreenshot);
-            
-            console.log('=== SCREENSHOT DEBUG END ===');
-            
+
         } catch (error) {
-            console.error('Widget: Client-side screenshot creation failed:', error);
-            closeLoadingModal();
-            
-            // Show error and fallback to placeholder
-            showErrorModal('Screenshot konnte nicht erstellt werden. Sie können trotzdem Feedback hinterlassen.');
+            console.error('Widget: Screen capture failed:', error);
+            if (overlay) overlay.style.display = 'block'; // Ensure overlay is visible on error
+            showErrorModal('Bildschirmaufnahme wurde abgebrochen oder ist fehlgeschlagen.');
         }
-    }
     
-    // Crop screenshot to selected area using canvas
-    async function cropScreenshotToSelection(screenshotDataUrl, selectionArea) {
+    async function cropScreenshotToSelection(screenshotDataUrl, selection) {
         return new Promise((resolve) => {
-            console.log('=== CROP DEBUG START ===');
-            console.log('Cropping with selection area:', selectionArea);
-            
             const img = new Image();
             img.onload = () => {
-                console.log('Original image dimensions:', {
-                    width: img.width,
-                    height: img.height
-                });
-                
+                const dpr = window.devicePixelRatio || 1;
                 const canvas = document.createElement('canvas');
+                
+                // Use the viewport coordinates from the selection
+                const cropX = selection.viewportX * dpr;
+                const cropY = selection.viewportY * dpr;
+                const cropWidth = selection.width * dpr;
+                const cropHeight = selection.height * dpr;
+
+                canvas.width = cropWidth;
+                canvas.height = cropHeight;
                 const ctx = canvas.getContext('2d');
-                
-                const scaleX = img.width / document.documentElement.scrollWidth;
-                const scaleY = img.height / document.documentElement.scrollHeight;
-                console.log('Scale factors:', { scaleX, scaleY });
 
-                const cropX = selectionArea.x * scaleX;
-                const cropY = selectionArea.y * scaleY;
-                const cropWidth = selectionArea.width * scaleX;
-                const cropHeight = selectionArea.height * scaleY;
-
-                console.log('Using ABSOLUTE coordinates for cropping:');
-                console.log('Absolute coords:', {
-                    x: selectionArea.x,
-                    y: selectionArea.y,
-                    width: selectionArea.width,
-                    height: selectionArea.height
-                });
-                console.log('Crop coordinates (in image space):', {
-                    x: cropX,
-                    y: cropY,
-                    width: cropWidth,
-                    height: cropHeight
-                });
-                
-                // Ensure crop coordinates are within image bounds
-                const finalCropX = Math.max(0, Math.min(cropX, img.width));
-                const finalCropY = Math.max(0, Math.min(cropY, img.height));
-                const finalCropWidth = Math.min(cropWidth, img.width - finalCropX);
-                const finalCropHeight = Math.min(cropHeight, img.height - finalCropY);
-                
-                console.log('Final bounded crop coordinates:', {
-                    x: finalCropX,
-                    y: finalCropY,
-                    width: finalCropWidth,
-                    height: finalCropHeight
-                });
-                
-                // Set canvas size to the selected area
-                canvas.width = finalCropWidth;
-                canvas.height = finalCropHeight;
-                
-                // Draw the cropped portion of the image
                 ctx.drawImage(
                     img,
-                    finalCropX, finalCropY, finalCropWidth, finalCropHeight, // Source area
-                    0, 0, finalCropWidth, finalCropHeight // Destination area
+                    cropX,
+                    cropY,
+                    cropWidth,
+                    cropHeight,
+                    0,
+                    0,
+                    cropWidth,
+                    cropHeight
                 );
-                
-                const croppedDataUrl = canvas.toDataURL('image/png', 0.9);
-                console.log('Cropped image data URL length:', croppedDataUrl.length);
-                console.log('=== CROP DEBUG END ===');
-                
-                resolve(croppedDataUrl);
+
+                resolve(canvas.toDataURL('image/png'));
             };
             img.src = screenshotDataUrl;
         });
