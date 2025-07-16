@@ -32,9 +32,61 @@
     let jiraConfigModal = null;
     let jiraUsers = [];
     let jiraSprints = [];
+    let jiraSwimlanes = [];
     let jiraIssueTypes = [];
     let currentFeedbackData = null;
     let selectedBoardId = null;
+    
+    // Show toast notification
+    function showToast(message, type = 'success', duration = 3000) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            z-index: 10003;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 300px;
+            word-wrap: break-word;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        `;
+        
+        // Set background color based on type
+        if (type === 'success') {
+            toast.style.backgroundColor = '#28a745';
+        } else if (type === 'error') {
+            toast.style.backgroundColor = '#dc3545';
+        } else if (type === 'warning') {
+            toast.style.backgroundColor = '#ffc107';
+            toast.style.color = '#212529';
+        } else {
+            toast.style.backgroundColor = '#007bff';
+        }
+        
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Auto remove
+        setTimeout(() => {
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, duration);
+    }
     
     // Create feedback button
     function createFeedbackButton() {
@@ -526,6 +578,13 @@
                         </div>
                         
                         <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Swimlane:</label>
+                            <select id="jira-swimlane" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;">
+                                <option value="">Keine Swimlane</option>
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
                             <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-family: Arial, sans-serif;">Labels:</label>
                             <input id="jira-labels" placeholder="bug, frontend, ui (durch Komma getrennt)" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box;" />
                         </div>
@@ -648,6 +707,30 @@
                             console.log('Widget: Loaded JIRA sprints:', jiraSprints.length);
                         }
                     }
+                    
+                    // Load swimlanes for this board
+                    const swimlanesResponse = await fetch(`${baseUrl}/api/jira`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getSwimlanes',
+                            jiraConfig: {
+                                serverUrl: projectConfig.jira_server_url,
+                                username: projectConfig.jira_username,
+                                apiToken: projectConfig.jira_api_token,
+                                projectKey: projectConfig.jira_project_key
+                            },
+                            boardId: selectedBoardId
+                        })
+                    });
+                    
+                    if (swimlanesResponse.ok) {
+                        const swimlanesResult = await swimlanesResponse.json();
+                        if (swimlanesResult.success) {
+                            jiraSwimlanes = swimlanesResult.data || [];
+                            console.log('Widget: Loaded JIRA swimlanes:', jiraSwimlanes.length);
+                        }
+                    }
                 }
             }
             
@@ -715,6 +798,18 @@
             });
         }
         
+        // Populate swimlanes
+        const swimlaneSelect = document.getElementById('jira-swimlane');
+        if (swimlaneSelect) {
+            jiraSwimlanes.forEach(swimlane => {
+                const option = document.createElement('option');
+                option.value = swimlane.id;
+                option.textContent = swimlane.name;
+                if (swimlane.id === 'assignee') option.selected = true; // Default to assignee
+                swimlaneSelect.appendChild(option);
+            });
+        }
+        
         console.log('Widget: JIRA form populated');
     }
     
@@ -734,6 +829,7 @@
             const issueType = document.getElementById('jira-issue-type')?.value || 'Bug';
             const assignee = document.getElementById('jira-assignee')?.value || '';
             const sprint = document.getElementById('jira-sprint')?.value || '';
+            const swimlane = document.getElementById('jira-swimlane')?.value || '';
             const labelsInput = document.getElementById('jira-labels')?.value || '';
             
             // Parse labels
@@ -742,7 +838,7 @@
             console.log('Widget: Creating JIRA task with config:', {
                 title: currentFeedbackData.title,
                 description: currentFeedbackData.description,
-                issueType, assignee, sprint, labels
+                issueType, assignee, sprint, swimlane, labels
             });
             
             // Create JIRA payload
@@ -763,7 +859,8 @@
                     defaultAssignee: assignee,
                     defaultLabels: labels,
                     selectedSprint: sprint,
-                    selectedBoardId: selectedBoardId
+                    selectedBoardId: selectedBoardId,
+                    selectedSwimlane: swimlane
                 }
             };
             
@@ -1148,6 +1245,7 @@
             
             if (response.ok) {
                 console.log('Widget: Task submitted successfully');
+                showToast('Feedback erfolgreich in der Datenbank gespeichert!', 'success', 2000);
                 showSuccessMessage();
             } else {
                 throw new Error(`HTTP ${response.status}`);

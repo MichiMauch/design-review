@@ -41,6 +41,9 @@ export async function POST(request) {
       case 'getSprints':
         result = await getJiraSprintsForWidget(data);
         break;
+      case 'getSwimlanes':
+        result = await getJiraSwimlanes(data);
+        break;
       default:
         result = NextResponse.json({ 
           success: false, 
@@ -915,6 +918,79 @@ async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
 
   } catch (error) {
     console.error('JIRA Sprints Error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 });
+  }
+}
+
+async function getJiraSwimlanes({ jiraConfig, boardId }) {
+  const { serverUrl, username, apiToken } = jiraConfig;
+  
+  if (!serverUrl || !username || !apiToken) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'JIRA Konfiguration unvollständig' 
+    }, { status: 400 });
+  }
+  
+  if (!boardId) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Board ID ist erforderlich' 
+    }, { status: 400 });
+  }
+
+  try {
+    // Get board configuration to access swimlanes
+    const configUrl = `${serverUrl}/rest/agile/1.0/board/${boardId}/configuration`;
+    const configResponse = await fetch(configUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!configResponse.ok) {
+      const errorText = await configResponse.text();
+      console.error('JIRA Board Config API Error:', configResponse.status, errorText);
+      return NextResponse.json({ 
+        success: false, 
+        error: `JIRA Board Config API Error: ${configResponse.status}` 
+      }, { status: configResponse.status });
+    }
+
+    const configData = await configResponse.json();
+    
+    // Extract swimlane configuration
+    const swimlanes = configData.subQuery?.query || 'Keine Swimlanes';
+    
+    // If swimlanes are configured, get the actual swimlane values
+    let swimlaneOptions = [];
+    if (swimlanes !== 'Keine Swimlanes' && configData.subQuery) {
+      // For most boards, swimlanes are based on assignee, component, or custom fields
+      // We'll provide common swimlane options
+      swimlaneOptions = [
+        { id: 'assignee', name: 'Nach Bearbeiter' },
+        { id: 'component', name: 'Nach Komponente' },
+        { id: 'priority', name: 'Nach Priorität' },
+        { id: 'none', name: 'Keine Swimlanes' }
+      ];
+    } else {
+      swimlaneOptions = [
+        { id: 'none', name: 'Keine Swimlanes' }
+      ];
+    }
+    
+    return NextResponse.json({
+      success: true,
+      data: swimlaneOptions
+    });
+
+  } catch (error) {
+    console.error('JIRA Swimlanes Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
