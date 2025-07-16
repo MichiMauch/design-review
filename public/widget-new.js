@@ -232,59 +232,41 @@
             // Show loading modal
             showLoadingModal();
             
-            // Import html-to-image dynamically
+
+            // Import html-to-image dynamisch
             const { toPng } = await import('https://unpkg.com/html-to-image@1.11.11/es/index.js');
-            
             console.log('Widget: html-to-image loaded successfully');
-            
-            // Wait a bit for any animations to settle
+            // Warte kurz, damit Animationen abgeschlossen sind
             await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Take screenshot of the current viewport only
-            console.log('Widget: Taking screenshot of current viewport...');
-            
-            // Create a temporary container that represents only the visible viewport
-            const viewportElement = document.createElement('div');
-            viewportElement.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: ${window.innerWidth}px;
-                height: ${window.innerHeight}px;
-                pointer-events: none;
-                z-index: -1;
-                overflow: hidden;
-            `;
-            
-            // Clone the body content and position it to show the current viewport
-            const bodyClone = document.body.cloneNode(true);
-            bodyClone.style.position = 'absolute';
-            bodyClone.style.top = `-${window.scrollY}px`;
-            bodyClone.style.left = `-${window.scrollX}px`;
-            // Fix: Set width to viewport width to avoid right cutoff
-            bodyClone.style.width = `${window.innerWidth}px`;
-            bodyClone.style.height = `${window.innerHeight}px`;
-            
-            // Remove any existing feedback widgets from clone
-            const feedbackElements = bodyClone.querySelectorAll('[id*="feedback"], [id*="annotation"]');
-            feedbackElements.forEach(el => el.remove());
-            
-            viewportElement.appendChild(bodyClone);
-            document.body.appendChild(viewportElement);
-            
-            console.log('Widget: Viewport element prepared for screenshot');
-            
-            const screenshotDataUrl = await toPng(viewportElement, {
+
+            // Screenshot direkt vom sichtbaren Bereich (Viewport) machen
+            console.log('Widget: Taking screenshot of current viewport (window)...');
+            // Temporär Feedback-Overlays ausblenden
+            const overlays = document.querySelectorAll('[id*="feedback"], [id*="annotation"]');
+            const prevDisplay = [];
+            overlays.forEach(el => {
+                prevDisplay.push(el.style.display);
+                el.style.display = 'none';
+            });
+
+            // Screenshot vom sichtbaren Bereich (Viewport)
+            const screenshotDataUrl = await toPng(document.documentElement, {
                 quality: 0.9,
-                pixelRatio: 2, // High DPI for better quality
+                pixelRatio: 2,
                 backgroundColor: '#ffffff',
                 width: window.innerWidth,
-                height: window.innerHeight
+                height: window.innerHeight,
+                style: {
+                    // Nur den sichtbaren Bereich rendern
+                    transform: `translate(-${window.scrollX}px, -${window.scrollY}px)`
+                }
             });
-            
-            // Clean up temporary element
-            document.body.removeChild(viewportElement);
-            
+
+            // Overlays wieder einblenden
+            overlays.forEach((el, i) => {
+                el.style.display = prevDisplay[i];
+            });
+
             console.log('Widget: Screenshot captured successfully, data URL length:', screenshotDataUrl.length);
             
             // Crop screenshot to selected area if we have one
