@@ -585,7 +585,18 @@
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 8px; font-weight: bold; 
                                       color: #555; font-family: Arial, sans-serif;">
-                            Beschreiben Sie Ihr Feedback:
+                            Titel:
+                        </label>
+                        <input id="annotation-feedback-title" 
+                                  placeholder="Geben Sie einen kurzen Titel ein..."
+                                  style="width: 100%; padding: 12px; border: 1px solid #ddd; 
+                                         border-radius: 6px; font-family: Arial, sans-serif; 
+                                         box-sizing: border-box;" />
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; 
+                                      color: #555; font-family: Arial, sans-serif;">
+                            Beschreibung:
                         </label>
                         <textarea id="annotation-feedback-text" 
                                   placeholder="Beschreiben Sie, was Sie in den markierten Bereichen verbessern möchten..."
@@ -757,9 +768,16 @@
     
     // Submit annotated feedback
     async function submitAnnotatedFeedback() {
-        const feedbackText = document.getElementById('annotation-feedback-text').value.trim();
-        if (!feedbackText) {
-            alert('Bitte geben Sie Ihr Feedback ein.');
+        const title = document.getElementById('annotation-feedback-title').value.trim();
+        const description = document.getElementById('annotation-feedback-text').value.trim();
+
+        if (!title) {
+            alert('Bitte geben Sie einen Titel ein.');
+            return;
+        }
+
+        if (!description) {
+            alert('Bitte geben Sie eine Beschreibung ein.');
             return;
         }
         
@@ -786,7 +804,7 @@
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
             
             // Submit feedback
-            await submitFeedback(feedbackText, annotatedScreenshot);
+            await submitFeedback(title, description, annotatedScreenshot);
             
         } catch (error) {
             console.error('Widget: Failed to create annotated screenshot:', error);
@@ -858,41 +876,41 @@
         document.body.appendChild(errorModal);
     }
     
-    // Submit feedback function
-    async function submitFeedback(feedbackText, screenshot) {
+    async function submitFeedback(title, description, screenshot) {
         if (isSubmitting) return;
         isSubmitting = true;
         
         try {
-            const feedbackData = {
+            const taskData = {
                 project_id: projectId,
-                url: window.location.href,
-                text: feedbackText,
+                title: title,
+                description: description,
                 screenshot: screenshot,
+                url: window.location.href,
                 selected_area: selectionArea ? JSON.stringify(selectionArea) : null,
                 user_agent: navigator.userAgent,
                 timestamp: new Date().toISOString()
             };
             
-            console.log('Widget: Submitting feedback...');
+            console.log('Widget: Submitting new task...');
             
-            const response = await fetch(`${baseUrl}/api/feedback`, {
+            const response = await fetch(`${baseUrl}/api/tasks`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(feedbackData)
+                body: JSON.stringify(taskData)
             });
             
             if (response.ok) {
-                console.log('Widget: Feedback submitted successfully');
+                console.log('Widget: Task submitted successfully');
                 showSuccessMessage();
             } else {
                 throw new Error(`HTTP ${response.status}`);
             }
             
         } catch (error) {
-            console.error('Widget: Feedback submission failed:', error);
+            console.error('Widget: Task submission failed:', error);
             showErrorMessage();
         } finally {
             isSubmitting = false;

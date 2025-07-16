@@ -141,9 +141,21 @@
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 8px; font-weight: bold; 
                                       color: #555; font-family: Arial, sans-serif;">
-                            Ihr Feedback:
+                            Titel:
                         </label>
-                        <textarea id="text-feedback" 
+                        <input type="text" id="text-feedback-title" 
+                               placeholder="Kurzer Titel für das Feedback..."
+                               style="width: 100%; padding: 12px; border: 1px solid #ddd; 
+                                      border-radius: 6px; font-family: Arial, sans-serif; 
+                                      box-sizing: border-box;" />
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; 
+                                      color: #555; font-family: Arial, sans-serif;">
+                            Beschreibung:
+                        </label>
+                        <textarea id="text-feedback-description" 
                                   placeholder="Beschreiben Sie, was verbessert werden sollte..."
                                   style="width: 100%; height: 120px; padding: 15px; border: 1px solid #ddd; 
                                          border-radius: 6px; font-family: Arial, sans-serif; resize: vertical;
@@ -170,18 +182,27 @@
         document.body.appendChild(modal);
         
         document.getElementById('submit-text-feedback').addEventListener('click', () => {
-            const feedbackText = document.getElementById('text-feedback').value.trim();
-            if (!feedbackText) {
-                alert('Bitte geben Sie Ihr Feedback ein.');
+            const title = document.getElementById('text-feedback-title').value.trim();
+            const description = document.getElementById('text-feedback-description').value.trim();
+            
+            if (!title) {
+                alert('Bitte geben Sie einen Titel ein.');
+                document.getElementById('text-feedback-title').focus();
+                return;
+            }
+            
+            if (!description) {
+                alert('Bitte geben Sie eine Beschreibung ein.');
+                document.getElementById('text-feedback-description').focus();
                 return;
             }
             
             modal.remove();
-            submitFeedback(feedbackText, null);
+            submitFeedback(title, description, null);
         });
         
-        // Focus textarea
-        setTimeout(() => document.getElementById('text-feedback').focus(), 100);
+        // Focus title field
+        setTimeout(() => document.getElementById('text-feedback-title').focus(), 100);
     }
     
     // Take screenshot - USE FULL SCREENSHOT, let user annotate
@@ -285,7 +306,17 @@
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 8px; font-weight: bold; 
                                       color: #555; font-family: Arial, sans-serif;">
-                            Beschreiben Sie Ihr Feedback:
+                            Titel:
+                        </label>
+                        <input type="text" id="annotation-feedback-title" 
+                               placeholder="Kurzer Titel für das Feedback..."
+                               style="width: 100%; padding: 12px; border: 1px solid #ddd; 
+                                      border-radius: 6px; font-family: Arial, sans-serif; 
+                                      box-sizing: border-box; margin-bottom: 15px;" />
+                                      
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; 
+                                      color: #555; font-family: Arial, sans-serif;">
+                            Beschreibung:
                         </label>
                         <textarea id="annotation-feedback-text" 
                                   placeholder="Beschreiben Sie, was Sie in den markierten Bereichen verbessern möchten..."
@@ -319,16 +350,25 @@
         document.getElementById('annotation-close').addEventListener('click', () => modal.remove());
         document.getElementById('annotation-cancel').addEventListener('click', () => modal.remove());
         document.getElementById('annotation-submit').addEventListener('click', () => {
-            const feedbackText = document.getElementById('annotation-feedback-text').value.trim();
-            if (!feedbackText) {
-                alert('Bitte geben Sie Ihr Feedback ein.');
+            const title = document.getElementById('annotation-feedback-title').value.trim();
+            const description = document.getElementById('annotation-feedback-text').value.trim();
+            
+            if (!title) {
+                alert('Bitte geben Sie einen Titel ein.');
+                document.getElementById('annotation-feedback-title').focus();
+                return;
+            }
+            
+            if (!description) {
+                alert('Bitte geben Sie eine Beschreibung ein.');
+                document.getElementById('annotation-feedback-text').focus();
                 return;
             }
             
             // Create final annotated screenshot
             createFinalAnnotatedScreenshot().then(annotatedScreenshot => {
                 modal.remove();
-                submitFeedback(feedbackText, annotatedScreenshot);
+                submitFeedback(title, description, annotatedScreenshot);
             });
         });
         
