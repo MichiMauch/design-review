@@ -37,6 +37,7 @@ export default function ProjectPage() {
   const [jiraConfigOpen, setJiraConfigOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingTask, setDeletingTask] = useState(null);
   const [showTaskDeleteConfirm, setShowTaskDeleteConfirm] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
@@ -294,6 +295,13 @@ export default function ProjectPage() {
   const deleteProject = async () => {
     if (!project) return;
     
+    // Prüfe Sicherheitsabfrage
+    const expectedText = `Ich will dieses Projekt: ${project.name} löschen`;
+    if (deleteConfirmText.trim() !== expectedText) {
+      showToast('Sicherheitsabfrage nicht korrekt. Projekt wird nicht gelöscht.', 'warning');
+      return;
+    }
+    
     setDeletingProject(true);
     try {
       const response = await fetch(`/api/projects/${params.id}`, {
@@ -302,7 +310,7 @@ export default function ProjectPage() {
 
       if (response.ok) {
         showToast('Projekt erfolgreich gelöscht!', 'success');
-        router.push('/projects');
+        router.push('/');
       } else {
         showToast('Fehler beim Löschen des Projekts', 'error');
       }
@@ -312,7 +320,14 @@ export default function ProjectPage() {
     } finally {
       setDeletingProject(false);
       setShowDeleteConfirm(false);
+      setDeleteConfirmText('');
     }
+  };
+
+  // Close delete modal and reset
+  const closeDeleteModal = () => {
+    setShowDeleteConfirm(false);
+    setDeleteConfirmText('');
   };
 
   // Show task delete confirmation
@@ -438,27 +453,64 @@ export default function ProjectPage() {
         console.log(`JIRA status response for ${task.jira_key}:`, data);
         
         if (data.success) {
-          return { taskId: task.id, status: data.status, sprint: data.sprint };
+          return { taskId: task.id, status: data.status, sprint: data.sprint, exists: true };
         } else {
-          // JIRA-Issue nicht gefunden - einfach null zurückgeben
-          console.log('JIRA-Issue nicht gefunden für Task:', task.id);
+          // JIRA-Issue nicht gefunden - markiere zum Löschen
+          console.log('JIRA-Issue nicht gefunden für Task:', task.id, task.jira_key);
+          return { taskId: task.id, exists: false, jiraKey: task.jira_key };
         }
-      } catch {
-        // Auch bei technischem Fehler null zurückgeben
-        console.log('Fehler beim Laden des JIRA-Status für Task:', task.id);
+      } catch (error) {
+        // Bei technischem Fehler nicht löschen, nur loggen
+        console.log('Fehler beim Laden des JIRA-Status für Task:', task.id, error);
+        return { taskId: task.id, exists: true, error: true };
       }
-      return null;
     });
 
     const results = await Promise.all(statusPromises);
     const statusMap = {};
     const sprintMap = {};
-    results.filter(Boolean).forEach(result => {
-      statusMap[result.taskId] = result.status;
-      if (result.sprint) {
-        sprintMap[result.taskId] = result.sprint;
+    const tasksToDelete = [];
+
+    results.forEach(result => {
+      if (result.exists && !result.error) {
+        statusMap[result.taskId] = result.status;
+        if (result.sprint) {
+          sprintMap[result.taskId] = result.sprint;
+        }
+      } else if (result.exists === false) {
+        // Task für Löschung vormerken
+        tasksToDelete.push(result.taskId);
       }
     });
+
+    // Nicht existierende JIRA Tasks automatisch löschen
+    if (tasksToDelete.length > 0) {
+      console.log('Lösche nicht existierende JIRA Tasks:', tasksToDelete);
+      
+      const deletePromises = tasksToDelete.map(async (taskId) => {
+        try {
+          const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}`, {
+            method: 'DELETE'
+          });
+          if (response.ok) {
+            console.log(`Task ${taskId} erfolgreich gelöscht`);
+            return taskId;
+          }
+        } catch (error) {
+          console.error(`Fehler beim Löschen von Task ${taskId}:`, error);
+        }
+        return null;
+      });
+
+      const deletedTasks = await Promise.all(deletePromises);
+      const successfullyDeleted = deletedTasks.filter(Boolean);
+      
+      if (successfullyDeleted.length > 0) {
+        showToast(`${successfullyDeleted.length} nicht existierende JIRA Task(s) automatisch gelöscht`, 'info');
+        // Tasks neu laden nach dem Löschen
+        setTimeout(() => loadTasks(), 1000);
+      }
+    }
     
     console.log('Final JIRA status map:', statusMap);
     console.log('Final JIRA sprint map:', sprintMap);
@@ -742,65 +794,65 @@ export default function ProjectPage() {
         <div className="mb-8">
           <Link 
             href="/"
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
           >
             <ArrowLeft className="h-4 w-4" />
-            Zurück zur Startseite
+            Zurück zur Übersicht
           </Link>
           
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-              <div className="flex items-center gap-4 mt-2 text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Globe className="h-4 w-4" />
-                  <a 
-                    href={project.domain.startsWith('http') ? project.domain : `https://${project.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    {project.domain}
-                  </a>
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+                  <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 text-sm font-medium ${
+                    project.widget_installed 
+                      ? 'bg-green-100 text-green-800 border border-green-200' 
+                      : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                  }`}>
+                    {project.widget_installed ? (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Widget aktiv
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4" />
+                        Widget ausstehend
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm">
-                    Erstellt am {formatTime(project.created_at)}
-                  </span>
+                
+                <div className="flex items-center gap-6 text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <a 
+                      href={project.domain.startsWith('http') ? project.domain : `https://${project.domain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      {project.domain}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-sm">
+                      Erstellt {formatTime(project.created_at)}
+                    </span>
+                  </div>
+                  {project.widget_last_ping && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-sm">
+                        Letzter Ping: {formatTime(project.widget_last_ping)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {/* Widget Status */}
-              <div className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                project.widget_installed 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {project.widget_installed ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Widget installiert
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  Widget nicht installiert
-                </>
-              )}
-            </div>
               
-            {/* Delete Project Button */}
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2 text-sm"
-              title="Projekt löschen"
-            >
-              <X className="h-4 w-4" />
-              Löschen
-            </button>
             </div>
           </div>
         </div>
@@ -866,11 +918,25 @@ export default function ProjectPage() {
             )}
 
             {/* Tasks */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-green-600" />
-                Tasks ({tasks.length})
-              </h2>
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-green-600" />
+                  Feedback Tasks
+                </h2>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                    {tasks.filter(t => !t.jira_key && t.status === 'open').length} offen
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    {tasks.filter(t => t.jira_key).length} in JIRA
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span>{tasks.length} gesamt</span>
+                </div>
+              </div>
               
               {tasks.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -884,72 +950,78 @@ export default function ProjectPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* All Tasks */}
-                  {tasks.length > 0 ? (
-                    <div className="space-y-6">
-                      {tasks.map((task) => (
-                        <div key={task.id} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
-                            <span>{formatTime(task.created_at)}</span>
-                            <div className="flex items-center gap-2">
-                              {task.jira_key ? (
-                                <a
-                                  href={task.jira_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getJiraStatusColor(jiraStatuses[task.id])}`}
-                                >
-                                  <JiraIcon className="h-3 w-3" />
-                                  {jiraStatuses[task.id]?.name || 'JIRA'}
-                                </a>
-                              ) : (
+                <div className="space-y-4">
+                  {/* Open Non-JIRA Tasks */}
+                  {tasks.filter(t => !t.jira_key && t.status === 'open').length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-red-500" />
+                        Offene Tasks ({tasks.filter(t => !t.jira_key && t.status === 'open').length})
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {tasks.filter(t => !t.jira_key && t.status === 'open').map((task) => (
+                          <div key={task.id} className="bg-white border border-red-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                {editingTask === task.id ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      value={editForm.title}
+                                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      placeholder="Task-Titel"
+                                    />
+                                    <textarea
+                                      value={editForm.description}
+                                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                      rows="2"
+                                      placeholder="Beschreibung (optional)"
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => saveTask(task.id)}
+                                        className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                                      >
+                                        <Save className="h-3 w-3" />
+                                        Speichern
+                                      </button>
+                                      <button
+                                        onClick={cancelEditing}
+                                        className="flex items-center gap-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
+                                      >
+                                        <X className="h-3 w-3" />
+                                        Abbrechen
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <h4 className="font-medium text-gray-900 mb-1" style={{
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden'
+                                    }}>{task.title}</h4>
+                                    {task.description && (
+                                      <p className="text-sm text-gray-600 mb-2" style={{
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                      }}>{task.description}</p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 ml-2">
                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                                   {getStatusIcon(task.status)}
-                                  {task.status === 'open' ? 'Offen' : task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
+                                  Offen
                                 </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mb-2">
-                            {editingTask === task.id ? (
-                              <div className="space-y-2">
-                                <input
-                                  type="text"
-                                  value={editForm.title}
-                                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  placeholder="Task-Titel"
-                                />
-                                <textarea
-                                  value={editForm.description}
-                                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                  rows="3"
-                                  placeholder="Beschreibung (optional)"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => saveTask(task.id)}
-                                    className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                                  >
-                                    <Save className="h-3 w-3" />
-                                    Speichern
-                                  </button>
-                                  <button
-                                    onClick={cancelEditing}
-                                    className="flex items-center gap-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
-                                  >
-                                    <X className="h-3 w-3" />
-                                    Abbrechen
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-start justify-between">
-                                <h3 className="font-medium text-gray-900 flex-1">{task.title}</h3>
-                                <div className="flex items-center gap-1 ml-2">
-                                  {!task.jira_key && (
+                                {!editingTask && (
+                                  <>
                                     <button
                                       onClick={() => startEditing(task)}
                                       className="p-1 text-gray-400 hover:text-gray-600 rounded"
@@ -957,32 +1029,248 @@ export default function ProjectPage() {
                                     >
                                       <Edit3 className="h-4 w-4" />
                                     </button>
-                                  )}
-                                  <button
-                                    onClick={() => openTaskDeleteModal(task)}
-                                    disabled={deletingTask === task.id}
-                                    className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                                    title="Task löschen"
-                                  >
-                                    {deletingTask === task.id ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                                    ) : (
-                                      <X className="h-4 w-4" />
-                                    )}
-                                  </button>
-                                </div>
+                                    <button
+                                      onClick={() => openTaskDeleteModal(task)}
+                                      disabled={deletingTask === task.id}
+                                      className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
+                                      title="Task löschen"
+                                    >
+                                      {deletingTask === task.id ? (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                      ) : (
+                                        <X className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                  </>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          
-                          {!editingTask || editingTask !== task.id ? (
-                            task.description && (
-                              <p className="text-gray-600 text-sm mb-3">{task.description}</p>
-                            )
-                          ) : null}
-                          
-                          <div className="text-xs text-gray-500 space-y-2">
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                              <span>{formatTime(task.created_at)}</span>
+                              {task.url && (
+                                <a 
+                                  href={task.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Seite
+                                </a>
+                              )}
+                            </div>
+                            
                             <div className="flex items-center justify-between">
+                              {task.screenshot && (
+                                <div className="w-16 h-16 bg-gray-100 rounded border overflow-hidden">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img 
+                                    src={task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot)} 
+                                    alt="Task Screenshot" 
+                                    className="w-full h-full object-cover cursor-pointer hover:opacity-80"
+                                    onClick={() => window.open(task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot), '_blank')}
+                                  />
+                                </div>
+                              )}
+                              <button
+                                onClick={() => openJiraModal(task)}
+                                disabled={creatingJira === task.id || loadingJiraData}
+                                className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm ml-auto"
+                                title="JIRA-Task erstellen"
+                              >
+                                {creatingJira === task.id ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    Erstelle...
+                                  </>
+                                ) : loadingJiraData ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    Lade...
+                                  </>
+                                ) : (
+                                  <>
+                                    <JiraIcon className="h-3 w-3" />
+                                    JIRA
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* JIRA Tasks */}
+                  {tasks.filter(t => t.jira_key).length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <JiraIcon className="h-5 w-5 text-blue-500" />
+                        JIRA Tasks ({tasks.filter(t => t.jira_key).length})
+                      </h3>
+                      <div className="space-y-3">
+                        {tasks.filter(t => t.jira_key).map((task) => (
+                          <div key={task.id} className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-900 mb-1">{task.title}</h4>
+                                {task.description && (
+                                  <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 ml-2">
+                                {jiraStatuses[task.id] ? (
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={task.jira_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}
+                                      title={`Status: ${jiraStatuses[task.id]?.name || 'Unbekannt'}`}
+                                    >
+                                      <JiraIcon className="h-3 w-3" />
+                                      {jiraStatuses[task.id]?.name || 'Unbekannt'}
+                                    </a>
+                                    {jiraStatuses[task.id]?.assignee && (
+                                      <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs text-gray-700">
+                                        <span>👤</span>
+                                        <span>{jiraStatuses[task.id].assignee.displayName}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={task.jira_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"
+                                      title="JIRA Status wird geladen..."
+                                    >
+                                      <JiraIcon className="h-3 w-3" />
+                                      Lade Status...
+                                    </a>
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => openTaskDeleteModal(task)}
+                                  disabled={deletingTask === task.id}
+                                  className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
+                                  title="Task aus Projekt entfernen"
+                                >
+                                  {deletingTask === task.id ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-gray-500">
+                                <div className="flex items-center gap-4">
+                                  <span>Erstellt {formatTime(task.created_at)}</span>
+                                  {task.jira_key && (
+                                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{task.jira_key}</span>
+                                  )}
+                                  {task.url && (
+                                    <a 
+                                      href={task.url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      Seite öffnen
+                                    </a>
+                                  )}
+                                </div>
+                                {jiraTaskSprints[task.id] && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                                    <Calendar className="h-3 w-3" />
+                                    {jiraTaskSprints[task.id].name}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* JIRA Status Details */}
+                              {jiraStatuses[task.id] && (
+                                <div className="flex items-center gap-4 text-xs">
+                                  {jiraStatuses[task.id].priority && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-gray-500">Priorität:</span>
+                                      <span className={`font-medium ${
+                                        jiraStatuses[task.id].priority.name?.toLowerCase().includes('high') ? 'text-red-600' :
+                                        jiraStatuses[task.id].priority.name?.toLowerCase().includes('medium') ? 'text-yellow-600' :
+                                        'text-green-600'
+                                      }`}>
+                                        {jiraStatuses[task.id].priority.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {jiraStatuses[task.id].updated && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-gray-500">Zuletzt aktualisiert:</span>
+                                      <span className="text-gray-700">{formatTime(jiraStatuses[task.id].updated)}</span>
+                                    </div>
+                                  )}
+                                  {jiraStatuses[task.id].resolution && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-gray-500">Lösung:</span>
+                                      <span className="text-green-700 font-medium">{jiraStatuses[task.id].resolution.name}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other Tasks (in progress, completed, etc.) */}
+                  {tasks.filter(t => !t.jira_key && t.status !== 'open').length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-500" />
+                        Andere Tasks ({tasks.filter(t => !t.jira_key && t.status !== 'open').length})
+                      </h3>
+                      <div className="space-y-3">
+                        {tasks.filter(t => !t.jira_key && t.status !== 'open').map((task) => (
+                          <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-900 mb-1">{task.title}</h4>
+                                {task.description && (
+                                  <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 ml-2">
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
+                                  {getStatusIcon(task.status)}
+                                  {task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
+                                </span>
+                                <button
+                                  onClick={() => openTaskDeleteModal(task)}
+                                  disabled={deletingTask === task.id}
+                                  className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
+                                  title="Task löschen"
+                                >
+                                  {deletingTask === task.id ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{formatTime(task.created_at)}</span>
                               {task.url && (
                                 <a 
                                   href={task.url} 
@@ -994,123 +1282,14 @@ export default function ProjectPage() {
                                   Seite öffnen
                                 </a>
                               )}
-                              {task.jira_key && jiraTaskSprints[task.id] && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                  <Calendar className="h-3 w-3" />
-                                  {jiraTaskSprints[task.id].name}
-                                </span>
-                              )}
-                              {!task.jira_key && (
-                                <button
-                                  onClick={() => openJiraModal(task)}
-                                  disabled={creatingJira === task.id || loadingJiraData}
-                                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
-                                  title="JIRA-Task erstellen"
-                                >
-                                  {creatingJira === task.id ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      Erstelle...
-                                    </>
-                                  ) : loadingJiraData ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      Lade...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <JiraIcon className="h-3 w-3" />
-                                      JIRA-Task
-                                    </>
-                                  )}
-                                </button>
-                              )}
                             </div>
-                            {task.url && (
-                              <div className="break-all text-gray-600 bg-gray-50 p-2 rounded border text-xs font-mono">
-                                {task.url}
-                              </div>
-                            )}
                           </div>
-                          
-                          {/* Selected Area Information */}
-                          {task.selected_area && (
-                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-                                <span className="text-sm font-medium text-blue-800">Ausgewählter Bereich</span>
-                              </div>
-                              {(() => {
-                                try {
-                                  const areaData = typeof task.selected_area === 'string' 
-                                    ? JSON.parse(task.selected_area) 
-                                    : task.selected_area;
-                                  
-                                  const areaSize = Math.round(areaData.width) * Math.round(areaData.height);
-                                  const isLargeArea = areaSize > 50000; // > 50k pixels
-                                  const isSmallElement = areaData.width < 100 && areaData.height < 100;
-                                  
-                                  return (
-                                    <div className="space-y-2">
-                                      <div className="text-xs text-blue-700 space-y-1">
-                                        <div>📍 Position: {Math.round(areaData.x)}px von links, {Math.round(areaData.y)}px von oben</div>
-                                        <div>📏 Größe: {Math.round(areaData.width)} × {Math.round(areaData.height)} px 
-                                          {isLargeArea && <span className="text-blue-600"> (großer Bereich)</span>}
-                                          {isSmallElement && <span className="text-blue-600"> (kleines Element)</span>}
-                                        </div>
-                                      </div>
-                                      
-                                      {task.url && (
-                                        <div className="pt-2 border-t border-blue-200">
-                                          <a
-                                            href={`${task.url}#feedback-highlight`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                                          >
-                                            🔗 Seite öffnen und Bereich anzeigen
-                                            <ExternalLink className="h-3 w-3" />
-                                          </a>
-                                          <div className="text-xs text-blue-600 mt-1">
-                                            💡 Tipp: Entwickler können mit diesen Koordinaten den exakten Bereich im Browser-DevTools finden
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                } catch {
-                                  return <div className="text-xs text-blue-700">Bereichs-Daten verfügbar</div>;
-                                }
-                              })()}
-                            </div>
-                          )}
-                          
-                          {task.screenshot && (
-                            <div className="mt-3">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img 
-                                src={task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot)} 
-                                alt="Task Screenshot" 
-                                className="max-w-full h-auto rounded border"
-                                style={{ maxHeight: '200px' }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>Noch keine Tasks vorhanden</p>
-                      <p className="text-sm mt-2">
-                        {project.widget_installed 
-                          ? "Tasks werden automatisch erstellt, wenn Nutzer Feedback über das Widget senden."
-                          : "Installieren Sie zuerst das Widget, damit Nutzer Feedback senden können."
-                        }
-                      </p>
+                        ))}
+                      </div>
                     </div>
                   )}
+                </div>
+              )}
             </div>
           </div>
           
@@ -1119,65 +1298,40 @@ export default function ProjectPage() {
             
 
             {/* Project Stats */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Projekt Statistiken</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Gesamt Tasks:</span>
-                  <span className="font-medium">{tasks.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Offene Tasks:</span>
-                  <span className="font-medium text-red-600">
-                    {tasks.filter(t => !t.jira_key && t.status === 'open').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">JIRA Tasks:</span>
-                  <span className="font-medium text-blue-600">
-                    {tasks.filter(t => t.jira_key).length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Widget Status */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Code className="h-4 w-4 text-gray-600" />
-                Widget Status
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                Projekt Statistiken
               </h3>
-              <div className="space-y-3">
-                {project.widget_installed ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-700 font-medium">Widget installiert</span>
+              <div className="space-y-4">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-900">{tasks.length}</div>
+                  <div className="text-sm text-gray-600">Gesamt Tasks</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-red-50 rounded-lg text-center">
+                    <div className="text-lg font-bold text-red-600">
+                      {tasks.filter(t => !t.jira_key && t.status === 'open').length}
                     </div>
-                    {project.widget_last_ping && (
-                      <div className="text-xs text-gray-600">
-                        Letzter Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE')}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-yellow-600" />
-                      <span className="text-sm text-yellow-700 font-medium">Widget nicht installiert</span>
+                    <div className="text-xs text-red-600">Offen</div>
+                  </div>
+                  <div className="p-3 bg-blue-50 rounded-lg text-center">
+                    <div className="text-lg font-bold text-blue-600">
+                      {tasks.filter(t => t.jira_key).length}
                     </div>
-                    <div className="text-xs text-gray-600">
-                      Installieren Sie das Widget mit dem Code-Snippet oben
-                    </div>
-                  </>
-                )}
+                    <div className="text-xs text-blue-600">JIRA</div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* JIRA Integration */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            {/* System Status */}
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">JIRA Integration</h3>
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-gray-600" />
+                  System Status
+                </h3>
                 <button
                   onClick={() => setJiraConfigOpen(!jiraConfigOpen)}
                   className="p-1 text-gray-400 hover:text-gray-600 rounded"
@@ -1186,9 +1340,74 @@ export default function ProjectPage() {
                   <Settings className="h-4 w-4" />
                 </button>
               </div>
+              
+              <div className="space-y-4">
+                {/* Widget Status */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Widget</span>
+                    {project.widget_installed ? (
+                      <div className="flex items-center gap-1 text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Aktiv</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-yellow-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Ausstehend</span>
+                      </div>
+                    )}
+                  </div>
+                  {project.widget_last_ping && (
+                    <div className="text-xs text-gray-500 pl-4">
+                      Letzter Ping: {formatTime(project.widget_last_ping)}
+                    </div>
+                  )}
+                </div>
+
+                {/* JIRA Status */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">JIRA Integration</span>
+                    {jiraConfig.serverUrl && jiraConfig.username && jiraConfig.apiToken && jiraConfig.projectKey ? (
+                      <div className="flex items-center gap-1 text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Konfiguriert</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-gray-400">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Nicht konfiguriert</span>
+                      </div>
+                    )}
+                  </div>
+                  {jiraConfig.serverUrl && (
+                    <div className="text-xs text-gray-500 pl-4">
+                      {jiraConfig.projectKey ? `Projekt: ${jiraConfig.projectKey}` : 'Konfiguration unvollständig'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Overall Status */}
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex items-center gap-2">
+                    {project.widget_installed && jiraConfig.serverUrl && jiraConfig.projectKey ? (
+                      <>
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-700">System bereit</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-yellow-700">Setup unvollständig</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
                 
-              {jiraConfigOpen ? (
-                <div className="space-y-4">
+              {jiraConfigOpen && (
+                <div className="space-y-4 mt-4 pt-4 border-t border-gray-200">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Server URL
@@ -1273,12 +1492,20 @@ export default function ProjectPage() {
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="text-sm text-gray-600">
-                  <p>JIRA-Integration konfiguriert</p>
-                  <p className="text-xs mt-1">Klicken Sie auf das Einstellungs-Icon zum Bearbeiten</p>
-                </div>
               )}
+            </div>
+
+            {/* Project Actions */}
+            <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
+              <h3 className="font-semibold text-gray-900 mb-3 text-sm">Projekt-Aktionen</h3>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full px-3 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 transition-colors flex items-center justify-center gap-1"
+                title="Projekt löschen"
+              >
+                <X className="h-3 w-3" />
+                Projekt löschen
+              </button>
             </div>
           </div>
         </div>
@@ -1286,22 +1513,41 @@ export default function ProjectPage() {
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Projekt löschen</h3>
               
               <div className="mb-6">
                 <p className="text-gray-700 mb-2">
                   Sind Sie sicher, dass Sie das Projekt <strong>{project.name}</strong> löschen möchten?
                 </p>
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-red-600 mb-4">
                   Diese Aktion kann nicht rückgängig gemacht werden. Alle Tasks und Daten werden dauerhaft gelöscht.
                 </p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm font-medium text-red-800 mb-2">Sicherheitsabfrage:</p>
+                  <p className="text-sm text-red-700 mb-3">
+                    Geben Sie den folgenden Text exakt ein, um das Löschen zu bestätigen:
+                  </p>
+                  <p className="text-sm font-mono bg-red-100 p-2 rounded border border-red-300 text-red-900">
+                    Ich will dieses Projekt: {project.name} löschen
+                  </p>
+                </div>
+                
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  placeholder="Text hier eingeben..."
+                  disabled={deletingProject}
+                />
               </div>
               
               <div className="flex gap-3">
                 <button
                   onClick={deleteProject}
-                  disabled={deletingProject}
+                  disabled={deletingProject || deleteConfirmText.trim() !== `Ich will dieses Projekt: ${project.name} löschen`}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
                 >
                   {deletingProject ? (
@@ -1317,7 +1563,7 @@ export default function ProjectPage() {
                   )}
                 </button>
                 <button
-                  onClick={() => setShowDeleteConfirm(false)}
+                  onClick={closeDeleteModal}
                   disabled={deletingProject}
                   className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
                 >
