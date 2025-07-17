@@ -960,6 +960,28 @@
             console.log('Widget: JIRA response:', jiraResult);
             
             if (jiraRes.ok && jiraResult.success) {
+                // Update the task in database with JIRA key
+                if (currentFeedbackData.taskId && jiraResult.ticket && jiraResult.ticket.key) {
+                    try {
+                        const updateResponse = await fetch(`${baseUrl}/api/projects/${projectId}/tasks/${currentFeedbackData.taskId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jira_key: jiraResult.ticket.key,
+                                jira_url: jiraResult.ticket.url
+                            })
+                        });
+                        
+                        if (updateResponse.ok) {
+                            console.log('Widget: Task updated with JIRA key:', jiraResult.ticket.key);
+                        } else {
+                            console.warn('Widget: Failed to update task with JIRA key');
+                        }
+                    } catch (error) {
+                        console.error('Widget: Error updating task with JIRA key:', error);
+                    }
+                }
+                
                 // Success - show toast notification with JIRA link
                 if (jiraResult.ticket && jiraResult.ticket.key) {
                     const jiraKey = jiraResult.ticket.key;
@@ -1264,8 +1286,8 @@
             const scaleY = img.naturalHeight / img.offsetHeight;
             finalCtx.drawImage(canvas, 0, 0, canvas.width * scaleX, canvas.height * scaleY);
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
-            // Submit feedback (DB)
-            await submitFeedback(title, description, annotatedScreenshot);
+            // Submit feedback (DB) and get task ID
+            const taskId = await submitFeedback(title, description, annotatedScreenshot);
             
             // Optional: JIRA-Konfiguration-Modal anzeigen
             if (createJira && projectConfig?.jira_server_url) {
@@ -1273,7 +1295,8 @@
                     title: title,
                     description: description,
                     screenshot: annotatedScreenshot,
-                    url: window.location.href
+                    url: window.location.href,
+                    taskId: taskId  // Add task ID for later update
                 };
                 
                 // Show JIRA configuration modal
@@ -1381,9 +1404,11 @@
             });
             
             if (response.ok) {
-                console.log('Widget: Task submitted successfully');
+                const result = await response.json();
+                console.log('Widget: Task submitted successfully', result);
                 showToast('Feedback erfolgreich in der Datenbank gespeichert!', 'success', 2000);
                 showSuccessMessage();
+                return result.id; // Return task ID for JIRA linking
             } else {
                 throw new Error(`HTTP ${response.status}`);
             }
