@@ -23,7 +23,9 @@
       "WebFetch(domain:frontend-economiesuisse-ch.vercel.app)",
       "Bash(rg:*)",
       "Bash(find:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(sqlite3:*)",
+      "Bash(turso db:*)"
     ],
     "deny": []
   }
