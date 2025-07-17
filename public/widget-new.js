@@ -963,7 +963,14 @@
                 // Update the task in database with JIRA key
                 if (currentFeedbackData.taskId && jiraResult.ticket && jiraResult.ticket.key) {
                     try {
-                        const updateResponse = await fetch(`${baseUrl}/api/projects/${projectId}/tasks/${currentFeedbackData.taskId}`, {
+                        console.log('Widget: Updating task with JIRA key:', {
+                            taskId: currentFeedbackData.taskId,
+                            jiraKey: jiraResult.ticket.key,
+                            jiraUrl: jiraResult.ticket.url,
+                            projectId: projectId
+                        });
+                        
+                        const updateResponse = await fetch(`${baseUrl}/api/projects/${currentFeedbackData.projectId}/tasks/${currentFeedbackData.taskId}`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -972,14 +979,24 @@
                             })
                         });
                         
+                        const updateResult = await updateResponse.json();
+                        console.log('Widget: Task update response:', updateResult);
+                        
                         if (updateResponse.ok) {
                             console.log('Widget: Task updated with JIRA key:', jiraResult.ticket.key);
                         } else {
-                            console.warn('Widget: Failed to update task with JIRA key');
+                            console.warn('Widget: Failed to update task with JIRA key:', updateResponse.status, updateResult);
                         }
                     } catch (error) {
                         console.error('Widget: Error updating task with JIRA key:', error);
                     }
+                } else {
+                    console.warn('Widget: Missing data for task update:', {
+                        hasTaskId: !!currentFeedbackData.taskId,
+                        hasJiraTicket: !!jiraResult.ticket,
+                        hasJiraKey: !!jiraResult.ticket?.key,
+                        currentFeedbackData: currentFeedbackData
+                    });
                 }
                 
                 // Success - show toast notification with JIRA link
@@ -1287,7 +1304,7 @@
             finalCtx.drawImage(canvas, 0, 0, canvas.width * scaleX, canvas.height * scaleY);
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
             // Submit feedback (DB) and get task ID
-            const taskId = await submitFeedback(title, description, annotatedScreenshot);
+            const taskResult = await submitFeedback(title, description, annotatedScreenshot);
             
             // Optional: JIRA-Konfiguration-Modal anzeigen
             if (createJira && projectConfig?.jira_server_url) {
@@ -1296,7 +1313,8 @@
                     description: description,
                     screenshot: annotatedScreenshot,
                     url: window.location.href,
-                    taskId: taskId  // Add task ID for later update
+                    taskId: taskResult.taskId,  // Add task ID for later update
+                    projectId: taskResult.projectId  // Add numeric project ID
                 };
                 
                 // Show JIRA configuration modal
@@ -1408,7 +1426,10 @@
                 console.log('Widget: Task submitted successfully', result);
                 showToast('Feedback erfolgreich in der Datenbank gespeichert!', 'success', 2000);
                 showSuccessMessage();
-                return result.id; // Return task ID for JIRA linking
+                return {
+                    taskId: result.id, 
+                    projectId: result.project_id // Return numeric project ID for PATCH updates
+                };
             } else {
                 throw new Error(`HTTP ${response.status}`);
             }

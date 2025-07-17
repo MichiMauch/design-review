@@ -72,6 +72,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       id: Number(result.lastInsertRowid),
+      project_id: projectId, // Return numeric project ID for PATCH updates
       message: 'Task saved successfully'
     }, {
       headers: corsHeaders()

@@ -22,7 +22,8 @@
       "Bash(timeout 10 npm run dev)",
       "WebFetch(domain:frontend-economiesuisse-ch.vercel.app)",
       "Bash(rg:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

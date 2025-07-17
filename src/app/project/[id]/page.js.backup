@@ -18,8 +18,7 @@ import {
   Save,
   X,
   ExternalLink as JiraIcon,
-  Settings,
-  RefreshCw
+  Settings
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -38,7 +37,6 @@ export default function ProjectPage() {
   const [jiraConfigOpen, setJiraConfigOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingTask, setDeletingTask] = useState(null);
   const [showTaskDeleteConfirm, setShowTaskDeleteConfirm] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
@@ -62,10 +60,9 @@ export default function ProjectPage() {
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const snippetCode = project ? 
-    `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
+    `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.id}" defer></script>` :
     '';
 
   // Helper function to get screenshot URL
@@ -128,17 +125,7 @@ export default function ProjectPage() {
       const response = await fetch(`/api/projects/${params.id}/tasks`);
       if (response.ok) {
         const tasksData = await response.json();
-        console.log('Loaded tasks:', tasksData.length, 'tasks');
-        console.log('JIRA tasks:', tasksData.filter(t => t.jira_key).map(t => ({id: t.id, jira_key: t.jira_key})));
         setTasks(tasksData);
-        
-        // Lade JIRA-Statuses für neue Tasks
-        setTimeout(() => {
-          if (tasksData.some(task => task.jira_key) && jiraConfig.serverUrl) {
-            console.log('Loading JIRA statuses for', tasksData.filter(t => t.jira_key).length, 'tasks');
-            loadJiraStatuses();
-          }
-        }, 100);
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -168,12 +155,9 @@ export default function ProjectPage() {
     loadTasks();
     loadJiraSettings();
 
-    // Check widget installation status and refresh tasks every 10 seconds
+    // Check widget installation status immediately and then every 10 seconds
     checkWidgetStatus();
-    const interval = setInterval(async () => {
-      checkWidgetStatus();
-      await loadTasks(); // Refresh tasks to catch new JIRA conversions
-    }, 10000);
+    const interval = setInterval(checkWidgetStatus, 10000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
@@ -306,39 +290,9 @@ export default function ProjectPage() {
     setTimeout(() => setToast(null), 8000); // Longer for links
   };
 
-  // Manual refresh function
-  const refreshData = async () => {
-    setIsRefreshing(true);
-    try {
-      // Erst Projekt und JIRA-Settings laden
-      await Promise.all([
-        loadProject(),
-        loadJiraSettings(),
-        checkWidgetStatus()
-      ]);
-      
-      // Dann Tasks laden
-      await loadTasks();
-      
-      showToast('Daten aktualisiert', 'success');
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-      showToast('Fehler beim Aktualisieren der Daten', 'error');
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   // Delete project function
   const deleteProject = async () => {
     if (!project) return;
-    
-    // Prüfe Sicherheitsabfrage
-    const expectedText = `Ich will dieses Projekt: ${project.name} löschen`;
-    if (deleteConfirmText.trim() !== expectedText) {
-      showToast('Sicherheitsabfrage nicht korrekt. Projekt wird nicht gelöscht.', 'warning');
-      return;
-    }
     
     setDeletingProject(true);
     try {
@@ -348,7 +302,7 @@ export default function ProjectPage() {
 
       if (response.ok) {
         showToast('Projekt erfolgreich gelöscht!', 'success');
-        router.push('/');
+        router.push('/projects');
       } else {
         showToast('Fehler beim Löschen des Projekts', 'error');
       }
@@ -358,14 +312,7 @@ export default function ProjectPage() {
     } finally {
       setDeletingProject(false);
       setShowDeleteConfirm(false);
-      setDeleteConfirmText('');
     }
-  };
-
-  // Close delete modal and reset
-  const closeDeleteModal = () => {
-    setShowDeleteConfirm(false);
-    setDeleteConfirmText('');
   };
 
   // Show task delete confirmation
@@ -491,64 +438,27 @@ export default function ProjectPage() {
         console.log(`JIRA status response for ${task.jira_key}:`, data);
         
         if (data.success) {
-          return { taskId: task.id, status: data.status, sprint: data.sprint, exists: true };
+          return { taskId: task.id, status: data.status, sprint: data.sprint };
         } else {
-          // JIRA-Issue nicht gefunden - markiere zum Löschen
-          console.log('JIRA-Issue nicht gefunden für Task:', task.id, task.jira_key);
-          return { taskId: task.id, exists: false, jiraKey: task.jira_key };
+          // JIRA-Issue nicht gefunden - einfach null zurückgeben
+          console.log('JIRA-Issue nicht gefunden für Task:', task.id);
         }
-      } catch (error) {
-        // Bei technischem Fehler nicht löschen, nur loggen
-        console.log('Fehler beim Laden des JIRA-Status für Task:', task.id, error);
-        return { taskId: task.id, exists: true, error: true };
+      } catch {
+        // Auch bei technischem Fehler null zurückgeben
+        console.log('Fehler beim Laden des JIRA-Status für Task:', task.id);
       }
+      return null;
     });
 
     const results = await Promise.all(statusPromises);
     const statusMap = {};
     const sprintMap = {};
-    const tasksToDelete = [];
-
-    results.forEach(result => {
-      if (result.exists && !result.error) {
-        statusMap[result.taskId] = result.status;
-        if (result.sprint) {
-          sprintMap[result.taskId] = result.sprint;
-        }
-      } else if (result.exists === false) {
-        // Task für Löschung vormerken
-        tasksToDelete.push(result.taskId);
+    results.filter(Boolean).forEach(result => {
+      statusMap[result.taskId] = result.status;
+      if (result.sprint) {
+        sprintMap[result.taskId] = result.sprint;
       }
     });
-
-    // Nicht existierende JIRA Tasks automatisch löschen
-    if (tasksToDelete.length > 0) {
-      console.log('Lösche nicht existierende JIRA Tasks:', tasksToDelete);
-      
-      const deletePromises = tasksToDelete.map(async (taskId) => {
-        try {
-          const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}`, {
-            method: 'DELETE'
-          });
-          if (response.ok) {
-            console.log(`Task ${taskId} erfolgreich gelöscht`);
-            return taskId;
-          }
-        } catch (error) {
-          console.error(`Fehler beim Löschen von Task ${taskId}:`, error);
-        }
-        return null;
-      });
-
-      const deletedTasks = await Promise.all(deletePromises);
-      const successfullyDeleted = deletedTasks.filter(Boolean);
-      
-      if (successfullyDeleted.length > 0) {
-        showToast(`${successfullyDeleted.length} nicht existierende JIRA Task(s) automatisch gelöscht`, 'info');
-        // Tasks neu laden nach dem Löschen
-        setTimeout(() => loadTasks(), 1000);
-      }
-    }
     
     console.log('Final JIRA status map:', statusMap);
     console.log('Final JIRA sprint map:', sprintMap);
@@ -891,6 +801,17 @@ export default function ProjectPage() {
                 </div>
               </div>
               
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+                  title="Projekt löschen"
+                >
+                  <X className="h-4 w-4" />
+                  Löschen
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -962,28 +883,17 @@ export default function ProjectPage() {
                   <MessageSquare className="h-5 w-5 text-green-600" />
                   Feedback Tasks
                 </h2>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                      {tasks.filter(t => !t.jira_key && t.status === 'open').length} offen
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      {tasks.filter(t => t.jira_key).length} in JIRA
-                    </span>
-                    <span className="text-gray-400">•</span>
-                    <span>{tasks.length} gesamt</span>
-                  </div>
-                  <button
-                    onClick={refreshData}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors disabled:opacity-50"
-                    title="Tasks aktualisieren"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Lädt...' : 'Aktualisieren'}
-                  </button>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                    {tasks.filter(t => !t.jira_key && t.status === 'open').length} offen
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    {tasks.filter(t => t.jira_key).length} in JIRA
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span>{tasks.length} gesamt</span>
                 </div>
               </div>
               
@@ -1170,44 +1080,20 @@ export default function ProjectPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-2 ml-2">
-                                {jiraStatuses[task.id] ? (
-                                  <div className="flex items-center gap-2">
-                                    <a
-                                      href={task.jira_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}
-                                      title={`Status: ${jiraStatuses[task.id]?.name || 'Unbekannt'}`}
-                                    >
-                                      <JiraIcon className="h-3 w-3" />
-                                      {jiraStatuses[task.id]?.name || 'Unbekannt'}
-                                    </a>
-                                    {jiraStatuses[task.id]?.assignee && (
-                                      <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs text-gray-700">
-                                        <span>👤</span>
-                                        <span>{jiraStatuses[task.id].assignee.displayName}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <a
-                                      href={task.jira_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"
-                                      title="JIRA Status wird geladen..."
-                                    >
-                                      <JiraIcon className="h-3 w-3" />
-                                      Lade Status...
-                                    </a>
-                                  </div>
-                                )}
+                                <a
+                                  href={task.jira_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getJiraStatusColor(jiraStatuses[task.id])}`}
+                                >
+                                  <JiraIcon className="h-3 w-3" />
+                                  {jiraStatuses[task.id]?.name || 'JIRA'}
+                                </a>
                                 <button
                                   onClick={() => openTaskDeleteModal(task)}
                                   disabled={deletingTask === task.id}
                                   className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                                  title="Task aus Projekt entfernen"
+                                  title="Task löschen"
                                 >
                                   {deletingTask === task.id ? (
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
@@ -1218,61 +1104,26 @@ export default function ProjectPage() {
                               </div>
                             </div>
                             
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-xs text-gray-500">
-                                <div className="flex items-center gap-4">
-                                  <span>Erstellt {formatTime(task.created_at)}</span>
-                                  {task.jira_key && (
-                                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{task.jira_key}</span>
-                                  )}
-                                  {task.url && (
-                                    <a 
-                                      href={task.url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                      Seite öffnen
-                                    </a>
-                                  )}
-                                </div>
-                                {jiraTaskSprints[task.id] && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                    <Calendar className="h-3 w-3" />
-                                    {jiraTaskSprints[task.id].name}
-                                  </span>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <div className="flex items-center gap-4">
+                                <span>{formatTime(task.created_at)}</span>
+                                {task.url && (
+                                  <a 
+                                    href={task.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                    Seite öffnen
+                                  </a>
                                 )}
                               </div>
-                              
-                              {/* JIRA Status Details */}
-                              {jiraStatuses[task.id] && (
-                                <div className="flex items-center gap-4 text-xs">
-                                  {jiraStatuses[task.id].priority && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-500">Priorität:</span>
-                                      <span className={`font-medium ${
-                                        jiraStatuses[task.id].priority.name?.toLowerCase().includes('high') ? 'text-red-600' :
-                                        jiraStatuses[task.id].priority.name?.toLowerCase().includes('medium') ? 'text-yellow-600' :
-                                        'text-green-600'
-                                      }`}>
-                                        {jiraStatuses[task.id].priority.name}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {jiraStatuses[task.id].updated && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-500">Zuletzt aktualisiert:</span>
-                                      <span className="text-gray-700">{formatTime(jiraStatuses[task.id].updated)}</span>
-                                    </div>
-                                  )}
-                                  {jiraStatuses[task.id].resolution && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-500">Lösung:</span>
-                                      <span className="text-green-700 font-medium">{jiraStatuses[task.id].resolution.name}</span>
-                                    </div>
-                                  )}
-                                </div>
+                              {jiraTaskSprints[task.id] && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                                  <Calendar className="h-3 w-3" />
+                                  {jiraTaskSprints[task.id].name}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -1338,7 +1189,6 @@ export default function ProjectPage() {
                     </div>
                   )}
                 </div>
-              )}
             </div>
           </div>
           
@@ -1543,60 +1393,28 @@ export default function ProjectPage() {
                 </div>
               )}
             </div>
-
-            {/* Project Actions */}
-            <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-3 text-sm">Projekt-Aktionen</h3>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="w-full px-3 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 transition-colors flex items-center justify-center gap-1"
-                title="Projekt löschen"
-              >
-                <X className="h-3 w-3" />
-                Projekt löschen
-              </button>
-            </div>
           </div>
         </div>
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Projekt löschen</h3>
               
               <div className="mb-6">
                 <p className="text-gray-700 mb-2">
                   Sind Sie sicher, dass Sie das Projekt <strong>{project.name}</strong> löschen möchten?
                 </p>
-                <p className="text-sm text-red-600 mb-4">
+                <p className="text-sm text-red-600">
                   Diese Aktion kann nicht rückgängig gemacht werden. Alle Tasks und Daten werden dauerhaft gelöscht.
                 </p>
-                
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm font-medium text-red-800 mb-2">Sicherheitsabfrage:</p>
-                  <p className="text-sm text-red-700 mb-3">
-                    Geben Sie den folgenden Text exakt ein, um das Löschen zu bestätigen:
-                  </p>
-                  <p className="text-sm font-mono bg-red-100 p-2 rounded border border-red-300 text-red-900">
-                    Ich will dieses Projekt: {project.name} löschen
-                  </p>
-                </div>
-                
-                <input
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Text hier eingeben..."
-                  disabled={deletingProject}
-                />
               </div>
               
               <div className="flex gap-3">
                 <button
                   onClick={deleteProject}
-                  disabled={deletingProject || deleteConfirmText.trim() !== `Ich will dieses Projekt: ${project.name} löschen`}
+                  disabled={deletingProject}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
                 >
                   {deletingProject ? (
@@ -1612,7 +1430,7 @@ export default function ProjectPage() {
                   )}
                 </button>
                 <button
-                  onClick={closeDeleteModal}
+                  onClick={() => setShowDeleteConfirm(false)}
                   disabled={deletingProject}
                   className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
                 >
