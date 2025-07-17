@@ -128,7 +128,17 @@ export default function ProjectPage() {
       const response = await fetch(`/api/projects/${params.id}/tasks`);
       if (response.ok) {
         const tasksData = await response.json();
+        console.log('Loaded tasks:', tasksData.length, 'tasks');
+        console.log('JIRA tasks:', tasksData.filter(t => t.jira_key).map(t => ({id: t.id, jira_key: t.jira_key})));
         setTasks(tasksData);
+        
+        // Lade JIRA-Statuses für neue Tasks
+        setTimeout(() => {
+          if (tasksData.some(task => task.jira_key) && jiraConfig.serverUrl) {
+            console.log('Loading JIRA statuses for', tasksData.filter(t => t.jira_key).length, 'tasks');
+            loadJiraStatuses();
+          }
+        }, 100);
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -160,9 +170,9 @@ export default function ProjectPage() {
 
     // Check widget installation status and refresh tasks every 10 seconds
     checkWidgetStatus();
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       checkWidgetStatus();
-      loadTasks(); // Refresh tasks to catch new JIRA conversions
+      await loadTasks(); // Refresh tasks to catch new JIRA conversions
     }, 10000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -300,11 +310,16 @@ export default function ProjectPage() {
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
+      // Erst Projekt und JIRA-Settings laden
       await Promise.all([
         loadProject(),
-        loadTasks(),
+        loadJiraSettings(),
         checkWidgetStatus()
       ]);
+      
+      // Dann Tasks laden
+      await loadTasks();
+      
       showToast('Daten aktualisiert', 'success');
     } catch (error) {
       console.error('Error refreshing data:', error);
