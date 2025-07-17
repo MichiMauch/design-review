@@ -18,7 +18,8 @@ import {
   Save,
   X,
   ExternalLink as JiraIcon,
-  Settings
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -61,6 +62,7 @@ export default function ProjectPage() {
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.id}" defer></script>` :
@@ -156,9 +158,12 @@ export default function ProjectPage() {
     loadTasks();
     loadJiraSettings();
 
-    // Check widget installation status immediately and then every 10 seconds
+    // Check widget installation status and refresh tasks every 10 seconds
     checkWidgetStatus();
-    const interval = setInterval(checkWidgetStatus, 10000);
+    const interval = setInterval(() => {
+      checkWidgetStatus();
+      loadTasks(); // Refresh tasks to catch new JIRA conversions
+    }, 10000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
@@ -289,6 +294,24 @@ export default function ProjectPage() {
   const showToast = (message, type = 'success', link = null) => {
     setToast({ message, type, link });
     setTimeout(() => setToast(null), 8000); // Longer for links
+  };
+
+  // Manual refresh function
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        loadProject(),
+        loadTasks(),
+        checkWidgetStatus()
+      ]);
+      showToast('Daten aktualisiert', 'success');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      showToast('Fehler beim Aktualisieren der Daten', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Delete project function
@@ -924,17 +947,28 @@ export default function ProjectPage() {
                   <MessageSquare className="h-5 w-5 text-green-600" />
                   Feedback Tasks
                 </h2>
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                    {tasks.filter(t => !t.jira_key && t.status === 'open').length} offen
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                    {tasks.filter(t => t.jira_key).length} in JIRA
-                  </span>
-                  <span className="text-gray-400">•</span>
-                  <span>{tasks.length} gesamt</span>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                      {tasks.filter(t => !t.jira_key && t.status === 'open').length} offen
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      {tasks.filter(t => t.jira_key).length} in JIRA
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span>{tasks.length} gesamt</span>
+                  </div>
+                  <button
+                    onClick={refreshData}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors disabled:opacity-50"
+                    title="Tasks aktualisieren"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? 'Lädt...' : 'Aktualisieren'}
+                  </button>
                 </div>
               </div>
               
