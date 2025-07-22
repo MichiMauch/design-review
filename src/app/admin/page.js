@@ -25,7 +25,7 @@ export default function AdminDashboard() {
         const uniqueProjects = [...new Set(data.feedback.map(f => f.project_id))];
         setProjects(uniqueProjects);
       }
-    } catch (error) {
+    } catch {
     } finally {
       setLoading(false);
     }

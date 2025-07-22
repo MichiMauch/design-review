@@ -46,7 +46,7 @@ export async function GET(request, { params }) {
 
     return addCorsHeaders(Response.json(processedRows));
 
-  } catch (error) {
+  } catch {
     return addCorsHeaders(new Response('Fehler beim Laden der Tasks', { status: 500 }));
   }
 }

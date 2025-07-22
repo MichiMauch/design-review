@@ -32,7 +32,7 @@ export async function GET(request, { params }) {
     const response = Response.json(result.rows[0]);
     return addCORSHeaders(response);
 
-  } catch (error) {
+  } catch {
     const response = new Response('Fehler beim Laden des Projekts', { status: 500 });
     return addCORSHeaders(response);
   }
@@ -67,7 +67,7 @@ export async function PUT(request, { params }) {
     }
 
     // Try to update with JIRA fields
-    const result = await db.execute({
+    await db.execute({
       sql: `UPDATE projects SET 
             name = ?, 
             domain = ?, 
@@ -93,8 +93,8 @@ export async function PUT(request, { params }) {
     const response = Response.json({ success: true, message: 'Projekt erfolgreich aktualisiert' });
     return addCORSHeaders(response);
 
-  } catch (error) {
-    const response = new Response(`Fehler beim Aktualisieren des Projekts: ${error.message}`, { status: 500 });
+  } catch {
+    const response = new Response(`Fehler beim Aktualisieren des Projekts`, { status: 500 });
     return addCORSHeaders(response);
   }
 }
@@ -125,7 +125,7 @@ export async function DELETE(request, { params }) {
     const response = Response.json({ success: true, message: 'Projekt erfolgreich gelöscht' });
     return addCORSHeaders(response);
 
-  } catch (error) {
+  } catch {
     const response = new Response('Fehler beim Löschen des Projekts', { status: 500 });
     return addCORSHeaders(response);
   }

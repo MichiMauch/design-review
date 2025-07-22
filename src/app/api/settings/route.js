@@ -51,7 +51,7 @@ export async function GET(request) {
           settings: {},
           message: 'Database initialized'
         });
-      } catch (initError) {
+      } catch {
       }
     }
     
@@ -101,7 +101,7 @@ export async function POST(request) {
         await initDatabase();
         // Retry nach Initialisierung
         return await POST(request);
-      } catch (initError) {
+      } catch {
       }
     }
     

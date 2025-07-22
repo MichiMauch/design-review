@@ -41,7 +41,7 @@ export async function POST(request) {
       created_at: new Date().toISOString()
     });
 
-  } catch (error) {
+  } catch {
     return new Response('Fehler beim Erstellen des Projekts', { status: 500 });
   }
 }
@@ -79,7 +79,7 @@ export async function GET() {
 
     return Response.json(projectsWithTasks);
 
-  } catch (error) {
+  } catch {
     return new Response('Fehler beim Laden der Projekte', { status: 500 });
   }
 }

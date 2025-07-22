@@ -32,7 +32,7 @@ export async function GET(request, { params }) {
       last_ping: project.widget_last_ping
     }));
 
-  } catch (error) {
+  } catch {
     return addCorsHeaders(new Response('Fehler beim Prüfen des Widget-Status', { status: 500 }));
   }
 }
@@ -54,7 +54,7 @@ export async function POST(request, { params }) {
 
     return addCorsHeaders(Response.json({ success: true }));
 
-  } catch (error) {
+  } catch {
     return addCorsHeaders(new Response('Fehler beim Aktualisieren des Widget-Status', { status: 500 }));
   }
 }

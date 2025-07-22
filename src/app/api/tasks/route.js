@@ -46,7 +46,7 @@ export async function POST(request) {
             );
         }
         project = projectResult.rows[0];
-    } catch (e) {
+    } catch {
         return NextResponse.json({ success: false, error: 'Failed to query projects' }, { status: 500, headers: corsHeaders() });
     }
     
@@ -83,7 +83,7 @@ export async function POST(request) {
       try {
         await initDatabase();
         return await POST(request);
-      } catch (initError) {
+      } catch {
       }
     }
     

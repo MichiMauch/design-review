@@ -38,7 +38,7 @@ export async function POST(request) {
       filename: result.filename
     }));
 
-  } catch (error) {
+  } catch {
     return addCorsHeaders(NextResponse.json(
       { error: 'Fehler beim Hochladen des Screenshots' },
       { status: 500 }

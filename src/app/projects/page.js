@@ -28,7 +28,7 @@ export default function ProjectsPage() {
         const data = await response.json();
         setProjects(data);
       }
-    } catch (error) {
+    } catch {
     } finally {
       setIsLoading(false);
     }

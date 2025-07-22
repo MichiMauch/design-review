@@ -65,7 +65,7 @@ export async function POST(request) {
         await initDatabase();
         // Retry nach Initialisierung
         return await POST(request);
-      } catch (initError) {
+      } catch {
       }
     }
     
@@ -112,7 +112,7 @@ export async function GET(request) {
         }, {
           headers: corsHeaders()
         });
-      } catch (initError) {
+      } catch {
       }
     }
     

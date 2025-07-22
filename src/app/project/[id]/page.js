@@ -83,7 +83,7 @@ export default function ProjectPage() {
     if (savedJiraConfig) {
       try {
         setJiraConfig(JSON.parse(savedJiraConfig));
-      } catch (error) {
+      } catch {
       }
     }
   }, []);
@@ -114,7 +114,7 @@ export default function ProjectPage() {
       }
       const projectData = await response.json();
       setProject(projectData);
-    } catch (error) {
+    } catch {
       router.push('/');
     } finally {
       setIsLoading(false);
@@ -135,7 +135,7 @@ export default function ProjectPage() {
           }
         }, 100);
       }
-    } catch (error) {
+    } catch {
     }
   };
 
@@ -152,7 +152,7 @@ export default function ProjectPage() {
           widget_last_ping: status.last_ping
         }));
       }
-    } catch (error) {
+    } catch {
     }
   };
 
@@ -204,7 +204,7 @@ export default function ProjectPage() {
           }
         }
       }
-    } catch (error) {
+    } catch {
     }
   };
 
@@ -213,7 +213,7 @@ export default function ProjectPage() {
       await navigator.clipboard.writeText(snippetCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -312,7 +312,7 @@ export default function ProjectPage() {
       await loadTasks();
       
       showToast('Daten aktualisiert', 'success');
-    } catch (error) {
+    } catch {
       showToast('Fehler beim Aktualisieren der Daten', 'error');
     } finally {
       setIsRefreshing(false);
@@ -342,7 +342,7 @@ export default function ProjectPage() {
       } else {
         showToast('Fehler beim Löschen des Projekts', 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Fehler beim Löschen des Projekts', 'error');
     } finally {
       setDeletingProject(false);
@@ -381,7 +381,7 @@ export default function ProjectPage() {
       } else {
         showToast('Fehler beim Löschen der Task', 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Fehler beim Löschen der Task', 'error');
     } finally {
       setDeletingTask(null);
@@ -420,7 +420,7 @@ export default function ProjectPage() {
       
       showToast('JIRA-Konfiguration gespeichert!', 'success');
       setJiraConfigOpen(false);
-    } catch (error) {
+    } catch {
       showToast('Fehler beim Speichern der JIRA-Konfiguration', 'error');
     }
   };
@@ -450,7 +450,7 @@ export default function ProjectPage() {
       } else {
         showToast(`JIRA-Verbindung fehlgeschlagen: ${result.error}`, 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Fehler beim Testen der JIRA-Verbindung', 'error');
     }
   };
@@ -475,7 +475,7 @@ export default function ProjectPage() {
           // JIRA-Issue nicht gefunden - markiere zum Löschen
           return { taskId: task.id, exists: false, jiraKey: task.jira_key };
         }
-      } catch (error) {
+      } catch {
         // Bei technischem Fehler nicht löschen, nur loggen
         return { taskId: task.id, exists: true, error: true };
       }
@@ -509,7 +509,7 @@ export default function ProjectPage() {
           if (response.ok) {
             return taskId;
           }
-        } catch (error) {
+        } catch {
         }
         return null;
       });
@@ -568,7 +568,7 @@ export default function ProjectPage() {
         const errorData = await response.json().catch(() => ({}));
         showToast('Fehler beim Speichern: ' + (errorData.details || 'Unbekannter Fehler'), 'error');
       }
-    } catch (error) {
+    } catch {
     }
   };
 
@@ -600,7 +600,7 @@ export default function ProjectPage() {
       
       setShowJiraModal(true);
       
-    } catch (error) {
+    } catch {
       setLoadingJiraData(false);
       showToast('Fehler beim Laden der JIRA-Daten', 'error');
     }
@@ -624,7 +624,7 @@ export default function ProjectPage() {
       if (result.success && result.users) {
         setJiraUsers(result.users);
       }
-    } catch (error) {
+    } catch {
     }
   };
 
@@ -665,7 +665,7 @@ export default function ProjectPage() {
           setJiraSprintsOptions(sprintsResult.sprints);
         }
       }
-    } catch (error) {
+    } catch {
     }
   };
 
@@ -725,7 +725,7 @@ export default function ProjectPage() {
       } else {
         showToast(`Fehler beim Erstellen: ${result.error}`, 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Fehler beim Erstellen des JIRA-Tasks', 'error');
     } finally {
       setCreatingJira(null);

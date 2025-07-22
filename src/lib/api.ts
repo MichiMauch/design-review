@@ -27,9 +27,9 @@ export async function captureScreenshot(
 }
 
 export async function createJiraTicket(
-  summary: string,
-  description: string,
-  attachments?: File[]
+  // _summary: string,
+  // _description: string,
+  // _attachments?: File[]
 ): Promise<{ success: boolean; issueKey?: string; error?: string }> {
   try {
     // This will be implemented later with actual JIRA API integration

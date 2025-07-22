@@ -55,7 +55,7 @@ export default function DemoPreviewPage() {
               };
               iframe.contentDocument.head.appendChild(script);
             }
-          } catch (error) {
+          } catch {
             setIframeLoading(false);
           }
         }, 1000);

@@ -10,7 +10,7 @@ export async function POST(request, { params }) {
 
     try {
         const { id } = params;
-        const body = await request.json();
+        await request.json();
         
         // Log widget ping for monitoring
 
@@ -22,7 +22,7 @@ export async function POST(request, { params }) {
             },
             { status: 200, headers }
         );
-    } catch (error) {
+    } catch {
         return NextResponse.json(
             { 
                 success: false, 

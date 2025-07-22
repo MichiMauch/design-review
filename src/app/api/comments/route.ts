@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       comments: comments.filter(comment => comment.url === url),
     });
 
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       comment,
     });
 
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -106,7 +106,7 @@ export async function DELETE(request: NextRequest) {
       success: true,
     });
 
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

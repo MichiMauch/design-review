@@ -294,7 +294,7 @@ async function createJiraTicket({ feedback, jiraConfig }) {
           originalDescription: issueData.fields.description
         });
       }
-    } catch (error) {
+    } catch {
       // Ticket wurde erstellt, nur Screenshot-Upload fehlgeschlagen
     }
   }
@@ -309,7 +309,7 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         sprintId: selectedSprint,
         issueKey: responseData.key
       });
-    } catch (error) {
+    } catch {
       // Ticket wurde erstellt, nur Sprint-Zuweisung fehlgeschlagen
     }
   }
@@ -324,7 +324,7 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         issueKey: responseData.key,
         statusId: selectedColumn.trim()
       });
-    } catch (error) {
+    } catch {
       // Ticket wurde erstellt, nur Status-Änderung fehlgeschlagen
     }
   }
@@ -449,7 +449,7 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      await response.json();
       
       // Try a simpler approach - just mention the attachment
       const simpleUpdatedDescription = {
@@ -483,12 +483,11 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
       });
 
       if (!retryResponse.ok) {
-        const retryErrorData = await retryResponse.json();
       } else {
       }
     } else {
     }
-  } catch (error) {
+  } catch {
   }
 }
 
@@ -793,10 +792,9 @@ async function getJiraUsersForWidget({ jiraConfig }) {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
     return NextResponse.json({ 
       success: false, 
-      error: `JIRA API Error: ${response.status} - ${errorText}` 
+      error: `JIRA API Error: ${response.status}` 
     }, { status: response.status });
   }
 
@@ -835,7 +833,6 @@ async function getJiraBoardsForWidget({ jiraConfig }) {
     });
 
     if (!boardsResponse.ok) {
-      const errorText = await boardsResponse.text();
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Boards API Error: ${boardsResponse.status}` 
@@ -891,7 +888,6 @@ async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
     });
 
     if (!sprintsResponse.ok) {
-      const errorText = await sprintsResponse.text();
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Sprints API Error: ${sprintsResponse.status}` 
@@ -949,7 +945,6 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
     });
 
     if (!configResponse.ok) {
-      const errorText = await configResponse.text();
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Board Config API Error: ${configResponse.status}` 
@@ -1073,7 +1068,6 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
     });
 
     if (!configResponse.ok) {
-      const errorText = await configResponse.text();
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Board Config API Error: ${configResponse.status}` 

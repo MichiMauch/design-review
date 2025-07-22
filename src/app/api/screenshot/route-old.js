@@ -19,7 +19,6 @@ export async function GET(request) {
     const url = searchParams.get('url');
     const resX = parseInt(searchParams.get('resX') || '1280');
     const resY = parseInt(searchParams.get('resY') || '900');
-    const outFormat = searchParams.get('outFormat') || 'png';
     const waitTime = parseInt(searchParams.get('waitTime') || '1000');
     const isFullPage = searchParams.get('isFullPage') === 'true';
     const dismissModals = searchParams.get('dismissModals') === 'true';
@@ -95,7 +94,7 @@ export async function POST(request) {
         imageBuffer = await response.arrayBuffer();
         method = 'nodehive';
       }
-    } catch (error) {
+    } catch {
     }
 
     // Option 2: Try screenshot.rocks API (fallback)
@@ -112,7 +111,7 @@ export async function POST(request) {
           imageBuffer = await response.arrayBuffer();
           method = 'screenshot-rocks';
         }
-      } catch (error) {
+      } catch {
       }
     }
 
@@ -143,7 +142,7 @@ export async function POST(request) {
             method = 'htmlcss';
           }
         }
-      } catch (error) {
+      } catch {
       }
     }
 

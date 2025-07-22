@@ -65,7 +65,7 @@ export async function POST(request) {
       to
     }));
 
-  } catch (error) {
+  } catch {
     return addCorsHeaders(NextResponse.json({ error: 'Translation failed' }, { status: 500 }));
   }
 }

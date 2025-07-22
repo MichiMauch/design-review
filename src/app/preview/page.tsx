@@ -35,7 +35,7 @@ export default function PreviewPage() {
           timestamp: new Date(comment.timestamp),
         }));
         setComments(parsedComments);
-      } catch (err) {
+      } catch {
       }
     }
   }, [router]);
@@ -52,7 +52,7 @@ export default function PreviewPage() {
       } else {
         setError(result.error || 'Screenshot konnte nicht erstellt werden');
       }
-    } catch (err) {
+    } catch {
       setError('Fehler beim Laden des Screenshots');
     } finally {
       setIsLoading(false);
