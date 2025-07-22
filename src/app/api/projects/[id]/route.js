@@ -33,7 +33,6 @@ export async function GET(request, { params }) {
     return addCORSHeaders(response);
 
   } catch (error) {
-    console.error('Error fetching project:', error);
     const response = new Response('Fehler beim Laden des Projekts', { status: 500 });
     return addCORSHeaders(response);
   }
@@ -56,12 +55,6 @@ export async function PUT(request, { params }) {
       jira_auto_create
     } = body;
 
-    console.log('Updating project with JIRA config:', { 
-      id: resolvedParams.id, 
-      name, 
-      domain, 
-      jira_server_url: jira_server_url ? 'SET' : 'NULL' 
-    });
 
     // First check if project exists
     const existingProject = await db.execute({
@@ -96,14 +89,11 @@ export async function PUT(request, { params }) {
       ]
     });
 
-    console.log('Project update result:', result);
 
     const response = Response.json({ success: true, message: 'Projekt erfolgreich aktualisiert' });
     return addCORSHeaders(response);
 
   } catch (error) {
-    console.error('Error updating project:', error);
-    console.error('Error details:', error.message);
     const response = new Response(`Fehler beim Aktualisieren des Projekts: ${error.message}`, { status: 500 });
     return addCORSHeaders(response);
   }
@@ -136,7 +126,6 @@ export async function DELETE(request, { params }) {
     return addCORSHeaders(response);
 
   } catch (error) {
-    console.error('Error deleting project:', error);
     const response = new Response('Fehler beim Löschen des Projekts', { status: 500 });
     return addCORSHeaders(response);
   }

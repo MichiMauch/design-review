@@ -2,7 +2,6 @@
 (function() {
     'use strict';
     
-    console.log('Widget: Loading modern feedback widget with html-to-image');
     
     // Configuration
     const script = document.currentScript || document.querySelector('script[data-project-id]');
@@ -19,7 +18,6 @@
         }
     }
     
-    console.log('Widget: Configuration loaded', { projectId, baseUrl });
     
     // State variables
     let isSelecting = false;
@@ -129,13 +127,11 @@
         button.addEventListener('click', startFeedbackProcess);
         
         document.body.appendChild(button);
-        console.log('Widget: Feedback button created');
     }
     
     // Start feedback process
     function startFeedbackProcess() {
         if (isSelecting) return;
-        console.log('Widget: Starting feedback process');
         // Direkt Screenshot aufnehmen und Annotation öffnen
         createScreenshotAndAnnotate();
     }
@@ -154,7 +150,6 @@
     
     async function createScreenshotAndAnnotate() {
         try {
-            console.log('Widget: Starting screen capture with getDisplayMedia...');
             
             if (overlay) overlay.style.display = 'none';
 
@@ -183,17 +178,12 @@
             ctx.drawImage(bitmap, 0, 0);
 
             const screenshotDataUrl = canvas.toDataURL('image/png');
-            console.log('Widget: Screenshot captured successfully via getDisplayMedia.');
-            console.log('Screenshot dimensions:', bitmap.width, 'x', bitmap.height);
 
             let finalScreenshot = screenshotDataUrl;
             if (selectionArea) {
-                console.log('Widget: Cropping screenshot to selected area...');
                 try {
                     finalScreenshot = await cropScreenshotToSelection(screenshotDataUrl, selectionArea);
-                    console.log('Widget: Screenshot cropped successfully');
                 } catch (cropError) {
-                    console.warn('Widget: Cropping failed, using original screenshot:', cropError);
                     // Fallback: use original screenshot if cropping fails
                     finalScreenshot = screenshotDataUrl;
                 }
@@ -202,7 +192,6 @@
             showAnnotationInterface(finalScreenshot);
 
         } catch (error) {
-            console.error('Widget: Screen capture failed:', error);
             if (overlay) overlay.style.display = 'block';
             
             // Provide more helpful error messages
@@ -227,27 +216,12 @@
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
 
-                    console.log('=== CROP DEBUG INFO ===');
-                    console.log('Image dimensions:', img.width, 'x', img.height);
-                    console.log('Window dimensions:', window.innerWidth, 'x', window.innerHeight);
-                    console.log('Outer dimensions:', window.outerWidth, 'x', window.outerHeight);
-                    console.log('Screen dimensions:', screen.width, 'x', screen.height);
-                    console.log('Device pixel ratio:', dpr);
-                    console.log('Selection (viewport):', selection.viewportX, selection.viewportY, selection.width, selection.height);
 
                     // SMART DETECTION: Figure out what getDisplayMedia actually captured
                     const isFullScreen = img.width >= screen.width * dpr * 0.9; // 90% threshold
                     const isMultiMonitor = img.width > screen.width * dpr;
                     const isBrowserOnly = Math.abs(img.width - window.outerWidth * dpr) < 50;
                     
-                    console.log('🔍 Screenshot analysis:', {
-                        isFullScreen,
-                        isMultiMonitor, 
-                        isBrowserOnly,
-                        screenWidthDPR: screen.width * dpr,
-                        outerWidthDPR: window.outerWidth * dpr,
-                        actualScreenshotWidth: img.width
-                    });
 
                     // Calculate browser window position in screenshot
                     let browserOffsetX = 0;
@@ -259,18 +233,10 @@
                         browserOffsetX = window.screenX * dpr;
                         browserOffsetY = window.screenY * dpr;
                         
-                        console.log('🖥️ Full screen capture detected');
-                        console.log('Browser window position on screen:', {
-                            screenX: window.screenX,
-                            screenY: window.screenY,
-                            offsetX: browserOffsetX,
-                            offsetY: browserOffsetY
-                        });
                     }
 
                     // Calculate chrome height
                     const chromeHeight = window.outerHeight - window.innerHeight;
-                    console.log('Chrome height:', chromeHeight);
 
                     // INTELLIGENT CROP STRATEGIES based on what was actually captured
                     const strategies = [
@@ -296,7 +262,6 @@
                         }
                     ];
 
-                    console.log('Crop strategies to try:', strategies);
 
                     // Start with the smart strategy
                     const primaryStrategy = strategies[0];
@@ -305,16 +270,6 @@
                     const cropWidth = selection.width * dpr;
                     const cropHeight = selection.height * dpr;
 
-                    console.log('Estimated chrome height:', chromeHeight);
-                    console.log('Primary crop coordinates (screenshot space):', {
-                        strategy: primaryStrategy.name,
-                        x: cropX,
-                        y: cropY,
-                        width: cropWidth,
-                        height: cropHeight,
-                        scaleFactors: screenshotToWindowScale,
-                        adjustment: coordAdjustment
-                    });
 
                     // Ensure crop area is within image bounds with better error handling
                     const safeCropX = Math.max(0, Math.min(cropX, img.width - 1));
@@ -326,15 +281,8 @@
                     const finalCropWidth = Math.max(10, safeCropWidth);
                     const finalCropHeight = Math.max(10, safeCropHeight);
 
-                    console.log('Safe crop coordinates:', {
-                        x: safeCropX,
-                        y: safeCropY,
-                        width: finalCropWidth,
-                        height: finalCropHeight
-                    });
 
                     if (finalCropWidth <= 10 || finalCropHeight <= 10) {
-                        console.warn('Widget: Crop area too small or invalid, using original image');
                         resolve(screenshotDataUrl);
                         return;
                     }
@@ -363,12 +311,6 @@
                         const strategyCropY = Math.max(0, Math.min(strategy.cropY, img.height - strategyCropHeight));
                         
                         try {
-                            console.log(`🔍 Trying strategy ${i + 1}: ${strategy.name}`, {
-                                original_selection: { x: selection.viewportX, y: selection.viewportY, w: selection.width, h: selection.height },
-                                calculated_crop: { x: strategy.cropX, y: strategy.cropY },
-                                safe_crop: { x: strategyCropX, y: strategyCropY, width: strategyCropWidth, height: strategyCropHeight },
-                                will_fit: strategyCropX + strategyCropWidth <= img.width && strategyCropY + strategyCropHeight <= img.height
-                            });
                             
                             // Ensure canvas is right size
                             canvas.width = strategyCropWidth;
@@ -381,19 +323,16 @@
                                 0, 0, strategyCropWidth, strategyCropHeight
                             );
                             
-                            console.log(`✅ Strategy ${strategy.name} SUCCESS!`);
                             cropSuccess = true;
                             break;
                             
                         } catch (strategyError) {
-                            console.warn(`❌ Strategy ${strategy.name} failed:`, strategyError);
                             continue;
                         }
                     }
                     
                     // If all strategies failed, use center crop
                     if (!cropSuccess) {
-                        console.warn('All strategies failed, using center crop as final fallback');
                         const centerX = Math.max(0, (img.width - finalCropWidth) / 2);
                         const centerY = Math.max(0, (img.height - finalCropHeight) / 2);
                         
@@ -403,20 +342,15 @@
                             centerX, centerY, finalCropWidth, finalCropHeight,
                             0, 0, finalCropWidth, finalCropHeight
                         );
-                        console.log('Used center crop as final fallback');
                     }
 
-                    console.log('Crop completed successfully');
-                    console.log('=== END CROP DEBUG ===');
 
                     resolve(canvas.toDataURL('image/png'));
                 } catch (error) {
-                    console.error('Error during screenshot cropping:', error);
                     reject(error);
                 }
             };
             img.onerror = (error) => {
-                console.error('Could not load screenshot image for cropping:', error);
                 reject(new Error('Image loading failed'));
             };
             img.src = screenshotDataUrl;
@@ -602,17 +536,11 @@
             
             // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
             if (jiraSection) {
-                console.log('Widget: Setting JIRA section visibility:', {
-                    projectConfig: projectConfig,
-                    jiraServerUrl: projectConfig?.jira_server_url,
-                    shouldShow: !!projectConfig?.jira_server_url
-                });
-                jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
+                    jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
             }
         }, 0);
         // Initialize annotation functionality
         initializeAnnotation();
-        console.log('Widget: Annotation interface shown');
     }
     
     // Show JIRA configuration modal
@@ -717,7 +645,6 @@
     // Load JIRA data (users, sprints, issue types)
     async function loadJiraData() {
         try {
-            console.log('Widget: Loading JIRA data...');
             
             // Load users
             const usersResponse = await fetch(`${baseUrl}/api/jira`, {
@@ -738,7 +665,6 @@
                 const usersResult = await usersResponse.json();
                 if (usersResult.success) {
                     jiraUsers = usersResult.data || [];
-                    console.log('Widget: Loaded JIRA users:', jiraUsers.length);
                 }
             }
             
@@ -759,11 +685,9 @@
             
             if (boardsResponse.ok) {
                 const boardsResult = await boardsResponse.json();
-                console.log('Widget: Boards result:', boardsResult);
                 
                 if (boardsResult.success && boardsResult.data && boardsResult.data.length > 0) {
                     selectedBoardId = boardsResult.data[0].id; // Use first board
-                    console.log('Widget: Using board ID:', selectedBoardId);
                     
                     // Now load sprints for this board
                     const sprintsResponse = await fetch(`${baseUrl}/api/jira`, {
@@ -785,7 +709,6 @@
                         const sprintsResult = await sprintsResponse.json();
                         if (sprintsResult.success) {
                             jiraSprints = sprintsResult.data || [];
-                            console.log('Widget: Loaded JIRA sprints:', jiraSprints.length);
                         }
                     }
                     
@@ -809,7 +732,6 @@
                         const columnsResult = await columnsResponse.json();
                         if (columnsResult.success) {
                             jiraBoardColumns = columnsResult.data || [];
-                            console.log('Widget: Loaded JIRA board columns:', jiraBoardColumns.length);
                         }
                     }
                 }
@@ -827,7 +749,6 @@
             populateJiraForm();
             
         } catch (error) {
-            console.error('Widget: Failed to load JIRA data:', error);
             // Show form anyway with limited options
             populateJiraForm();
         }
@@ -892,7 +813,6 @@
             });
         }
         
-        console.log('Widget: JIRA form populated');
     }
     
     // Create JIRA task from modal
@@ -917,11 +837,6 @@
             // Parse labels
             const labels = labelsInput.split(',').map(label => label.trim()).filter(label => label);
             
-            console.log('Widget: Creating JIRA task with config:', {
-                title: currentFeedbackData.title,
-                description: currentFeedbackData.description,
-                issueType, assignee, sprint, column, labels
-            });
             
             // Create JIRA payload
             const jiraPayload = {
@@ -946,7 +861,6 @@
                 }
             };
             
-            console.log('Widget: Sending JIRA payload:', jiraPayload);
             
             const jiraRes = await fetch(`${baseUrl}/api/jira`, {
                 method: 'POST',
@@ -954,21 +868,13 @@
                 body: JSON.stringify(jiraPayload)
             });
             
-            console.log('Widget: JIRA response status:', jiraRes.status);
             
             const jiraResult = await jiraRes.json();
-            console.log('Widget: JIRA response:', jiraResult);
             
             if (jiraRes.ok && jiraResult.success) {
                 // Update the task in database with JIRA key
                 if (currentFeedbackData.taskId && jiraResult.ticket && jiraResult.ticket.key) {
                     try {
-                        console.log('Widget: Updating task with JIRA key:', {
-                            taskId: currentFeedbackData.taskId,
-                            jiraKey: jiraResult.ticket.key,
-                            jiraUrl: jiraResult.ticket.url,
-                            projectId: projectId
-                        });
                         
                         const updateResponse = await fetch(`${baseUrl}/api/projects/${currentFeedbackData.projectId}/tasks/${currentFeedbackData.taskId}`, {
                             method: 'PATCH',
@@ -980,23 +886,13 @@
                         });
                         
                         const updateResult = await updateResponse.json();
-                        console.log('Widget: Task update response:', updateResult);
                         
                         if (updateResponse.ok) {
-                            console.log('Widget: Task updated with JIRA key:', jiraResult.ticket.key);
                         } else {
-                            console.warn('Widget: Failed to update task with JIRA key:', updateResponse.status, updateResult);
                         }
                     } catch (error) {
-                        console.error('Widget: Error updating task with JIRA key:', error);
                     }
                 } else {
-                    console.warn('Widget: Missing data for task update:', {
-                        hasTaskId: !!currentFeedbackData.taskId,
-                        hasJiraTicket: !!jiraResult.ticket,
-                        hasJiraKey: !!jiraResult.ticket?.key,
-                        currentFeedbackData: currentFeedbackData
-                    });
                 }
                 
                 // Success - show toast notification with JIRA link
@@ -1018,7 +914,6 @@
             }
             
         } catch (error) {
-            console.error('Widget: JIRA task creation failed:', error);
             
             // Show error message
             const errorMessage = document.createElement('div');
@@ -1332,7 +1227,6 @@
                 closeAnnotationInterface();
             }
         } catch (error) {
-            console.error('Widget: Failed to create annotated screenshot:', error);
             await submitFeedback(title, description, null);
             closeAnnotationInterface();
         } finally {
@@ -1379,19 +1273,13 @@
     
     async function loadProjectConfig() {
         try {
-            console.log('Widget: Loading project config for project ID:', projectId);
-            // Try to load by name first (for backward compatibility)
+                // Try to load by name first (for backward compatibility)
             const response = await fetch(`${baseUrl}/api/projects/by-name/${encodeURIComponent(projectId)}`);
-            console.log('Widget: Project config response status:', response.status);
             if (response.ok) {
                 projectConfig = await response.json();
-                console.log('Widget: Project config loaded:', projectConfig);
-                console.log('Widget: JIRA enabled:', !!projectConfig?.jira_server_url);
             } else {
-                console.error('Widget: Failed to load project config, status:', response.status);
             }
         } catch (error) {
-            console.error('Widget: Failed to load project config:', error);
         }
     }
     
@@ -1411,7 +1299,6 @@
                 timestamp: new Date().toISOString()
             };
             
-            console.log('Widget: Submitting new task...');
             
             const response = await fetch(`${baseUrl}/api/tasks`, {
                 method: 'POST',
@@ -1423,7 +1310,6 @@
             
             if (response.ok) {
                 const result = await response.json();
-                console.log('Widget: Task submitted successfully', result);
                 showToast('Feedback erfolgreich in der Datenbank gespeichert!', 'success', 2000);
                 showSuccessMessage();
                 return {
@@ -1435,7 +1321,6 @@
             }
             
         } catch (error) {
-            console.error('Widget: Task submission failed:', error);
             showErrorMessage();
         } finally {
             isSubmitting = false;
@@ -1470,7 +1355,6 @@
     // Initialize widget
     async function initWidget() {
         if (document.getElementById('feedback-widget-button')) {
-            console.log('Widget: Already initialized');
             return;
         }
         
@@ -1483,7 +1367,6 @@
             createFeedbackButton();
         }
         
-        console.log('Widget: Initialized successfully');
     }
     
     // Start the widget and expose global reference for error modal

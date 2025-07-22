@@ -47,7 +47,6 @@ export async function GET(request, { params }) {
     return addCorsHeaders(Response.json(processedRows));
 
   } catch (error) {
-    console.error('Error fetching tasks:', error);
     return addCorsHeaders(new Response('Fehler beim Laden der Tasks', { status: 500 }));
   }
 }
@@ -57,17 +56,6 @@ export async function POST(request, { params }) {
     const resolvedParams = await params;
     const { title, description, screenshot, url, selected_area, title_en, description_en } = await request.json();
 
-    console.log('📝 Task creation request:', {
-      title,
-      description,
-      screenshot,
-      screenshot_type: typeof screenshot,
-      screenshot_length: screenshot ? screenshot.length : 0,
-      url,
-      selected_area,
-      title_en,
-      description_en
-    });
 
     if (!title || !url) {
       return addCorsHeaders(new Response('Titel und URL sind erforderlich', { status: 400 }));
@@ -90,7 +78,6 @@ export async function POST(request, { params }) {
       });
 
       if (projectResult.rows.length === 0) {
-        console.error('Project not found:', projectName);
         return addCorsHeaders(new Response(`Project '${projectName}' nicht gefunden`, { status: 404 }));
       }
 
@@ -119,22 +106,17 @@ export async function POST(request, { params }) {
       if (screenshot.startsWith('data:')) {
         // Base64 data - store as blob (fallback)
         screenshotBlob = screenshot;
-        console.log('Screenshot type: Base64 blob (fallback)');
       } else if (screenshot.startsWith('http')) {
         // Full URL - extract filename and store both
         screenshotUrl = screenshot;
         screenshotFilename = screenshot.split('/').pop(); // Extract filename from URL
-        console.log('Screenshot type: Full URL');
       } else if (screenshot.includes('.png') || screenshot.includes('.jpg') || screenshot.includes('.jpeg')) {
         // Filename only - store filename and construct R2 URL
         screenshotFilename = screenshot;
         screenshotUrl = `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/screenshots/${screenshot}`;
-        console.log('Screenshot type: Filename -> R2 URL:', screenshotUrl);
-        console.log('Screenshot filename stored:', screenshotFilename);
       } else {
         // Unknown format - treat as blob
         screenshotBlob = screenshot;
-        console.log('Screenshot type: Unknown format -> blob');
       }
     }
 
@@ -175,12 +157,6 @@ export async function POST(request, { params }) {
     }));
 
   } catch (error) {
-    console.error('Error creating task:', error);
-    console.error('Error details:', {
-      projectId: resolvedParams?.id,
-      error: error.message,
-      stack: error.stack
-    });
     return addCorsHeaders(new Response(`Fehler beim Erstellen der Task: ${error.message}`, { status: 500 }));
   }
 }

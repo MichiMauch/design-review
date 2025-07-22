@@ -33,7 +33,6 @@ export async function GET(request, { params }) {
     }));
 
   } catch (error) {
-    console.error('Error checking widget status:', error);
     return addCorsHeaders(new Response('Fehler beim Prüfen des Widget-Status', { status: 500 }));
   }
 }
@@ -56,7 +55,6 @@ export async function POST(request, { params }) {
     return addCorsHeaders(Response.json({ success: true }));
 
   } catch (error) {
-    console.error('Error updating widget status:', error);
     return addCorsHeaders(new Response('Fehler beim Aktualisieren des Widget-Status', { status: 500 }));
   }
 }

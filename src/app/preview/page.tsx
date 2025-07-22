@@ -36,7 +36,6 @@ export default function PreviewPage() {
         }));
         setComments(parsedComments);
       } catch (err) {
-        console.error('Error parsing saved comments:', err);
       }
     }
   }, [router]);
@@ -55,7 +54,6 @@ export default function PreviewPage() {
       }
     } catch (err) {
       setError('Fehler beim Laden des Screenshots');
-      console.error('Screenshot error:', err);
     } finally {
       setIsLoading(false);
     }

@@ -2,7 +2,6 @@
 (function() {
     'use strict';
     
-    console.log('Widget: Loading modern feedback widget with annotation');
     
     // Configuration
     const script = document.currentScript || document.querySelector('script[data-project-id]');
@@ -19,7 +18,6 @@
         }
     }
     
-    console.log('Widget: Configuration loaded', { projectId, baseUrl });
     
     // State variables
     let isSelecting = false;
@@ -64,14 +62,12 @@
         button.addEventListener('click', startFeedbackProcess);
         
         document.body.appendChild(button);
-        console.log('Widget: Feedback button created');
     }
     
     // Start feedback process
     function startFeedbackProcess() {
         if (isSelecting) return;
         
-        console.log('Widget: Starting feedback process');
         createSelectionOverlay();
     }
     
@@ -147,7 +143,6 @@
                         height: height
                     };
                     
-                    console.log('Widget: Area selected:', selectionArea);
                     removeSelectionOverlay();
                     createScreenshotAndAnnotate();
                 } else {
@@ -169,7 +164,6 @@
         document.addEventListener('keydown', onKeyDown);
         
         document.body.appendChild(overlay);
-        console.log('Widget: Selection overlay created');
     }
     
     // Remove selection overlay
@@ -184,7 +178,6 @@
     // Create screenshot and show annotation interface
     async function createScreenshotAndAnnotate() {
         try {
-            console.log('Widget: Creating screenshot for annotation...');
             
             // Show loading modal
             showLoadingModal();
@@ -208,14 +201,12 @@
             const blob = await response.blob();
             const screenshotDataURL = await blobToDataURL(blob);
             
-            console.log('Widget: Screenshot created, showing annotation interface');
             
             // Close loading modal and show annotation interface
             closeLoadingModal();
             showAnnotationInterface(screenshotDataURL);
             
         } catch (error) {
-            console.error('Widget: Screenshot creation failed:', error);
             closeLoadingModal();
             showFeedbackModal(null); // Show feedback modal without screenshot
         }
@@ -361,7 +352,6 @@
         // Initialize annotation functionality
         initializeAnnotation();
         
-        console.log('Widget: Annotation interface shown');
     }
     
     // Initialize annotation functionality
@@ -535,7 +525,6 @@
             await submitFeedback(feedbackText, annotatedScreenshot);
             
         } catch (error) {
-            console.error('Widget: Failed to create annotated screenshot:', error);
             await submitFeedback(feedbackText, null);
         }
     }
@@ -614,7 +603,6 @@
                 timestamp: new Date().toISOString()
             };
             
-            console.log('Widget: Submitting feedback...');
             
             const response = await fetch(`${baseUrl}/api/feedback`, {
                 method: 'POST',
@@ -625,14 +613,12 @@
             });
             
             if (response.ok) {
-                console.log('Widget: Feedback submitted successfully');
                 showSuccessMessage();
             } else {
                 throw new Error(`HTTP ${response.status}`);
             }
             
         } catch (error) {
-            console.error('Widget: Feedback submission failed:', error);
             showErrorMessage();
         } finally {
             isSubmitting = false;
@@ -709,7 +695,6 @@
     // Initialize widget
     function initWidget() {
         if (document.getElementById('feedback-widget-button')) {
-            console.log('Widget: Already initialized');
             return;
         }
         
@@ -719,7 +704,6 @@
             createFeedbackButton();
         }
         
-        console.log('Widget: Initialized successfully');
     }
     
     // Start the widget

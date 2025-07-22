@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Comments GET error:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Comments POST error:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -109,7 +107,6 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Comments DELETE error:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

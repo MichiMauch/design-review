@@ -15,7 +15,6 @@ export async function OPTIONS() {
 // Simple Screenshot API that ALWAYS works on Vercel
 export async function POST(request) {
   try {
-    console.log('Simple Screenshot: Starting...');
     
     const { url, width = 1200, height = 800 } = await request.json();
     
@@ -26,8 +25,6 @@ export async function POST(request) {
       }, { status: 400 }));
     }
     
-    console.log('Simple Screenshot: URL:', url);
-    console.log('Simple Screenshot: Dimensions:', { width, height });
     
     // Use htmlcsstoimage.com API (free tier, very reliable)
     const htmlcssImageUrl = 'https://hcti.io/v1/image';
@@ -85,7 +82,6 @@ export async function POST(request) {
         const base64Image = Buffer.from(imageBuffer).toString('base64');
         const dataUrl = `data:image/png;base64,${base64Image}`;
         
-        console.log('Simple Screenshot: Success with HTML/CSS to Image API');
         
         return addCorsHeaders(NextResponse.json({
           success: true,
@@ -99,7 +95,6 @@ export async function POST(request) {
     throw new Error('Could not get image from HTML/CSS to Image API');
     
   } catch (error) {
-    console.error('Simple Screenshot: Failed:', error.message);
     
     // Return a simple placeholder that works
     const canvas = Buffer.from(`

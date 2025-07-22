@@ -29,7 +29,6 @@ export default function ProjectsPage() {
         setProjects(data);
       }
     } catch (error) {
-      console.error('Error loading projects:', error);
     } finally {
       setIsLoading(false);
     }

@@ -37,7 +37,6 @@ export default function DemoPage() {
     script.defer = true;
     
     script.onload = () => {
-      console.log('Widget v3.0 loaded - Canvas Screenshots');
     };
     
     document.head.appendChild(script);

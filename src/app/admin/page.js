@@ -26,7 +26,6 @@ export default function AdminDashboard() {
         setProjects(uniqueProjects);
       }
     } catch (error) {
-      console.error('Error loading feedback:', error);
     } finally {
       setLoading(false);
     }

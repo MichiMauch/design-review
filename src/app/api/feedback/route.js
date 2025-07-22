@@ -58,7 +58,6 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error('Feedback API error:', error);
     
     // Bei Tabellen-Fehler versuchen wir die Datenbank zu initialisieren
     if (error.message && error.message.includes('no such table')) {
@@ -67,7 +66,6 @@ export async function POST(request) {
         // Retry nach Initialisierung
         return await POST(request);
       } catch (initError) {
-        console.error('Database initialization failed:', initError);
       }
     }
     
@@ -103,7 +101,6 @@ export async function GET(request) {
     });
 
   } catch (error) {
-    console.error('Feedback GET API error:', error);
     
     // Bei Tabellen-Fehler versuchen wir die Datenbank zu initialisieren
     if (error.message && error.message.includes('no such table')) {
@@ -116,7 +113,6 @@ export async function GET(request) {
           headers: corsHeaders()
         });
       } catch (initError) {
-        console.error('Database initialization failed:', initError);
       }
     }
     

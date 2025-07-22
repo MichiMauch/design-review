@@ -47,7 +47,6 @@ export async function POST(request) {
         }
         project = projectResult.rows[0];
     } catch (e) {
-        console.error('Error fetching project:', e);
         return NextResponse.json({ success: false, error: 'Failed to query projects' }, { status: 500, headers: corsHeaders() });
     }
     
@@ -79,14 +78,12 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error('Tasks API error:', error);
     
     if (error.message && error.message.includes('no such table')) {
       try {
         await initDatabase();
         return await POST(request);
       } catch (initError) {
-        console.error('Database initialization failed:', initError);
       }
     }
     

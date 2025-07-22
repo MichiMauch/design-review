@@ -48,7 +48,6 @@ export async function POST(request) {
     });
 
     if (!response.ok) {
-      console.error('OpenAI API error:', response.status, response.statusText);
       return addCorsHeaders(NextResponse.json({ error: 'Translation failed' }, { status: 500 }));
     }
 
@@ -67,7 +66,6 @@ export async function POST(request) {
     }));
 
   } catch (error) {
-    console.error('Translation error:', error);
     return addCorsHeaders(NextResponse.json({ error: 'Translation failed' }, { status: 500 }));
   }
 }

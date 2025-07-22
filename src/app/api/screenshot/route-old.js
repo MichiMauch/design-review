@@ -31,9 +31,6 @@ export async function GET(request) {
       ));
     }
 
-    console.log('Screenshot API (GET): Creating screenshot for URL:', url, {
-      resX, resY, outFormat, waitTime, isFullPage, dismissModals
-    });
 
     // Use POST function with converted parameters
     const mockRequest = {
@@ -50,7 +47,6 @@ export async function GET(request) {
     return await POST(mockRequest);
     
   } catch (error) {
-    console.error('Screenshot API (GET) error:', error);
     return addCorsHeaders(NextResponse.json({
       success: false,
       error: error.message
@@ -69,7 +65,6 @@ export async function POST(request) {
       ));
     }
 
-    console.log('Screenshot API: Creating screenshot for URL:', url);
 
     // Multiple screenshot service fallbacks for reliability
     let imageBuffer = null;
@@ -85,7 +80,6 @@ export async function POST(request) {
       nodeHiveUrl.searchParams.set('waitTime', '2000');
       nodeHiveUrl.searchParams.set('isFullPage', 'false');
       
-      console.log('Screenshot API: Trying preview.nodehive.com:', nodeHiveUrl.toString());
 
       const response = await fetch(nodeHiveUrl.toString(), {
         method: 'GET',
@@ -100,17 +94,14 @@ export async function POST(request) {
       if (response.ok) {
         imageBuffer = await response.arrayBuffer();
         method = 'nodehive';
-        console.log('NodeHive screenshot successful');
       }
     } catch (error) {
-      console.log('NodeHive failed:', error.message);
     }
 
     // Option 2: Try screenshot.rocks API (fallback)
     if (!imageBuffer) {
       try {
         const screenshotUrl = `https://api.screenshot.rocks/screenshot?url=${encodeURIComponent(url)}&width=1280&height=900&quality=80`;
-        console.log('Trying screenshot.rocks:', screenshotUrl);
         
         const response = await fetch(screenshotUrl, {
           method: 'GET',
@@ -120,17 +111,14 @@ export async function POST(request) {
         if (response.ok) {
           imageBuffer = await response.arrayBuffer();
           method = 'screenshot-rocks';
-          console.log('Screenshot.rocks successful');
         }
       } catch (error) {
-        console.log('Screenshot.rocks failed:', error.message);
       }
     }
 
     // Option 3: Use htmlcsstoimage.com if API key available
     if (!imageBuffer && process.env.HTMLCSS_API_KEY) {
       try {
-        console.log('Trying htmlcsstoimage.com');
         const response = await fetch('https://hcti.io/v1/image', {
           method: 'POST',
           headers: {
@@ -153,17 +141,14 @@ export async function POST(request) {
           if (imageResponse.ok) {
             imageBuffer = await imageResponse.arrayBuffer();
             method = 'htmlcss';
-            console.log('HTMLCSS screenshot successful');
           }
         }
       } catch (error) {
-        console.log('HTMLCSS failed:', error.message);
       }
     }
 
     // If all services failed, return fallback response
     if (!imageBuffer) {
-      console.log('All screenshot services failed, returning fallback');
       return addCorsHeaders(NextResponse.json({
         success: false,
         fallback: true,
@@ -173,7 +158,6 @@ export async function POST(request) {
       }));
     }
 
-    console.log(`Screenshot successful using ${method}, size: ${imageBuffer.byteLength} bytes`);
     const imageBufferNode = Buffer.from(imageBuffer);
     
     // Upload to Cloudflare R2
@@ -193,7 +177,6 @@ export async function POST(request) {
     }));
 
   } catch (error) {
-    console.error('Screenshot API error:', error);
     
     // Return a fallback placeholder
     return addCorsHeaders(NextResponse.json({

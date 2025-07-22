@@ -84,7 +84,6 @@ export default function ProjectPage() {
       try {
         setJiraConfig(JSON.parse(savedJiraConfig));
       } catch (error) {
-        console.error('Error loading JIRA config from localStorage:', error);
       }
     }
   }, []);
@@ -116,7 +115,6 @@ export default function ProjectPage() {
       const projectData = await response.json();
       setProject(projectData);
     } catch (error) {
-      console.error('Error loading project:', error);
       router.push('/');
     } finally {
       setIsLoading(false);
@@ -128,20 +126,16 @@ export default function ProjectPage() {
       const response = await fetch(`/api/projects/${params.id}/tasks`);
       if (response.ok) {
         const tasksData = await response.json();
-        console.log('Loaded tasks:', tasksData.length, 'tasks');
-        console.log('JIRA tasks:', tasksData.filter(t => t.jira_key).map(t => ({id: t.id, jira_key: t.jira_key})));
         setTasks(tasksData);
         
         // Lade JIRA-Statuses für neue Tasks
         setTimeout(() => {
           if (tasksData.some(task => task.jira_key) && jiraConfig.serverUrl) {
-            console.log('Loading JIRA statuses for', tasksData.filter(t => t.jira_key).length, 'tasks');
             loadJiraStatuses();
           }
         }, 100);
       }
     } catch (error) {
-      console.error('Error loading tasks:', error);
     }
   };
 
@@ -159,7 +153,6 @@ export default function ProjectPage() {
         }));
       }
     } catch (error) {
-      console.error('Error checking widget status:', error);
     }
   };
 
@@ -212,7 +205,6 @@ export default function ProjectPage() {
         }
       }
     } catch (error) {
-      console.error('Error loading JIRA settings:', error);
     }
   };
 
@@ -222,7 +214,6 @@ export default function ProjectPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
     }
   };
 
@@ -322,7 +313,6 @@ export default function ProjectPage() {
       
       showToast('Daten aktualisiert', 'success');
     } catch (error) {
-      console.error('Error refreshing data:', error);
       showToast('Fehler beim Aktualisieren der Daten', 'error');
     } finally {
       setIsRefreshing(false);
@@ -353,7 +343,6 @@ export default function ProjectPage() {
         showToast('Fehler beim Löschen des Projekts', 'error');
       }
     } catch (error) {
-      console.error('Error deleting project:', error);
       showToast('Fehler beim Löschen des Projekts', 'error');
     } finally {
       setDeletingProject(false);
@@ -393,7 +382,6 @@ export default function ProjectPage() {
         showToast('Fehler beim Löschen der Task', 'error');
       }
     } catch (error) {
-      console.error('Error deleting task:', error);
       showToast('Fehler beim Löschen der Task', 'error');
     } finally {
       setDeletingTask(null);
@@ -433,7 +421,6 @@ export default function ProjectPage() {
       showToast('JIRA-Konfiguration gespeichert!', 'success');
       setJiraConfigOpen(false);
     } catch (error) {
-      console.error('Error saving JIRA config:', error);
       showToast('Fehler beim Speichern der JIRA-Konfiguration', 'error');
     }
   };
@@ -464,7 +451,6 @@ export default function ProjectPage() {
         showToast(`JIRA-Verbindung fehlgeschlagen: ${result.error}`, 'error');
       }
     } catch (error) {
-      console.error('Error testing JIRA connection:', error);
       showToast('Fehler beim Testen der JIRA-Verbindung', 'error');
     }
   };
@@ -472,15 +458,9 @@ export default function ProjectPage() {
   const loadJiraStatuses = async () => {
     const tasksWithJira = tasks.filter(task => task.jira_key);
     if (tasksWithJira.length === 0 || !jiraConfig.serverUrl || !jiraConfig.username || !jiraConfig.apiToken) {
-      console.log('Skipping JIRA status load:', { 
-        tasksWithJira: tasksWithJira.length, 
-        hasServerUrl: !!jiraConfig.serverUrl,
-        hasCredentials: !!(jiraConfig.username && jiraConfig.apiToken)
-      });
       return;
     }
 
-    console.log('Loading JIRA statuses for tasks:', tasksWithJira.map(t => t.jira_key));
 
     const statusPromises = tasksWithJira.map(async (task) => {
       try {
@@ -488,18 +468,15 @@ export default function ProjectPage() {
         const response = await fetch(url);
         const data = await response.json();
         
-        console.log(`JIRA status response for ${task.jira_key}:`, data);
         
         if (data.success) {
           return { taskId: task.id, status: data.status, sprint: data.sprint, exists: true };
         } else {
           // JIRA-Issue nicht gefunden - markiere zum Löschen
-          console.log('JIRA-Issue nicht gefunden für Task:', task.id, task.jira_key);
           return { taskId: task.id, exists: false, jiraKey: task.jira_key };
         }
       } catch (error) {
         // Bei technischem Fehler nicht löschen, nur loggen
-        console.log('Fehler beim Laden des JIRA-Status für Task:', task.id, error);
         return { taskId: task.id, exists: true, error: true };
       }
     });
@@ -523,7 +500,6 @@ export default function ProjectPage() {
 
     // Nicht existierende JIRA Tasks automatisch löschen
     if (tasksToDelete.length > 0) {
-      console.log('Lösche nicht existierende JIRA Tasks:', tasksToDelete);
       
       const deletePromises = tasksToDelete.map(async (taskId) => {
         try {
@@ -531,11 +507,9 @@ export default function ProjectPage() {
             method: 'DELETE'
           });
           if (response.ok) {
-            console.log(`Task ${taskId} erfolgreich gelöscht`);
             return taskId;
           }
         } catch (error) {
-          console.error(`Fehler beim Löschen von Task ${taskId}:`, error);
         }
         return null;
       });
@@ -550,8 +524,6 @@ export default function ProjectPage() {
       }
     }
     
-    console.log('Final JIRA status map:', statusMap);
-    console.log('Final JIRA sprint map:', sprintMap);
     setJiraStatuses(statusMap);
     setJiraTaskSprints(sprintMap);
   };
@@ -594,11 +566,9 @@ export default function ProjectPage() {
         showToast('Task erfolgreich gespeichert!', 'success');
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to update task:', response.status, errorData);
         showToast('Fehler beim Speichern: ' + (errorData.details || 'Unbekannter Fehler'), 'error');
       }
     } catch (error) {
-      console.error('Error updating task:', error);
     }
   };
 
@@ -631,7 +601,6 @@ export default function ProjectPage() {
       setShowJiraModal(true);
       
     } catch (error) {
-      console.error('Error opening JIRA modal:', error);
       setLoadingJiraData(false);
       showToast('Fehler beim Laden der JIRA-Daten', 'error');
     }
@@ -656,7 +625,6 @@ export default function ProjectPage() {
         setJiraUsers(result.users);
       }
     } catch (error) {
-      console.error('Error loading JIRA users:', error);
     }
   };
 
@@ -698,7 +666,6 @@ export default function ProjectPage() {
         }
       }
     } catch (error) {
-      console.error('Error loading JIRA sprints:', error);
     }
   };
 
@@ -759,7 +726,6 @@ export default function ProjectPage() {
         showToast(`Fehler beim Erstellen: ${result.error}`, 'error');
       }
     } catch (error) {
-      console.error('Error creating JIRA task:', error);
       showToast('Fehler beim Erstellen des JIRA-Tasks', 'error');
     } finally {
       setCreatingJira(null);

@@ -27,13 +27,11 @@ export default function JiraDebugPage() {
       const response = await fetch(`/api/jira?${urlParams}`);
       const data = await response.json();
       
-      console.log(`Debug ${action}:`, data);
       setDebugData(prev => ({
         ...prev,
         [action]: data
       }));
     } catch (error) {
-      console.error(`Error debugging ${action}:`, error);
       setDebugData(prev => ({
         ...prev,
         [action]: { error: error.message }

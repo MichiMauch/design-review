@@ -13,12 +13,6 @@ export async function POST(request, { params }) {
         const body = await request.json();
         
         // Log widget ping for monitoring
-        console.log('Widget ping received:', {
-            projectId: id,
-            url: body.url,
-            timestamp: body.timestamp,
-            userAgent: request.headers.get('User-Agent')
-        });
 
         return NextResponse.json(
             { 
@@ -29,7 +23,6 @@ export async function POST(request, { params }) {
             { status: 200, headers }
         );
     } catch (error) {
-        console.error('Widget ping error:', error);
         return NextResponse.json(
             { 
                 success: false, 

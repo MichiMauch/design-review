@@ -51,13 +51,11 @@ export default function DemoPreviewPage() {
               script.setAttribute('data-project-id', 'demo-preview');
               script.defer = true;
               script.onload = () => {
-                console.log('Feedback widget loaded for URL:', debouncedUrl);
-                setIframeLoading(false);
+                  setIframeLoading(false);
               };
               iframe.contentDocument.head.appendChild(script);
             }
           } catch (error) {
-            console.log('Cannot inject feedback widget (CORS):', error);
             setIframeLoading(false);
           }
         }, 1000);

@@ -42,7 +42,6 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error('Error creating project:', error);
     return new Response('Fehler beim Erstellen des Projekts', { status: 500 });
   }
 }
@@ -81,7 +80,6 @@ export async function GET() {
     return Response.json(projectsWithTasks);
 
   } catch (error) {
-    console.error('Error fetching projects:', error);
     return new Response('Fehler beim Laden der Projekte', { status: 500 });
   }
 }

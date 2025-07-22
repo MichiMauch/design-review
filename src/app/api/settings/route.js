@@ -41,7 +41,6 @@ export async function GET(request) {
       });
     }
   } catch (error) {
-    console.error('Settings GET Error:', error);
     
     // Bei Tabellen-Fehler versuchen wir die Datenbank zu initialisieren
     if (error.message && error.message.includes('no such table')) {
@@ -53,7 +52,6 @@ export async function GET(request) {
           message: 'Database initialized'
         });
       } catch (initError) {
-        console.error('Database initialization failed:', initError);
       }
     }
     
@@ -96,7 +94,6 @@ export async function POST(request) {
     });
     
   } catch (error) {
-    console.error('Settings POST Error:', error);
     
     // Bei Tabellen-Fehler versuchen wir die Datenbank zu initialisieren
     if (error.message && error.message.includes('no such table')) {
@@ -105,7 +102,6 @@ export async function POST(request) {
         // Retry nach Initialisierung
         return await POST(request);
       } catch (initError) {
-        console.error('Database initialization failed:', initError);
       }
     }
     
@@ -142,7 +138,6 @@ export async function DELETE(request) {
     });
     
   } catch (error) {
-    console.error('Settings DELETE Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 

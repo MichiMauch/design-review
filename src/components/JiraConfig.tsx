@@ -26,7 +26,6 @@ export default function JiraConfigComponent({ onConfigSave }: JiraConfigProps) {
       try {
         setConfig(JSON.parse(savedConfig));
       } catch {
-        console.error('Error loading JIRA config');
       }
     }
   }, []);
@@ -48,7 +47,6 @@ export default function JiraConfigComponent({ onConfigSave }: JiraConfigProps) {
 
       setTimeout(() => setIsSaved(false), 3000);
     } catch {
-      console.error('Error saving JIRA config');
     }
   };
 

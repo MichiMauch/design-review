@@ -21,7 +21,6 @@ export async function OPTIONS() {
 export async function POST(request) {
   try {
     const requestBody = await request.json();
-    console.log('JIRA API received:', requestBody);
     
     const { action, ...data } = requestBody;
     let result;
@@ -55,8 +54,6 @@ export async function POST(request) {
     }
     return withCORS(result);
   } catch (error) {
-    console.error('JIRA API Error:', error);
-    console.error('Error details:', error.stack);
     const errorResponse = NextResponse.json({ 
       success: false, 
       error: error.message 
@@ -248,7 +245,6 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         ]
       });
     } catch {
-      console.log('Could not parse selected area');
     }
   }
 
@@ -266,12 +262,6 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   const responseData = await response.json();
 
   if (!response.ok) {
-    console.error('JIRA API Error Details:', {
-      status: response.status,
-      statusText: response.statusText,
-      responseData,
-      requestData: issueData
-    });
     
     const errorMessage = responseData.errorMessages?.join(', ') || 
                         responseData.errors ? Object.values(responseData.errors).join(', ') : 
@@ -305,7 +295,6 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         });
       }
     } catch (error) {
-      console.warn('Screenshot upload failed:', error);
       // Ticket wurde erstellt, nur Screenshot-Upload fehlgeschlagen
     }
   }
@@ -321,7 +310,6 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         issueKey: responseData.key
       });
     } catch (error) {
-      console.warn('Sprint assignment failed:', error);
       // Ticket wurde erstellt, nur Sprint-Zuweisung fehlgeschlagen
     }
   }
@@ -337,7 +325,6 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         statusId: selectedColumn.trim()
       });
     } catch (error) {
-      console.warn('Status change failed:', error);
       // Ticket wurde erstellt, nur Status-Änderung fehlgeschlagen
     }
   }
@@ -377,7 +364,6 @@ async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey,
         filename = lastPart;
       }
     } catch (error) {
-      console.error('Error downloading screenshot:', error);
       throw new Error(`Screenshot download failed: ${error.message}`);
     }
   } else {
@@ -408,7 +394,6 @@ async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey,
 
 async function addImageToDescription({ serverUrl, username, apiToken, issueKey, attachment, originalDescription }) {
   try {
-    console.log('Adding image to description:', { issueKey, attachment });
     
     // Insert the image right after the Discover section
     const discoverIndex = originalDescription.content.findIndex(
@@ -448,7 +433,6 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
       content: updatedContent
     };
 
-    console.log('Updated description structure:', JSON.stringify(updatedDescription, null, 2));
 
     const response = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}`, {
       method: 'PUT',
@@ -466,7 +450,6 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.warn('Failed to add image to description:', errorData);
       
       // Try a simpler approach - just mention the attachment
       const simpleUpdatedDescription = {
@@ -501,15 +484,11 @@ async function addImageToDescription({ serverUrl, username, apiToken, issueKey, 
 
       if (!retryResponse.ok) {
         const retryErrorData = await retryResponse.json();
-        console.warn('Retry also failed:', retryErrorData);
       } else {
-        console.log('Simple text reference added successfully');
       }
     } else {
-      console.log('Image added to description successfully');
     }
   } catch (error) {
-    console.warn('Error adding image to description:', error);
   }
 }
 
@@ -604,7 +583,6 @@ export async function GET(request) {
     }, { status: 400 });
 
   } catch (error) {
-    console.error('JIRA GET API Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
@@ -816,7 +794,6 @@ async function getJiraUsersForWidget({ jiraConfig }) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('JIRA Users API Error:', response.status, errorText);
     return NextResponse.json({ 
       success: false, 
       error: `JIRA API Error: ${response.status} - ${errorText}` 
@@ -859,7 +836,6 @@ async function getJiraBoardsForWidget({ jiraConfig }) {
 
     if (!boardsResponse.ok) {
       const errorText = await boardsResponse.text();
-      console.error('JIRA Boards API Error:', boardsResponse.status, errorText);
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Boards API Error: ${boardsResponse.status}` 
@@ -879,7 +855,6 @@ async function getJiraBoardsForWidget({ jiraConfig }) {
     });
 
   } catch (error) {
-    console.error('JIRA Boards Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
@@ -917,7 +892,6 @@ async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
 
     if (!sprintsResponse.ok) {
       const errorText = await sprintsResponse.text();
-      console.error('JIRA Sprints API Error:', sprintsResponse.status, errorText);
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Sprints API Error: ${sprintsResponse.status}` 
@@ -939,7 +913,6 @@ async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
     });
 
   } catch (error) {
-    console.error('JIRA Sprints Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
@@ -977,7 +950,6 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
 
     if (!configResponse.ok) {
       const errorText = await configResponse.text();
-      console.error('JIRA Board Config API Error:', configResponse.status, errorText);
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Board Config API Error: ${configResponse.status}` 
@@ -985,14 +957,12 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
     }
 
     const configData = await configResponse.json();
-    console.log('JIRA Board Configuration:', JSON.stringify(configData, null, 2));
     
     let swimlaneOptions = [{ id: '', name: 'Keine Swimlane' }];
     
     // Check for swimlane configuration in the board
     if (configData.subQuery && configData.subQuery.query) {
       const subQuery = configData.subQuery.query;
-      console.log('JIRA Swimlane SubQuery:', subQuery);
       
       // Parse different types of swimlane configurations
       if (subQuery.includes('assignee')) {
@@ -1060,7 +1030,6 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
       }
     }
     
-    console.log('JIRA Swimlanes found:', swimlaneOptions.length);
     
     return NextResponse.json({
       success: true,
@@ -1068,7 +1037,6 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
     });
 
   } catch (error) {
-    console.error('JIRA Swimlanes Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
@@ -1106,7 +1074,6 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
 
     if (!configResponse.ok) {
       const errorText = await configResponse.text();
-      console.error('JIRA Board Config API Error:', configResponse.status, errorText);
       return NextResponse.json({ 
         success: false, 
         error: `JIRA Board Config API Error: ${configResponse.status}` 
@@ -1114,7 +1081,6 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
     }
 
     const configData = await configResponse.json();
-    console.log('JIRA Board Configuration for Columns:', JSON.stringify(configData.columnConfig, null, 2));
     
     let columnOptions = [];
     
@@ -1143,7 +1109,6 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
       ];
     }
     
-    console.log('JIRA Board Columns found:', columnOptions.length, columnOptions);
     
     return NextResponse.json({
       success: true,
@@ -1151,7 +1116,6 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
     });
 
   } catch (error) {
-    console.error('JIRA Board Columns Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
@@ -1175,7 +1139,6 @@ async function changeIssueStatus({ serverUrl, username, apiToken, issueKey, stat
     }
 
     const transitionsData = await transitionsResponse.json();
-    console.log('Available transitions:', transitionsData.transitions);
 
     // Find a transition that leads to the desired status
     const targetTransition = transitionsData.transitions.find(
@@ -1183,8 +1146,6 @@ async function changeIssueStatus({ serverUrl, username, apiToken, issueKey, stat
     );
 
     if (!targetTransition) {
-      console.warn(`No transition found to status ${statusId}. Available transitions:`, 
-        transitionsData.transitions.map(t => ({ id: t.id, name: t.name, to: t.to })));
       return;
     }
 
@@ -1208,10 +1169,8 @@ async function changeIssueStatus({ serverUrl, username, apiToken, issueKey, stat
       throw new Error(`Transition failed: ${errorData.errorMessages?.join(', ') || transitionResponse.statusText}`);
     }
 
-    console.log(`Successfully transitioned issue ${issueKey} to status ${statusId}`);
     
   } catch (error) {
-    console.error('Status change error:', error);
     throw error;
   }
 }

@@ -2,7 +2,6 @@
 (function() {
     'use strict';
     
-    console.log('Widget: Loading modern feedback widget');
     
     // Configuration
     const script = document.currentScript || document.querySelector('script[data-project-id]');
@@ -19,7 +18,6 @@
         }
     }
     
-    console.log('Widget: Configuration loaded', { projectId, baseUrl });
     
     // State variables
     let isSelecting = false;
@@ -38,11 +36,9 @@
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
             script.onload = () => {
-                console.log('Widget: html2canvas loaded');
                 resolve(window.html2canvas);
             };
             script.onerror = () => {
-                console.error('Widget: Failed to load html2canvas');
                 reject(new Error('Failed to load html2canvas'));
             };
             document.head.appendChild(script);
@@ -84,14 +80,12 @@
         button.addEventListener('click', startFeedbackProcess);
         
         document.body.appendChild(button);
-        console.log('Widget: Feedback button created');
     }
     
     // Start feedback process
     function startFeedbackProcess() {
         if (isSelecting) return;
         
-        console.log('Widget: Starting feedback process');
         createSelectionOverlay();
     }
     
@@ -167,7 +161,6 @@
                         height: height
                     };
                     
-                    console.log('Widget: Area selected:', selectionArea);
                     removeSelectionOverlay();
                     showFeedbackModal();
                 } else {
@@ -189,7 +182,6 @@
         document.addEventListener('keydown', onKeyDown);
         
         document.body.appendChild(overlay);
-        console.log('Widget: Selection overlay created');
     }
     
     // Remove selection overlay
@@ -268,7 +260,6 @@
             modal.querySelector('#feedback-text').focus();
         }, 100);
         
-        console.log('Widget: Feedback modal shown');
     }
     
     // Close feedback modal
@@ -283,12 +274,10 @@
     // Create screenshot
     async function createScreenshot() {
         if (!selectionArea) {
-            console.error('Widget: No selection area available');
             return null;
         }
         
         try {
-            console.log('Widget: Creating screenshot...');
             
             // Load html2canvas
             const html2canvas = await loadHtml2Canvas();
@@ -326,11 +315,9 @@
             );
             
             const dataURL = croppedCanvas.toDataURL('image/png', 0.9);
-            console.log('Widget: Screenshot created successfully');
             return dataURL;
             
         } catch (error) {
-            console.error('Widget: Screenshot creation failed:', error);
             return null;
         }
     }
@@ -365,7 +352,6 @@
                 timestamp: new Date().toISOString()
             };
             
-            console.log('Widget: Submitting feedback...', feedbackData);
             
             // Send to API
             const response = await fetch(`${baseUrl}/api/feedback`, {
@@ -377,7 +363,6 @@
             });
             
             if (response.ok) {
-                console.log('Widget: Feedback submitted successfully');
                 
                 // Show success message
                 modal.innerHTML = `
@@ -413,7 +398,6 @@
             }
             
         } catch (error) {
-            console.error('Widget: Feedback submission failed:', error);
             
             // Show error message
             modal.innerHTML = `
@@ -448,7 +432,6 @@
     function initWidget() {
         // Check if already initialized
         if (document.getElementById('feedback-widget-button')) {
-            console.log('Widget: Already initialized');
             return;
         }
         
@@ -459,7 +442,6 @@
             createFeedbackButton();
         }
         
-        console.log('Widget: Initialized successfully');
     }
     
     // Start the widget

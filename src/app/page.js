@@ -39,7 +39,6 @@ export default function HomePage() {
       const project = await response.json();
       router.push(`/project/${project.id}`);
     } catch (error) {
-      console.error('Failed to create project:', error);
       alert('Fehler beim Erstellen des Projekts: ' + error.message);
     } finally {
       setIsLoading(false);

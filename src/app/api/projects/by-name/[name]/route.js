@@ -28,7 +28,6 @@ export async function GET(request, { params }) {
     return addCorsHeaders(Response.json(result.rows[0]));
 
   } catch (error) {
-    console.error('Error fetching project by name:', error);
     return addCorsHeaders(new Response('Fehler beim Laden des Projekts', { status: 500 }));
   }
 }

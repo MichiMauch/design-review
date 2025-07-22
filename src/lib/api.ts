@@ -19,7 +19,6 @@ export async function captureScreenshot(
 
     return response.data;
   } catch (error) {
-    console.error('Screenshot capture failed:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -34,7 +33,6 @@ export async function createJiraTicket(
 ): Promise<{ success: boolean; issueKey?: string; error?: string }> {
   try {
     // This will be implemented later with actual JIRA API integration
-    console.log('Creating JIRA ticket:', { summary, description, attachments });
     
     // Mock implementation for now
     return {
@@ -42,7 +40,6 @@ export async function createJiraTicket(
       issueKey: 'PROJ-' + Math.floor(Math.random() * 1000),
     };
   } catch (error) {
-    console.error('JIRA ticket creation failed:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
