@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, created_at FROM tasks WHERE project_id = ? ORDER BY created_at DESC LIMIT 20',
+      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, created_at FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
       args: [resolvedParams.id]
     });
 
