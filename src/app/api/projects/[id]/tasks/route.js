@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot_url, created_at FROM tasks WHERE project_id = ? ORDER BY created_at DESC LIMIT 20',
+      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, created_at FROM tasks WHERE project_id = ? ORDER BY created_at DESC LIMIT 20',
       args: [resolvedParams.id]
     });
 
@@ -30,11 +30,11 @@ export async function GET(request, { params }) {
       if (row.screenshot_url) {
         // Use the R2 URL
         screenshotDisplay = row.screenshot_url;
+      } else if (row.screenshot && !row.screenshot.startsWith('data:')) {
+        // Construct R2 URL from filename (for older entries without screenshot_url)
+        const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
+        screenshotDisplay = `https://pub-${accountId}.r2.dev/screenshots/${row.screenshot}`;
       }
-      
-      // If no screenshot_url but we might have a filename in the excluded screenshot field,
-      // we need to fetch it separately or construct the R2 URL
-      // For now, we'll add a separate endpoint to get screenshot data when needed
       
       return {
         ...row,

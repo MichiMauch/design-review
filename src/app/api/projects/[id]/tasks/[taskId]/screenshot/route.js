@@ -83,6 +83,46 @@ export async function GET(request, { params }) {
         } catch (error) {
           console.error('Error fetching external screenshot:', error);
         }
+      } else if (task.screenshot && (task.screenshot.includes('.png') || task.screenshot.includes('.jpg') || task.screenshot.includes('.jpeg'))) {
+        // Filename only - load directly from R2 with authentication
+        try {
+          const AWS = require('aws-sdk');
+          const https = require('https');
+          
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
+          
+          const s3 = new AWS.S3({
+            endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+            accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
+            secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+            signatureVersion: 'v4',
+            s3ForcePathStyle: true,
+            region: 'auto',
+            sslEnabled: true,
+            httpOptions: {
+              agent: https.globalAgent,
+              timeout: 120000,
+            }
+          });
+          
+          const bucketName = 'review';
+          const key = `screenshots/${task.screenshot}`;
+          
+          console.log(`Loading image from R2: ${key}`);
+          
+          const result = await s3.getObject({
+            Bucket: bucketName,
+            Key: key
+          }).promise();
+          
+          imageData = result.Body;
+          contentType = result.ContentType || 'image/png';
+          
+          console.log(`Successfully loaded ${imageData.length} bytes from R2`);
+          
+        } catch (error) {
+          console.error('Error loading screenshot from R2:', error);
+        }
       }
     }
 

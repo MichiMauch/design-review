@@ -20,7 +20,7 @@ const s3 = new S3({
   }
 });
 
-const BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET!;
+const BUCKET_NAME = 'review';
 
 export async function uploadScreenshotToR2(
   file: Buffer,
@@ -54,7 +54,7 @@ export async function uploadScreenshotToR2(
     
     const result = {
       filename: cleanFileName,
-      url: `https://pub-${accountId}.r2.dev/${key}` // This will be https://pub-6a52908bab2567e2a24d0dec042053d5.r2.dev/screenshots/filename
+      url: `https://pub-${accountId}.r2.dev/${key}` // This will be https://pub-cac1d67ee1dc4cb6814dff593983d703.r2.dev/screenshots/filename
     };
     
     console.log('R2 Upload v2: Generated result:', result);

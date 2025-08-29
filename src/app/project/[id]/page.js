@@ -77,10 +77,10 @@ export default function ProjectPage() {
   // Helper function to get screenshot URL
   const getScreenshotUrl = (screenshot) => {
     if (!screenshot) return null;
-    if (screenshot.startsWith('http')) return screenshot;
     if (screenshot.startsWith('data:')) return screenshot;
-    // Assume it's a filename that needs to be served from the uploads endpoint
-    return `/api/uploads/${screenshot}`;
+    if (screenshot.startsWith('http')) return screenshot;
+    // For filename-only screenshots, construct the correct R2 URL
+    return `https://pub-cac1d67ee1dc4cb6814dff593983d703.r2.dev/screenshots/${screenshot}`;
   };
 
   // Load screenshot for a specific task
@@ -90,7 +90,7 @@ export default function ProjectPage() {
     setLoadingScreenshots(prev => ({ ...prev, [taskId]: true }));
     
     try {
-      const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}/screenshot`);
+      const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}/screenshot?format=json`);
       if (response.ok) {
         const data = await response.json();
         // Update the task in the tasks array with the screenshot URL
@@ -1180,7 +1180,7 @@ export default function ProjectPage() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  const imageUrl = task.screenshot_display || (task.screenshot?.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot));
+                                  const imageUrl = getScreenshotUrl(task.screenshot) || task.screenshot_display;
                                   if (imageUrl) {
                                     openScreenshotLightbox(imageUrl);
                                   }
@@ -1190,7 +1190,7 @@ export default function ProjectPage() {
                                   <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img 
-                                      src={task.screenshot_display || (task.screenshot?.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot))} 
+                                      src={getScreenshotUrl(task.screenshot) || task.screenshot_display} 
                                       alt="Task Screenshot" 
                                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
                                     />
