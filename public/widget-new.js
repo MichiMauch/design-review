@@ -542,6 +542,7 @@
             // JIRA functionality temporarily disabled
             /*
             // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
+            const jiraSection = document.getElementById('jira-section');
             if (jiraSection) {
                     jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
             }

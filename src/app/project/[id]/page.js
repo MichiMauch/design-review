@@ -18,7 +18,9 @@ import {
   ExternalLink as JiraIcon,
   Settings,
   RefreshCw,
-  Download
+  Download,
+  List,
+  Columns
 } from 'lucide-react';
 import Link from 'next/link';
 import { downloadExcel } from '@/utils/excelExport';
@@ -79,6 +81,8 @@ export default function ProjectPage() {
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
   const [exportingExcel, setExportingExcel] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('list');
+  const [selectedTaskForModal, setSelectedTaskForModal] = useState(null);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -994,9 +998,9 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <div className={`grid gap-6 ${viewMode === 'board' ? 'grid-cols-1' : 'lg:grid-cols-4'}`}>
           {/* Main Content Area */}
-          <div className="lg:col-span-3">
+          <div className={viewMode === 'board' ? '' : 'lg:col-span-3'}>
             {/* Widget Installation - only show if not installed */}
             {!project.widget_installed && (
               <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -1084,19 +1088,47 @@ export default function ProjectPage() {
                     {isRefreshing ? 'Lädt...' : 'Aktualisieren'}
                   </button>
                   
-                  {/* Status Filter */}
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="all">Alle Status</option>
-                    {TASK_STATUSES.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center border border-gray-200 rounded-lg">
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors ${
+                        viewMode === 'list' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                      }`}
+                    >
+                      <List className="h-4 w-4" />
+                      Liste
+                    </button>
+                    <button
+                      onClick={() => setViewMode('board')}
+                      className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors border-l border-gray-200 ${
+                        viewMode === 'board' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Columns className="h-4 w-4" />
+                      Board
+                    </button>
+                  </div>
+                  
+                  {/* Status Filter - nur in Liste-Ansicht */}
+                  {viewMode === 'list' && (
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="all">Alle Status</option>
+                      {TASK_STATUSES.map(status => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
               
@@ -1111,7 +1143,7 @@ export default function ProjectPage() {
                     }
                   </p>
                 </div>
-              ) : (
+              ) : viewMode === 'list' ? (
                 <div className="space-y-4">
                   {/* Non-JIRA Tasks */}
                   {getFilteredTasks(tasks.filter(t => !t.jira_key)).length > 0 && (
@@ -1435,12 +1467,62 @@ export default function ProjectPage() {
                   )}
 
                 </div>
+              ) : (
+                /* Board View */
+                <div className="grid grid-cols-7 gap-4 h-[calc(100vh-200px)]">
+                  {TASK_STATUSES.map(status => {
+                    const statusTasks = tasks.filter(t => !t.jira_key && (t.status || 'open') === status.value);
+                    return (
+                      <div key={status.value} className="flex flex-col">
+                        <div className={`p-3 rounded-t-lg border-b-2 ${status.color} font-medium text-sm`}>
+                          <div className="flex items-center justify-between">
+                            <span>{status.label}</span>
+                            <span className="bg-white bg-opacity-50 px-2 py-1 rounded text-xs">
+                              {statusTasks.length}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-1 bg-gray-50 rounded-b-lg p-2 overflow-y-auto">
+                          <div className="space-y-2">
+                            {statusTasks.map(task => (
+                              <div 
+                                key={task.id}
+                                className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+                                onClick={() => setSelectedTaskForModal(task)}
+                              >
+                                <div className="space-y-2">
+                                  <h4 className="font-medium text-sm text-gray-900" style={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
+                                  }}>
+                                    {task.title}
+                                  </h4>
+                                  <div className="flex items-center justify-between text-xs text-gray-500">
+                                    <span>{formatTime(task.created_at)}</span>
+                                    {task.screenshot_display || task.screenshot ? (
+                                      <div className="w-4 h-4 bg-gray-200 rounded text-center text-xs">
+                                        📷
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
           
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
+          {/* Sidebar - nur in List-Ansicht */}
+          {viewMode === 'list' && (
+            <div className="lg:col-span-1 space-y-6">
             
 
             {/* Project Stats */}
@@ -1673,7 +1755,8 @@ export default function ProjectPage() {
                 </button>
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Delete Confirmation Modal */}
@@ -1920,6 +2003,157 @@ export default function ProjectPage() {
                   e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y3ZjdmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5TY3JlZW5zaG90IG5pY2h0IGdlZnVuZGVuPC90ZXh0Pjwvc3ZnPg==';
                 }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Task Detail Modal */}
+        {selectedTaskForModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                {/* Modal Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Task Details
+                  </h3>
+                  <button
+                    onClick={() => setSelectedTaskForModal(null)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Task Content */}
+                <div className="space-y-4">
+                  {/* Title */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Titel</label>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      {selectedTaskForModal.title}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {selectedTaskForModal.description && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        {selectedTaskForModal.description}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={selectedTaskForModal.status || 'open'}
+                      onChange={(e) => {
+                        updateTaskStatus(selectedTaskForModal.id, e.target.value);
+                        setSelectedTaskForModal({...selectedTaskForModal, status: e.target.value});
+                      }}
+                      className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusInfo(selectedTaskForModal.status).color}`}
+                    >
+                      {TASK_STATUSES.map(status => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Screenshot */}
+                  {(selectedTaskForModal.screenshot_display || selectedTaskForModal.screenshot) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Screenshot</label>
+                      <div className="border rounded-lg p-2 bg-gray-50">
+                        <img
+                          src={getScreenshotUrl(selectedTaskForModal.screenshot) || selectedTaskForModal.screenshot_display}
+                          alt="Task Screenshot"
+                          className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => openScreenshotLightbox(getScreenshotUrl(selectedTaskForModal.screenshot) || selectedTaskForModal.screenshot_display)}
+                          onError={(e) => {
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y3ZjdmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5TY3JlZW5zaG90IG5pY2h0IGdlZnVuZGVuPC90ZXh0Pjwvc3ZnPg==';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* URL */}
+                  {selectedTaskForModal.url && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={selectedTaskForModal.url}
+                          readOnly
+                          className="flex-1 p-3 bg-gray-50 rounded-lg text-sm"
+                        />
+                        <a
+                          href={selectedTaskForModal.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Öffnen
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Created Date */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Erstellt</label>
+                    <div className="p-3 bg-gray-50 rounded-lg text-sm">
+                      {formatTime(selectedTaskForModal.created_at)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Actions */}
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openJiraModal(selectedTaskForModal)}
+                      disabled={creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm"
+                    >
+                      {creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          {loadingJiraModal === selectedTaskForModal.id ? 'Lade...' : 'Erstelle...'}
+                        </>
+                      ) : (
+                        <>
+                          <JiraIcon className="h-3 w-3" />
+                          JIRA Task
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openTaskDeleteModal(selectedTaskForModal)}
+                      className="flex items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                    >
+                      <X className="h-3 w-3" />
+                      Löschen
+                    </button>
+                    <button
+                      onClick={() => setSelectedTaskForModal(null)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
