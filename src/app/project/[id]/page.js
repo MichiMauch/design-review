@@ -83,6 +83,8 @@ export default function ProjectPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState('list');
   const [selectedTaskForModal, setSelectedTaskForModal] = useState(null);
+  const [draggedTask, setDraggedTask] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -666,6 +668,56 @@ export default function ProjectPage() {
       console.error('Error updating task status:', error);
       showToast('Fehler beim Aktualisieren des Status', 'error');
     }
+  };
+
+  // Drag & Drop Handlers
+  const handleDragStart = (e, task) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target.outerHTML);
+    e.target.style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e) => {
+    e.target.style.opacity = '1';
+    setDraggedTask(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnter = (e, statusValue) => {
+    e.preventDefault();
+    setDragOverColumn(statusValue);
+  };
+
+  const handleDragLeave = (e) => {
+    // Only remove highlight if leaving the column entirely
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleDrop = async (e, statusValue) => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    
+    if (draggedTask && draggedTask.status !== statusValue) {
+      // Optimistically update UI
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === draggedTask.id ? { ...task, status: statusValue } : task
+        )
+      );
+      
+      // Update status on server
+      await updateTaskStatus(draggedTask.id, statusValue);
+    }
+    
+    setDraggedTask(null);
   };
 
   const saveTask = async (taskId) => {
@@ -1473,7 +1525,18 @@ export default function ProjectPage() {
                   {TASK_STATUSES.map(status => {
                     const statusTasks = tasks.filter(t => !t.jira_key && (t.status || 'open') === status.value);
                     return (
-                      <div key={status.value} className="flex flex-col min-w-80 w-80">
+                      <div 
+                        key={status.value} 
+                        className={`flex flex-col min-w-80 w-80 transition-all ${
+                          dragOverColumn === status.value 
+                            ? 'ring-2 ring-blue-400 ring-opacity-75 bg-blue-50' 
+                            : ''
+                        }`}
+                        onDragOver={handleDragOver}
+                        onDragEnter={(e) => handleDragEnter(e, status.value)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, status.value)}
+                      >
                         <div className={`p-3 rounded-t-lg border-b-2 ${status.color} font-medium text-sm`}>
                           <div className="flex items-center justify-between">
                             <span>{status.label}</span>
@@ -1482,13 +1545,30 @@ export default function ProjectPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex-1 bg-gray-100 rounded-b-lg p-3 overflow-y-auto">
+                        <div className={`flex-1 rounded-b-lg p-3 overflow-y-auto transition-all ${
+                          dragOverColumn === status.value 
+                            ? 'bg-blue-50' 
+                            : 'bg-gray-100'
+                        }`}>
                           <div className="space-y-2">
+                            {statusTasks.length === 0 && dragOverColumn === status.value && (
+                              <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center text-blue-500">
+                                <span className="text-sm">Task hier ablegen</span>
+                              </div>
+                            )}
                             {statusTasks.map(task => (
                               <div 
                                 key={task.id}
-                                className="bg-white rounded-lg p-3 shadow-md hover:shadow-lg transition-shadow cursor-pointer border border-gray-200"
-                                onClick={() => setSelectedTaskForModal(task)}
+                                draggable
+                                className="bg-white rounded-lg p-3 shadow-md hover:shadow-lg transition-all cursor-grab active:cursor-grabbing border border-gray-200"
+                                onClick={() => {
+                                  // Prevent modal opening during drag
+                                  if (!draggedTask) {
+                                    setSelectedTaskForModal(task);
+                                  }
+                                }}
+                                onDragStart={(e) => handleDragStart(e, task)}
+                                onDragEnd={handleDragEnd}
                               >
                                 <div className="space-y-2">
                                   <h4 className="font-medium text-sm text-gray-900" style={{
