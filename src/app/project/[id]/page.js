@@ -9,7 +9,6 @@ import {
   Code, 
   MessageSquare, 
   ArrowLeft,
-  Clock,
   AlertCircle,
   Globe,
   Calendar,
@@ -79,6 +78,7 @@ export default function ProjectPage() {
   const [lightboxImage, setLightboxImage] = useState(null);
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -284,6 +284,14 @@ export default function ProjectPage() {
     }
   };
 
+
+  // Filter tasks based on status
+  const getFilteredTasks = (tasksToFilter) => {
+    if (statusFilter === 'all') {
+      return tasksToFilter;
+    }
+    return tasksToFilter.filter(task => task.status === statusFilter);
+  };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
@@ -1075,6 +1083,20 @@ export default function ProjectPage() {
                     <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                     {isRefreshing ? 'Lädt...' : 'Aktualisieren'}
                   </button>
+                  
+                  {/* Status Filter */}
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">Alle Status</option>
+                    {TASK_STATUSES.map(status => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
@@ -1091,15 +1113,15 @@ export default function ProjectPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Open Non-JIRA Tasks */}
-                  {tasks.filter(t => !t.jira_key && t.status === 'open').length > 0 && (
+                  {/* Non-JIRA Tasks */}
+                  {getFilteredTasks(tasks.filter(t => !t.jira_key)).length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <AlertCircle className="h-5 w-5 text-red-500" />
-                        Offene Tasks ({tasks.filter(t => !t.jira_key && t.status === 'open').length})
+                        Tasks ({getFilteredTasks(tasks.filter(t => !t.jira_key)).length})
                       </h3>
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                        {tasks.filter(t => !t.jira_key && t.status === 'open').map((task) => (
+                        {getFilteredTasks(tasks.filter(t => !t.jira_key)).map((task) => (
                           <div key={task.id} className="bg-white border border-red-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
@@ -1153,7 +1175,11 @@ export default function ProjectPage() {
                               <div className="flex items-center gap-1 ml-2">
                                 <select
                                   value={task.status || 'open'}
-                                  onChange={(e) => updateTaskStatus(task.id, e.target.value)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    updateTaskStatus(task.id, e.target.value);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusInfo(task.status).color}`}
                                 >
                                   {TASK_STATUSES.map(status => (
@@ -1408,69 +1434,6 @@ export default function ProjectPage() {
                     </div>
                   )}
 
-                  {/* Other Tasks (in progress, completed, etc.) */}
-                  {tasks.filter(t => !t.jira_key && t.status !== 'open').length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-500" />
-                        Andere Tasks ({tasks.filter(t => !t.jira_key && t.status !== 'open').length})
-                      </h3>
-                      <div className="space-y-3">
-                        {tasks.filter(t => !t.jira_key && t.status !== 'open').map((task) => (
-                          <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-medium text-gray-900 mb-1">{task.title}</h4>
-                                {task.description && (
-                                  <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1 ml-2">
-                                <select
-                                  value={task.status || 'open'}
-                                  onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusInfo(task.status).color}`}
-                                >
-                                  {TASK_STATUSES.map(status => (
-                                    <option key={status.value} value={status.value}>
-                                      {status.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  onClick={() => openTaskDeleteModal(task)}
-                                  disabled={deletingTask === task.id}
-                                  className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                                  title="Task löschen"
-                                >
-                                  {deletingTask === task.id ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                                  ) : (
-                                    <X className="h-4 w-4" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center justify-between text-xs text-gray-500">
-                              <span>{formatTime(task.created_at)}</span>
-                              {task.url && (
-                                <a 
-                                  href={task.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                  Seite öffnen
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
