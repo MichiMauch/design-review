@@ -333,26 +333,11 @@ export default function ProjectPage() {
       date = new Date(dateString);
     } else {
       // SQLite datetime format (e.g., "2025-08-29 10:43:38") - treat as local time
-      // The database stores in local time but JavaScript interprets as UTC
-      // We need to manually construct the date in the local timezone
-      const parts = dateString.split(' ');
-      if (parts.length === 2) {
-        const [datePart, timePart] = parts;
-        const [year, month, day] = datePart.split('-');
-        const [hour, minute, second] = timePart.split(':');
-        
-        // Create date in local timezone (not UTC)
-        date = new Date(
-          parseInt(year),
-          parseInt(month) - 1, // Month is 0-indexed
-          parseInt(day),
-          parseInt(hour),
-          parseInt(minute),
-          parseInt(second)
-        );
-      } else {
-        date = new Date(dateString);
-      }
+      // JavaScript interprets "YYYY-MM-DD HH:mm:ss" as UTC, but we need local time
+      // Solution: Add timezone offset to compensate
+      const tempDate = new Date(dateString.replace(' ', 'T'));
+      const timezoneOffset = tempDate.getTimezoneOffset() * 60000; // in milliseconds
+      date = new Date(tempDate.getTime() - timezoneOffset);
     }
     
     // Verify date is valid
@@ -365,6 +350,15 @@ export default function ProjectPage() {
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Debug logging
+    console.log('Time debug:', {
+      original: dateString,
+      parsed: date.toLocaleString('de-DE'),
+      now: now.toLocaleString('de-DE'),
+      diffMins,
+      diffHours
+    });
 
     if (diffMs < 60000) { // Less than 1 minute
       return 'Gerade eben';
