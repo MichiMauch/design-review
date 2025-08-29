@@ -83,17 +83,7 @@ export async function POST(request, { params }) {
       projectId = projectResult.rows[0].id;
     }
 
-    // Get current German time with proper timezone info
-    const now = new Date();
-    const germanTime = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: 'Europe/Berlin',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }).format(now).replace(' ', 'T') + '+02:00'; // Add CEST timezone offset
+    // Use SQLite's datetime function for consistent timezone handling
 
     // R2 Upload only - no Data URL storage
     let screenshotUrl = null;
@@ -182,7 +172,7 @@ export async function POST(request, { params }) {
     const result = await db.execute({
       sql: `
         INSERT INTO tasks (project_id, title, description, screenshot, screenshot_url, url, selected_area, title_en, description_en, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
       `,
       args: [
         projectId, // Now using the resolved numeric project ID
@@ -193,8 +183,7 @@ export async function POST(request, { params }) {
         url,
         selected_area ? JSON.stringify(selected_area) : null,
         title_en || null,
-        description_en || null,
-        germanTime
+        description_en || null
       ]
     });
 
@@ -212,7 +201,7 @@ export async function POST(request, { params }) {
       selected_area,
       title_en,
       description_en,
-      created_at: germanTime
+      created_at: new Date().toISOString()
     }));
 
   } catch (error) {
