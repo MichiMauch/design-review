@@ -548,7 +548,8 @@
             }
             */
         }, 0);
-        // Initialize annotation functionality
+        
+        // Initialize annotation functionality after DOM elements are created
         initializeAnnotation();
     }
     
