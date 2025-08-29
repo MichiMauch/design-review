@@ -105,7 +105,7 @@ export async function POST(request) {
           Screenshot Service
         </text>
         <text x="600" y="400" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#94a3b8">
-          URL: ${url || 'N/A'}
+          Service temporär nicht erreichbar
         </text>
         <text x="600" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#94a3b8">
           ${new Date().toLocaleString('de-DE')}

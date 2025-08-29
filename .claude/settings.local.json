@@ -43,7 +43,9 @@
       "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)",
       "Read(/Users/michaelmauch/Documents/Development/kokomo2/app/admin/api/upload-image/**)",
       "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)",
-      "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)"
+      "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)",
+      "Bash(source .env.local)",
+      "Bash(gh api:*)"
     ],
     "deny": []
   }

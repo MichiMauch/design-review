@@ -10,7 +10,6 @@ import {
   MessageSquare, 
   ArrowLeft,
   Clock,
-  CheckCircle2,
   AlertCircle,
   Globe,
   Calendar,
@@ -24,6 +23,17 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { downloadExcel } from '@/utils/excelExport';
+
+// Task status definitions
+const TASK_STATUSES = [
+  { value: 'open', label: 'Offen', color: 'bg-red-100 text-red-800 border-red-200' },
+  { value: 'problem', label: 'Problem', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  { value: 'netnode', label: 'NETNODE', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { value: 'tbd', label: 'TBD', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+  { value: 'warning', label: 'Warnung', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { value: 'ignore', label: 'Ignorieren', color: 'bg-gray-100 text-gray-500 border-gray-200' },
+  { value: 'done', label: 'Erledigt', color: 'bg-green-100 text-green-800 border-green-200' }
+];
 
 export default function ProjectPage() {
   const params = useParams();
@@ -274,23 +284,6 @@ export default function ProjectPage() {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'open': return 'bg-red-100 text-red-800';
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'open': return <AlertCircle className="h-4 w-4" />;
-      case 'in_progress': return <Clock className="h-4 w-4" />;
-      case 'completed': return <CheckCircle2 className="h-4 w-4" />;
-      default: return <AlertCircle className="h-4 w-4" />;
-    }
-  };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
@@ -632,6 +625,35 @@ export default function ProjectPage() {
   const cancelEditing = () => {
     setEditingTask(null);
     setEditForm({ title: '', description: '' });
+  };
+
+  const getStatusInfo = (statusValue) => {
+    return TASK_STATUSES.find(status => status.value === statusValue) || TASK_STATUSES[0];
+  };
+
+  const updateTaskStatus = async (taskId, newStatus) => {
+    try {
+      const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        // Update local state
+        setTasks(tasks.map(task => 
+          task.id === taskId ? { ...task, status: newStatus } : task
+        ));
+        showToast('Status erfolgreich aktualisiert', 'success');
+      } else {
+        showToast('Fehler beim Aktualisieren des Status', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      showToast('Fehler beim Aktualisieren des Status', 'error');
+    }
   };
 
   const saveTask = async (taskId) => {
@@ -1129,10 +1151,17 @@ export default function ProjectPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 ml-2">
-                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
-                                  {getStatusIcon(task.status)}
-                                  Offen
-                                </span>
+                                <select
+                                  value={task.status || 'open'}
+                                  onChange={(e) => updateTaskStatus(task.id, e.target.value)}
+                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusInfo(task.status).color}`}
+                                >
+                                  {TASK_STATUSES.map(status => (
+                                    <option key={status.value} value={status.value}>
+                                      {status.label}
+                                    </option>
+                                  ))}
+                                </select>
                                 {!editingTask && (
                                   <>
                                     <button
@@ -1397,10 +1426,17 @@ export default function ProjectPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 ml-2">
-                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
-                                  {getStatusIcon(task.status)}
-                                  {task.status === 'in_progress' ? 'In Bearbeitung' : 'Abgeschlossen'}
-                                </span>
+                                <select
+                                  value={task.status || 'open'}
+                                  onChange={(e) => updateTaskStatus(task.id, e.target.value)}
+                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusInfo(task.status).color}`}
+                                >
+                                  {TASK_STATUSES.map(status => (
+                                    <option key={status.value} value={status.value}>
+                                      {status.label}
+                                    </option>
+                                  ))}
+                                </select>
                                 <button
                                   onClick={() => openTaskDeleteModal(task)}
                                   disabled={deletingTask === task.id}
