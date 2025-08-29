@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Globe, FolderOpen } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Globe, FolderOpen, Loader } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -9,7 +9,39 @@ export default function HomePage() {
   const [projectName, setProjectName] = useState('');
   const [projectDomain, setProjectDomain] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const router = useRouter();
+
+  // Check user authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const userData = await response.json();
+          if (userData.user.role !== 'admin') {
+            // Redirect non-admin users to projects page
+            router.push('/projects');
+            return;
+          }
+          setUser(userData.user);
+        } else {
+          // Not authenticated, redirect to login
+          router.push('/login');
+          return;
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.push('/login');
+        return;
+      } finally {
+        setLoadingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   const createProject = async () => {
     if (!projectName.trim() || !projectDomain.trim()) {
@@ -44,6 +76,23 @@ export default function HomePage() {
       setIsLoading(false);
     }
   };
+
+  // Show loading spinner while checking authentication
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Lade...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only render the page if user is admin
+  if (!user || user.role !== 'admin') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

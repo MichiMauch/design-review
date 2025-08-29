@@ -39,14 +39,33 @@ function MagicLinkContent() {
         setMessage('Erfolgreich angemeldet!');
         setUserInfo(result.user);
         
-        // Redirect to admin or projects page after short delay
-        setTimeout(() => {
-          if (result.user.role === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/projects');
+        console.log('✅ Login successful');
+        
+        // Test if session cookie works by calling /api/auth/me
+        setTimeout(async () => {
+          try {
+            const testResponse = await fetch('/api/auth/me');
+            const testResult = await testResponse.json();
+            console.log('🔍 Session test:', testResponse.ok ? 'SUCCESS' : 'FAILED', testResult);
+            
+            if (testResponse.ok) {
+              console.log('🔄 Redirecting to projects/admin');
+              if (result.user.role === 'admin') {
+                router.push('/admin');
+              } else {
+                router.push('/projects');
+              }
+            } else {
+              console.error('❌ Session cookie not working, staying on login');
+              setStatus('error');
+              setMessage('Cookie konnte nicht gesetzt werden. Bitte versuche es erneut.');
+            }
+          } catch (error) {
+            console.error('❌ Session test failed:', error);
+            setStatus('error');
+            setMessage('Verbindungsfehler beim Testen der Session.');
           }
-        }, 2000);
+        }, 1000);
       } else {
         setStatus('error');
         setMessage(result.error || 'Magic Link ist ungültig oder abgelaufen.');

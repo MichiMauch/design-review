@@ -81,7 +81,7 @@ export default function ProjectPage() {
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
   const [exportingExcel, setExportingExcel] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('board');
   const [selectedTaskForModal, setSelectedTaskForModal] = useState(null);
   const [draggedTask, setDraggedTask] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
@@ -90,6 +90,7 @@ export default function ProjectPage() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [addingComment, setAddingComment] = useState(false);
   const [commentCounts, setCommentCounts] = useState({});
+  const [user, setUser] = useState(null);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -193,7 +194,7 @@ export default function ProjectPage() {
       const projectData = await response.json();
       setProject(projectData);
     } catch {
-      router.push('/');
+      router.push('/projects');
     } finally {
       setIsLoading(false);
     }
@@ -275,6 +276,23 @@ export default function ProjectPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks.length, project?.id]);
+
+  // Load current user on component mount
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const response = await fetch('/api/auth/me');
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData.user);
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
 
   const loadJiraSettings = async () => {
     try {
@@ -540,7 +558,7 @@ export default function ProjectPage() {
 
       if (response.ok) {
         showToast('Projekt erfolgreich gelöscht!', 'success');
-        router.push('/');
+        router.push('/projects');
       } else {
         showToast('Fehler beim Löschen des Projekts', 'error');
       }
@@ -1072,8 +1090,8 @@ export default function ProjectPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Projekt nicht gefunden</h1>
-          <Link href="/" className="text-blue-600 hover:text-blue-700">
-            Zurück zur Startseite
+          <Link href="/projects" className="text-blue-600 hover:text-blue-700">
+            Zurück zur Projektübersicht
           </Link>
         </div>
       </div>
@@ -1124,11 +1142,11 @@ export default function ProjectPage() {
         {/* Header */}
         <div className="mb-8">
           <Link 
-            href="/"
+            href="/projects"
             className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
           >
             <ArrowLeft className="h-4 w-4" />
-            Zurück zur Übersicht
+            Zurück zur Projektübersicht
           </Link>
           
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
@@ -1251,23 +1269,8 @@ export default function ProjectPage() {
             {/* Tasks */}
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-green-600" />
-                  Feedback Tasks
-                </h2>
+                <div></div>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                      {tasks.filter(t => !t.jira_key && t.status === 'open').length} offen
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      {tasks.filter(t => t.jira_key).length} in JIRA
-                    </span>
-                    <span className="text-gray-400">•</span>
-                    <span>{tasks.length} gesamt</span>
-                  </div>
                   <button
                     onClick={refreshData}
                     disabled={isRefreshing}
@@ -1509,29 +1512,31 @@ export default function ProjectPage() {
                                   </div>
                                 )}
                               </div>
-                              <button
-                                onClick={() => openJiraModal(task)}
-                                disabled={creatingJira === task.id || loadingJiraModal === task.id}
-                                className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm ml-auto"
-                                title="JIRA-Task erstellen"
-                              >
-                                {creatingJira === task.id ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                    Erstelle...
-                                  </>
-                                ) : loadingJiraModal === task.id ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                    Lade...
-                                  </>
-                                ) : (
-                                  <>
-                                    <JiraIcon className="h-3 w-3" />
-                                    JIRA
-                                  </>
-                                )}
-                              </button>
+                              {user?.role === 'admin' && (
+                                <button
+                                  onClick={() => openJiraModal(task)}
+                                  disabled={creatingJira === task.id || loadingJiraModal === task.id}
+                                  className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm ml-auto"
+                                  title="JIRA-Task erstellen"
+                                >
+                                  {creatingJira === task.id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                      Erstelle...
+                                    </>
+                                  ) : loadingJiraModal === task.id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                      Lade...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <JiraIcon className="h-3 w-3" />
+                                      JIRA
+                                    </>
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -1540,7 +1545,7 @@ export default function ProjectPage() {
                   )}
 
                   {/* JIRA Tasks */}
-                  {tasks.filter(t => t.jira_key).length > 0 && (
+                  {user?.role === 'admin' && tasks.filter(t => t.jira_key).length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <JiraIcon className="h-5 w-5 text-blue-500" />
@@ -2120,7 +2125,7 @@ export default function ProjectPage() {
         )}
 
         {/* JIRA Modal */}
-        {showJiraModal && selectedTask && (
+        {user?.role === 'admin' && showJiraModal && selectedTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-6 w-full max-w-lg">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">JIRA-Task erstellen</h3>
@@ -2453,23 +2458,25 @@ export default function ProjectPage() {
                 {/* Modal Actions */}
                 <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => openJiraModal(selectedTaskForModal)}
-                      disabled={creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id}
-                      className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm"
-                    >
-                      {creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                          {loadingJiraModal === selectedTaskForModal.id ? 'Lade...' : 'Erstelle...'}
-                        </>
-                      ) : (
-                        <>
-                          <JiraIcon className="h-3 w-3" />
-                          JIRA Task
-                        </>
-                      )}
-                    </button>
+                    {user?.role === 'admin' && (
+                      <button
+                        onClick={() => openJiraModal(selectedTaskForModal)}
+                        disabled={creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id}
+                        className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm"
+                      >
+                        {creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                            {loadingJiraModal === selectedTaskForModal.id ? 'Lade...' : 'Erstelle...'}
+                          </>
+                        ) : (
+                          <>
+                            <JiraIcon className="h-3 w-3" />
+                            JIRA Task
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                   
                   <div className="flex items-center gap-2">

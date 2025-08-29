@@ -7,8 +7,9 @@ export async function POST() {
     });
 
     // Clear session cookie
+    const isProduction = process.env.NODE_ENV === 'production';
     response.headers.set('Set-Cookie', 
-      'session=; HttpOnly; Secure=${process.env.NODE_ENV === \'production\'}; SameSite=Strict; Path=/; Max-Age=0'
+      `next-auth.session-token=; HttpOnly; ${isProduction ? 'Secure;' : ''} SameSite=Strict; Path=/; Max-Age=0`
     );
 
     return response;

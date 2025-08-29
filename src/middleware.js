@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { jwtVerify } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
@@ -56,7 +56,7 @@ function isProtectedRoute(pathname) {
   return isProtectedPage || isProtectedApi;
 }
 
-export function middleware(request) {
+export async function middleware(request) {
   const { pathname } = request.nextUrl;
   
   // Skip middleware for static files and Next.js internals
@@ -79,8 +79,8 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // Get session token
-  const sessionToken = request.cookies.get('session')?.value;
+  // Get session token - try both possible names
+  const sessionToken = request.cookies.get('session')?.value || request.cookies.get('next-auth.session-token')?.value;
   
   if (!sessionToken) {
     // For API routes, return 401
@@ -97,8 +97,9 @@ export function middleware(request) {
   }
 
   try {
-    // Verify JWT token
-    const decoded = jwt.verify(sessionToken, JWT_SECRET);
+    // Verify JWT token using jose (Edge Runtime compatible)
+    const secret = new TextEncoder().encode(JWT_SECRET);
+    const { payload: decoded } = await jwtVerify(sessionToken, secret);
     
     // Check if user has access to specific project routes
     if (pathname.startsWith('/project/')) {
@@ -153,13 +154,11 @@ export function middleware(request) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (widget.js, etc.)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|widget-new.js|.*\\.(?:jpg|jpeg|gif|png|svg|ico|css|js)$).*)',
+    '/project/:path*',
+    '/projects',
+    '/admin/:path*',
+    '/api/admin/:path*',
+    '/api/projects/:path*/edit',
+    '/api/jira/:path*'
   ],
 };

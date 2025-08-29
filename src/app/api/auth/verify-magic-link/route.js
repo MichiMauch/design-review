@@ -1,5 +1,5 @@
 import { getDb, initDatabase } from '../../../../../lib/db.js';
-import jwt from 'jsonwebtoken';
+import { SignJWT } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
@@ -69,18 +69,19 @@ export async function POST(request) {
       projectAccess = accessResult.rows.map(row => row.project_id);
     }
 
-    // Create JWT session token
-    const sessionToken = jwt.sign(
-      {
-        email: tokenData.email,
-        name: tokenData.name,
-        role: tokenData.role,
-        projectAccess: projectAccess,
-        loginTime: now.toISOString()
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' } // Session expires in 7 days
-    );
+    // Create JWT session token using jose
+    const secret = new TextEncoder().encode(JWT_SECRET);
+    const sessionToken = await new SignJWT({
+      email: tokenData.email,
+      name: tokenData.name,
+      role: tokenData.role,
+      projectAccess: projectAccess,
+      loginTime: now.toISOString()
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('7d')
+      .setIssuedAt()
+      .sign(secret);
 
     // Create response with secure cookie
     const response = Response.json({
@@ -95,9 +96,12 @@ export async function POST(request) {
     });
 
     // Set secure HTTP-only cookie
+    const isProduction = process.env.NODE_ENV === 'production';
     response.headers.set('Set-Cookie', 
-      `session=${sessionToken}; HttpOnly; Secure=${process.env.NODE_ENV === 'production'}; SameSite=Strict; Path=/; Max-Age=${7 * 24 * 60 * 60}`
+      `next-auth.session-token=${sessionToken}; HttpOnly; ${isProduction ? 'Secure;' : ''} SameSite=Strict; Path=/; Max-Age=${7 * 24 * 60 * 60}`
     );
+    
+    console.log('🍪 Setting cookie:', `next-auth.session-token=${sessionToken.substring(0, 20)}...; HttpOnly; ${isProduction ? 'Secure;' : ''} SameSite=Strict`);
 
     return response;
 
