@@ -1469,11 +1469,11 @@ export default function ProjectPage() {
                 </div>
               ) : (
                 /* Board View */
-                <div className="grid grid-cols-7 gap-4 h-[calc(100vh-200px)]">
+                <div className="flex gap-4 h-[calc(100vh-200px)] overflow-x-auto pb-4">
                   {TASK_STATUSES.map(status => {
                     const statusTasks = tasks.filter(t => !t.jira_key && (t.status || 'open') === status.value);
                     return (
-                      <div key={status.value} className="flex flex-col">
+                      <div key={status.value} className="flex flex-col min-w-80 w-80">
                         <div className={`p-3 rounded-t-lg border-b-2 ${status.color} font-medium text-sm`}>
                           <div className="flex items-center justify-between">
                             <span>{status.label}</span>
@@ -1482,12 +1482,12 @@ export default function ProjectPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex-1 bg-gray-50 rounded-b-lg p-2 overflow-y-auto">
+                        <div className="flex-1 bg-gray-100 rounded-b-lg p-3 overflow-y-auto">
                           <div className="space-y-2">
                             {statusTasks.map(task => (
                               <div 
                                 key={task.id}
-                                className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+                                className="bg-white rounded-lg p-3 shadow-md hover:shadow-lg transition-shadow cursor-pointer border border-gray-200"
                                 onClick={() => setSelectedTaskForModal(task)}
                               >
                                 <div className="space-y-2">
