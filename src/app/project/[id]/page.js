@@ -63,6 +63,8 @@ export default function ProjectPage() {
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
+  const [loadingScreenshots, setLoadingScreenshots] = useState({});
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -76,6 +78,57 @@ export default function ProjectPage() {
     // Assume it's a filename that needs to be served from the uploads endpoint
     return `/api/uploads/${screenshot}`;
   };
+
+  // Load screenshot for a specific task
+  const loadTaskScreenshot = async (taskId) => {
+    if (loadingScreenshots[taskId]) return;
+    
+    setLoadingScreenshots(prev => ({ ...prev, [taskId]: true }));
+    
+    try {
+      const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}/screenshot`);
+      if (response.ok) {
+        const data = await response.json();
+        // Update the task in the tasks array with the screenshot URL
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === taskId 
+              ? { ...task, screenshot_display: data.screenshot_url }
+              : task
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error loading screenshot:', error);
+    } finally {
+      setLoadingScreenshots(prev => ({ ...prev, [taskId]: false }));
+    }
+  };
+
+  // Open screenshot in lightbox
+  const openScreenshotLightbox = (screenshotUrl) => {
+    setLightboxImage(screenshotUrl);
+  };
+
+  // Close lightbox
+  const closeLightbox = () => {
+    setLightboxImage(null);
+  };
+
+  // Handle ESC key to close lightbox
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        closeLightbox();
+      }
+    };
+
+    if (lightboxImage) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [lightboxImage]);
+
 
   // Load JIRA config from localStorage on component mount
   useEffect(() => {
@@ -1020,12 +1073,7 @@ export default function ProjectPage() {
                                       overflow: 'hidden'
                                     }}>{task.title}</h4>
                                     {task.description && (
-                                      <p className="text-sm text-gray-600 mb-2" style={{
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden'
-                                      }}>{task.description}</p>
+                                      <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                                     )}
                                   </>
                                 )}
@@ -1077,17 +1125,51 @@ export default function ProjectPage() {
                             </div>
                             
                             <div className="flex items-center justify-between">
-                              {task.screenshot && (
-                                <div className="w-16 h-16 bg-gray-100 rounded border overflow-hidden">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img 
-                                    src={task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot)} 
-                                    alt="Task Screenshot" 
-                                    className="w-full h-full object-cover cursor-pointer hover:opacity-80"
-                                    onClick={() => window.open(task.screenshot.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot), '_blank')}
-                                  />
-                                </div>
-                              )}
+                              <div 
+                                className="w-20 h-20 bg-gray-100 rounded-lg border overflow-hidden relative group cursor-pointer"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const imageUrl = task.screenshot_display || (task.screenshot?.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot));
+                                  if (imageUrl) {
+                                    openScreenshotLightbox(imageUrl);
+                                  }
+                                }}
+                              >
+                                {task.screenshot_display || task.screenshot ? (
+                                  <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img 
+                                      src={task.screenshot_display || (task.screenshot?.startsWith('http') ? task.screenshot : getScreenshotUrl(task.screenshot))} 
+                                      alt="Task Screenshot" 
+                                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                                    />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                                      <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        🔍
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    {loadingScreenshots[task.id] ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                                    ) : (
+                                      <button 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          loadTaskScreenshot(task.id);
+                                        }}
+                                        className="text-xs text-blue-600 hover:text-blue-800 p-1 transition-colors"
+                                        title="Screenshot laden"
+                                      >
+                                        📷 Laden
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                               <button
                                 onClick={() => openJiraModal(task)}
                                 disabled={creatingJira === task.id || loadingJiraData}
@@ -1741,6 +1823,34 @@ export default function ProjectPage() {
                   Abbrechen
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Screenshot Lightbox Modal */}
+        {lightboxImage && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+            onClick={closeLightbox}
+          >
+            <div className="relative max-w-4xl max-h-[90vh] p-4">
+              <button
+                onClick={closeLightbox}
+                className="absolute top-2 right-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-2 z-10"
+                title="Schließen (ESC)"
+              >
+                <X className="h-6 w-6" />
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxImage}
+                alt="Screenshot"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+                onError={(e) => {
+                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y3ZjdmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5TY3JlZW5zaG90IG5pY2h0IGdlZnVuZGVuPC90ZXh0Pjwvc3ZnPg==';
+                }}
+              />
             </div>
           </div>
         )}

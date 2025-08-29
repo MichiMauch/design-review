@@ -12,13 +12,14 @@ export async function OPTIONS() {
 }
 
 export async function GET(request, { params }) {
+  let resolvedParams;
   try {
-    const resolvedParams = await params;
+    resolvedParams = await params;
     await initDatabase();
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
+      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot_url, created_at FROM tasks WHERE project_id = ? ORDER BY created_at DESC LIMIT 20',
       args: [resolvedParams.id]
     });
 
@@ -29,25 +30,24 @@ export async function GET(request, { params }) {
       if (row.screenshot_url) {
         // Use the R2 URL
         screenshotDisplay = row.screenshot_url;
-      } else if (row.screenshot && row.screenshot.startsWith('data:')) {
-        // Use base64 data as fallback
-        screenshotDisplay = row.screenshot;
-      } else if (row.screenshot && !row.screenshot.startsWith('data:')) {
-        // Construct R2 URL from filename
-        const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
-        screenshotDisplay = `https://pub-${accountId}.r2.dev/screenshots/${row.screenshot}`;
       }
+      
+      // If no screenshot_url but we might have a filename in the excluded screenshot field,
+      // we need to fetch it separately or construct the R2 URL
+      // For now, we'll add a separate endpoint to get screenshot data when needed
       
       return {
         ...row,
+        screenshot: null, // Excluded from query for performance, but we'll load it via separate call
         screenshot_display: screenshotDisplay
       };
     });
 
     return addCorsHeaders(Response.json(processedRows));
 
-  } catch {
-    return addCorsHeaders(new Response('Fehler beim Laden der Tasks', { status: 500 }));
+  } catch (error) {
+    console.error('Error loading tasks for project', resolvedParams?.id || 'unknown', ':', error);
+    return addCorsHeaders(new Response(`Fehler beim Laden der Tasks: ${error.message}`, { status: 500 }));
   }
 }
 
