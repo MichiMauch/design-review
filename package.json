@@ -25,6 +25,7 @@
     "puppeteer": "^22.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.6.0",
     "sharp": "^0.34.3",
     "sqlite3": "^5.1.6",
     "tailwind-merge": "^3.3.1",

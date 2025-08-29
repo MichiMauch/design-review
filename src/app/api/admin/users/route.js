@@ -1,7 +1,17 @@
 import { getDb, initDatabase } from '../../../../../lib/db.js';
+import { getUser } from '../../../../../lib/auth.js';
 
 export async function GET() {
   try {
+    // Check authentication and admin role
+    const user = await getUser();
+    if (!user || user.role !== 'admin') {
+      return Response.json(
+        { success: false, error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
     await initDatabase();
     const db = getDb();
 
@@ -14,7 +24,8 @@ export async function GET() {
       users: result.rows
     });
 
-  } catch {
+  } catch (error) {
+    console.error('Error loading users:', error);
     return Response.json(
       { success: false, error: 'Fehler beim Laden der Benutzer' },
       { status: 500 }
@@ -24,6 +35,15 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    // Check authentication and admin role
+    const user = await getUser();
+    if (!user || user.role !== 'admin') {
+      return Response.json(
+        { success: false, error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
     const { email, name, role } = await request.json();
 
     // Validation
@@ -61,7 +81,7 @@ export async function POST(request) {
         success: true,
         message: 'Benutzer erfolgreich erstellt',
         user: {
-          id: result.lastInsertRowid,
+          id: Number(result.lastInsertRowid),
           email: email.toLowerCase().trim(),
           name: name.trim(),
           role: role
@@ -69,7 +89,8 @@ export async function POST(request) {
       });
 
     } catch (dbError) {
-      if (dbError.message.includes('UNIQUE constraint failed')) {
+      console.error('Database error creating user:', dbError);
+      if (dbError.message && dbError.message.includes('UNIQUE constraint failed')) {
         return Response.json(
           { success: false, error: 'Ein Benutzer mit dieser E-Mail-Adresse existiert bereits' },
           { status: 409 }
@@ -78,7 +99,8 @@ export async function POST(request) {
       throw dbError;
     }
 
-  } catch {
+  } catch (error) {
+    console.error('Error creating user:', error);
     return Response.json(
       { success: false, error: 'Fehler beim Erstellen des Benutzers' },
       { status: 500 }

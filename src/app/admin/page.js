@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { MessageSquare, Globe, Calendar, User, Eye, UserPlus, Edit2, Trash2, Users, BarChart3, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function AdminDashboard() {
   const [tasks, setTasks] = useState([]);
@@ -78,11 +79,12 @@ export default function AdminDashboard() {
 
   const createUser = async () => {
     if (!newUser.email.trim() || !newUser.name.trim()) {
-      alert('E-Mail und Name sind erforderlich');
+      toast.error('E-Mail und Name sind erforderlich');
       return;
     }
 
     setIsCreatingUser(true);
+
     try {
       const response = await fetch('/api/admin/users', {
         method: 'POST',
@@ -91,15 +93,19 @@ export default function AdminDashboard() {
       });
       
       const data = await response.json();
-      if (data.success) {
+      
+      if (response.ok && data.success) {
+        toast.success('Benutzer erfolgreich erstellt!');
         setNewUser({ email: '', name: '', role: 'user' });
         await loadUsers();
-        alert('Benutzer erfolgreich erstellt');
       } else {
-        alert('Fehler: ' + data.error);
+        // Show specific error message if available
+        const errorMessage = data.error || `HTTP ${response.status}: ${response.statusText}`;
+        toast.error(`Fehler: ${errorMessage}`);
       }
-    } catch {
-      alert('Fehler beim Erstellen des Benutzers');
+    } catch (error) {
+      console.error('Create user error:', error);
+      toast.error('Netzwerkfehler beim Erstellen des Benutzers');
     } finally {
       setIsCreatingUser(false);
     }
@@ -123,15 +129,17 @@ export default function AdminDashboard() {
       });
       
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
+        toast.success('Benutzer erfolgreich aktualisiert!');
         setEditingUser(null);
         await loadUsers();
-        alert('Benutzer erfolgreich aktualisiert');
       } else {
-        alert('Fehler: ' + data.error);
+        const errorMessage = data.error || `HTTP ${response.status}: ${response.statusText}`;
+        toast.error(`Fehler: ${errorMessage}`);
       }
-    } catch {
-      alert('Fehler beim Aktualisieren des Benutzers');
+    } catch (error) {
+      console.error('Update user error:', error);
+      toast.error('Netzwerkfehler beim Aktualisieren des Benutzers');
     }
   };
 
@@ -146,14 +154,16 @@ export default function AdminDashboard() {
       });
       
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
+        toast.success('Benutzer erfolgreich gelöscht!');
         await loadUsers();
-        alert('Benutzer erfolgreich gelöscht');
       } else {
-        alert('Fehler: ' + data.error);
+        const errorMessage = data.error || `HTTP ${response.status}: ${response.statusText}`;
+        toast.error(`Fehler: ${errorMessage}`);
       }
-    } catch {
-      alert('Fehler beim Löschen des Benutzers');
+    } catch (error) {
+      console.error('Delete user error:', error);
+      toast.error('Netzwerkfehler beim Löschen des Benutzers');
     }
   };
 
@@ -198,11 +208,12 @@ export default function AdminDashboard() {
       const data = await response.json();
       if (data.success) {
         await loadUserProjectAccess(userId);
+        toast.success('Projekt-Zugriff erfolgreich geändert');
       } else {
-        alert('Fehler: ' + data.error);
+        toast.error('Fehler: ' + data.error);
       }
     } catch {
-      alert('Fehler beim Ändern der Projekt-Zugriffe');
+      toast.error('Fehler beim Ändern der Projekt-Zugriffe');
     }
   };
 
@@ -930,6 +941,30 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+      
+      {/* Toast notifications */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            style: {
+              background: '#10B981',
+            },
+          },
+          error: {
+            duration: 5000,
+            style: {
+              background: '#EF4444',
+            },
+          },
+        }}
+      />
     </div>
   );
 }
