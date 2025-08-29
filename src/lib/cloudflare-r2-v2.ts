@@ -136,6 +136,6 @@ export async function uploadDataUrlToR2(dataUrl: string): Promise<{ success: boo
 }
 
 export function getScreenshotUrl(filename: string): string {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '6a52908bab2567e2a24d0dec042053d5';
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
   return `https://pub-${accountId}.r2.dev/screenshots/${filename}`;
 }
