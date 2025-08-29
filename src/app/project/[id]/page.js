@@ -85,6 +85,11 @@ export default function ProjectPage() {
   const [selectedTaskForModal, setSelectedTaskForModal] = useState(null);
   const [draggedTask, setDraggedTask] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
+  const [taskComments, setTaskComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [addingComment, setAddingComment] = useState(false);
+  const [commentCounts, setCommentCounts] = useState({});
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -252,6 +257,25 @@ export default function ProjectPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, jiraConfig]);
 
+  // Load comments when task modal is opened
+  useEffect(() => {
+    if (selectedTaskForModal?.id && project?.id) {
+      loadTaskComments(selectedTaskForModal.id);
+    } else {
+      setTaskComments([]);
+      setNewComment('');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTaskForModal?.id, project?.id]);
+
+  // Load comment counts when tasks change
+  useEffect(() => {
+    if (tasks.length > 0 && project?.id) {
+      loadCommentCounts();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks.length, project?.id]);
+
   const loadJiraSettings = async () => {
     try {
       // First try to load from settings API
@@ -300,14 +324,45 @@ export default function ProjectPage() {
   };
 
   const formatTime = (dateString) => {
-    const date = new Date(dateString);
+    if (!dateString) return 'Unbekannt';
+    
+    // Handle different date formats from database
+    let date;
+    if (dateString.includes('T')) {
+      // ISO format with timezone (e.g., "2025-08-29T12:53:20+02:00")
+      date = new Date(dateString);
+    } else {
+      // SQLite datetime format (e.g., "2025-08-29 10:43:38") - treat as local time
+      // Parse as local time by adding 'T' and assuming local timezone
+      const parts = dateString.split(' ');
+      if (parts.length === 2) {
+        date = new Date(`${parts[0]}T${parts[1]}`);
+      } else {
+        date = new Date(dateString);
+      }
+    }
+    
+    // Verify date is valid
+    if (isNaN(date.getTime())) {
+      return 'Ungültige Zeit';
+    }
+    
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) {
+    // Debug: Log the date parsing for troubleshooting
+    console.log('Date parsing:', {
+      original: dateString,
+      parsed: date.toISOString(),
+      now: now.toISOString(),
+      diffMs,
+      diffMins
+    });
+
+    if (diffMs < 60000) { // Less than 1 minute
       return 'Gerade eben';
     } else if (diffMins < 60) {
       return `vor ${diffMins} Min`;
@@ -322,6 +377,91 @@ export default function ProjectPage() {
         month: '2-digit',
         year: 'numeric'
       });
+    }
+  };
+
+  // Comment management functions
+  const loadTaskComments = async (taskId) => {
+    if (!taskId) return;
+    setLoadingComments(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/tasks/${taskId}/comments`);
+      const result = await response.json();
+      if (result.success) {
+        setTaskComments(result.comments);
+      } else {
+        showToast('Fehler beim Laden der Kommentare', 'error');
+      }
+    } catch {
+      showToast('Fehler beim Laden der Kommentare', 'error');
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const addTaskComment = async (taskId, commentText) => {
+    if (!commentText.trim()) return;
+    setAddingComment(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/tasks/${taskId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment_text: commentText, author: 'Benutzer' })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setTaskComments(prev => [...prev, result.comment]);
+        setCommentCounts(prev => ({
+          ...prev,
+          [taskId]: (prev[taskId] || 0) + 1
+        }));
+        setNewComment('');
+        showToast('Kommentar hinzugefügt', 'success');
+      } else {
+        showToast('Fehler beim Hinzufügen des Kommentars', 'error');
+      }
+    } catch {
+      showToast('Fehler beim Hinzufügen des Kommentars', 'error');
+    } finally {
+      setAddingComment(false);
+    }
+  };
+
+  const deleteTaskComment = async (taskId, commentId) => {
+    try {
+      const response = await fetch(`/api/projects/${project.id}/tasks/${taskId}/comments?commentId=${commentId}`, {
+        method: 'DELETE'
+      });
+      const result = await response.json();
+      if (result.success) {
+        setTaskComments(prev => prev.filter(comment => comment.id !== commentId));
+        setCommentCounts(prev => ({
+          ...prev,
+          [taskId]: Math.max(0, (prev[taskId] || 0) - 1)
+        }));
+        showToast('Kommentar gelöscht', 'success');
+      } else {
+        showToast('Fehler beim Löschen des Kommentars', 'error');
+      }
+    } catch {
+      showToast('Fehler beim Löschen des Kommentars', 'error');
+    }
+  };
+
+  const loadCommentCounts = async () => {
+    if (!project?.id || tasks.length === 0) return;
+    try {
+      const counts = {};
+      await Promise.all(tasks.map(async (task) => {
+        const response = await fetch(`/api/projects/${project.id}/tasks/${task.id}/comments`);
+        const result = await response.json();
+        if (result.success) {
+          counts[task.id] = result.comments.length;
+        }
+      }));
+      setCommentCounts(counts);
+    } catch {
+      // Silently fail - comment counts are not critical
     }
   };
 
@@ -1293,6 +1433,18 @@ export default function ProjectPage() {
                                         <X className="h-4 w-4" />
                                       )}
                                     </button>
+                                    <button
+                                      onClick={() => setSelectedTaskForModal(task)}
+                                      className="relative p-1 text-gray-400 hover:text-blue-600 rounded"
+                                      title="Kommentare anzeigen"
+                                    >
+                                      <MessageSquare className="h-4 w-4" />
+                                      {commentCounts[task.id] > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                                          {commentCounts[task.id]}
+                                        </span>
+                                      )}
+                                    </button>
                                   </>
                                 )}
                               </div>
@@ -1441,6 +1593,18 @@ export default function ProjectPage() {
                                   </div>
                                 )}
                                 <button
+                                  onClick={() => setSelectedTaskForModal(task)}
+                                  className="relative p-1 text-gray-400 hover:text-blue-600 rounded"
+                                  title="Kommentare anzeigen"
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                  {commentCounts[task.id] > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                                      {commentCounts[task.id]}
+                                    </span>
+                                  )}
+                                </button>
+                                <button
                                   onClick={() => openTaskDeleteModal(task)}
                                   disabled={deletingTask === task.id}
                                   className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
@@ -1581,11 +1745,21 @@ export default function ProjectPage() {
                                   </h4>
                                   <div className="flex items-center justify-between text-xs text-gray-500">
                                     <span>{formatTime(task.created_at)}</span>
-                                    {task.screenshot_display || task.screenshot ? (
-                                      <div className="w-4 h-4 bg-gray-200 rounded text-center text-xs">
-                                        📷
-                                      </div>
-                                    ) : null}
+                                    <div className="flex items-center gap-1">
+                                      {task.screenshot_display || task.screenshot ? (
+                                        <div className="w-4 h-4 bg-gray-200 rounded text-center text-xs">
+                                          📷
+                                        </div>
+                                      ) : null}
+                                      {commentCounts[task.id] > 0 && (
+                                        <div className="relative">
+                                          <MessageSquare className="h-3 w-3 text-blue-500" />
+                                          <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center font-bold text-xs leading-none">
+                                            {commentCounts[task.id]}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2191,6 +2365,89 @@ export default function ProjectPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Erstellt</label>
                     <div className="p-3 bg-gray-50 rounded-lg text-sm">
                       {formatTime(selectedTaskForModal.created_at)}
+                    </div>
+                  </div>
+
+                  {/* Comments Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Kommentare ({taskComments.length})
+                    </label>
+                    
+                    {/* Comments List */}
+                    {loadingComments ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-60 overflow-y-auto mb-4">
+                        {taskComments.length === 0 ? (
+                          <div className="text-center py-6 text-gray-500">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Noch keine Kommentare</p>
+                          </div>
+                        ) : (
+                          taskComments.map((comment, index) => (
+                            <div key={comment.id} className="bg-gray-50 rounded-lg p-3 border">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-2 flex-1">
+                                  <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                                    {index + 1}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm text-gray-900 mb-1">
+                                      {comment.comment_text}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                                      {comment.author && (
+                                        <span>von {comment.author}</span>
+                                      )}
+                                      <span>•</span>
+                                      <span>{formatTime(comment.created_at)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => deleteTaskComment(selectedTaskForModal.id, comment.id)}
+                                  className="p-1 text-gray-400 hover:text-red-600 transition-colors ml-2"
+                                  title="Kommentar löschen"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* Add Comment Form */}
+                    <div className="flex gap-2">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Kommentar hinzufügen..."
+                        className="flex-1 px-3 py-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={2}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            addTaskComment(selectedTaskForModal.id, newComment);
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => addTaskComment(selectedTaskForModal.id, newComment)}
+                        disabled={!newComment.trim() || addingComment}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg text-sm flex items-center gap-1"
+                      >
+                        {addingComment ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                        ) : (
+                          <MessageSquare className="h-3 w-3" />
+                        )}
+                        {addingComment ? 'Sende...' : 'Senden'}
+                      </button>
                     </div>
                   </div>
                 </div>
