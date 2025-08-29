@@ -95,99 +95,88 @@ export async function POST(request, { params }) {
       second: '2-digit'
     }).format(now).replace(' ', 'T') + '+02:00'; // Add CEST timezone offset
 
-    // Determine screenshot type and storage strategy
+    // R2 Upload only - no Data URL storage
     let screenshotUrl = null;
     let screenshotFilename = null;
-    let screenshotBlob = null;
     
-    if (screenshot) {
-      // Check if it's a filename (R2), URL, or base64 data
-      if (screenshot.startsWith('data:')) {
-        // Base64 data - upload to R2 using AWS SDK v2
-        console.log('Uploading screenshot to R2 using AWS SDK v2...');
-        console.log('Environment check:', {
-          hasAccountId: !!process.env.CLOUDFLARE_ACCOUNT_ID,
-          hasBucket: !!process.env.CLOUDFLARE_R2_BUCKET,
-          hasAccessKey: !!process.env.CLOUDFLARE_ACCESS_KEY_ID,
-          hasSecretKey: !!process.env.CLOUDFLARE_SECRET_ACCESS_KEY
-        });
-        
-        try {
-          // Direct R2 upload implementation
-          console.log('Starting direct R2 upload...');
-          
-          // Extract content type and base64 data
-          const matches = screenshot.match(/^data:([^;]+);base64,(.+)$/);
-          if (!matches) {
-            throw new Error('Invalid data URL format');
-          }
-          
-          const contentType = matches[1];
-          const base64Data = matches[2];
-          const buffer = Buffer.from(base64Data, 'base64');
-          
-          // Generate filename
-          const ext = contentType.split('/')[1] || 'png';
-          const timestamp = Date.now();
-          const filename = `task-${timestamp}.${ext}`;
-          const key = `screenshots/${filename}`;
-          
-          // Setup S3 client
-          const AWS = await import('aws-sdk');
-          const https = await import('https');
-          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
-          
-          const s3 = new AWS.default.S3({
-            endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-            accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
-            secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
-            signatureVersion: 'v4',
-            s3ForcePathStyle: true,
-            region: 'auto',
-            sslEnabled: true,
-            httpOptions: {
-              agent: https.default.globalAgent,
-              timeout: 120000,
-            }
-          });
-          
-          console.log('Uploading to R2...', {
-            key,
-            contentType,
-            bufferSize: buffer.length,
-            accountId: accountId.substring(0, 10) + '...'
-          });
-          
-          // Upload to R2
-          await s3.putObject({
-            Bucket: 'review',
-            Key: key,
-            Body: buffer,
-            ContentType: contentType,
-          }).promise();
-          
-          screenshotFilename = filename;
-          screenshotUrl = `https://pub-${accountId}.r2.dev/${key}`;
-          
-          console.log('R2 upload SUCCESS:', { filename: screenshotFilename, url: screenshotUrl });
-          
-        } catch (error) {
-          console.error('R2 upload FAILED:', error.message);
-          console.error('Stack trace:', error.stack);
-          throw new Error(`R2 upload failed: ${error.message}`);
-        }
-      } else if (screenshot.startsWith('http')) {
-        // Full URL - extract filename and store both
-        screenshotUrl = screenshot;
-        screenshotFilename = screenshot.split('/').pop(); // Extract filename from URL
-      } else if (screenshot.includes('.png') || screenshot.includes('.jpg') || screenshot.includes('.jpeg')) {
-        // Filename only - store filename and construct R2 URL
-        screenshotFilename = screenshot;
-        screenshotUrl = `https://pub-${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.dev/screenshots/${screenshot}`;
-      } else {
-        // Unknown format - treat as blob
-        screenshotBlob = screenshot;
+    if (screenshot && screenshot.startsWith('data:')) {
+      console.log('=== R2 UPLOAD PROCESS START ===');
+      console.log('Environment check:', {
+        hasAccountId: !!process.env.CLOUDFLARE_ACCOUNT_ID,
+        accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+        hasAccessKey: !!process.env.CLOUDFLARE_ACCESS_KEY_ID,
+        hasSecretKey: !!process.env.CLOUDFLARE_SECRET_ACCESS_KEY
+      });
+      
+      // Extract content type and base64 data
+      const matches = screenshot.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        console.error('Invalid data URL format');
+        return addCorsHeaders(new Response('Invalid screenshot format', { status: 400 }));
       }
+      
+      const contentType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Generate filename
+      const ext = contentType.split('/')[1] || 'png';
+      const timestamp = Date.now();
+      const filename = `task-${timestamp}.${ext}`;
+      const key = `screenshots/${filename}`;
+      
+      console.log('Upload details:', {
+        contentType,
+        bufferSize: buffer.length,
+        filename,
+        key
+      });
+      
+      // Setup S3 client
+      const AWS = await import('aws-sdk');
+      const https = await import('https');
+      const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
+      
+      const s3 = new AWS.default.S3({
+        endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+        accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
+        secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+        signatureVersion: 'v4',
+        s3ForcePathStyle: true,
+        region: 'auto',
+        sslEnabled: true,
+        httpOptions: {
+          agent: https.default.globalAgent,
+          timeout: 120000,
+        }
+      });
+      
+      try {
+        console.log('Starting S3 putObject...');
+        await s3.putObject({
+          Bucket: 'review',
+          Key: key,
+          Body: buffer,
+          ContentType: contentType,
+        }).promise();
+        
+        screenshotFilename = filename;
+        screenshotUrl = `https://pub-${accountId}.r2.dev/${key}`;
+        
+        console.log('=== R2 UPLOAD SUCCESS ===');
+        console.log('Filename:', screenshotFilename);
+        console.log('URL:', screenshotUrl);
+        
+      } catch (error) {
+        console.error('=== R2 UPLOAD FAILED ===');
+        console.error('Error:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Stack:', error.stack);
+        return addCorsHeaders(new Response(`Screenshot upload failed: ${error.message}`, { status: 500 }));
+      }
+    } else if (screenshot) {
+      console.log('Non-data URL screenshot received:', screenshot.substring(0, 100));
+      return addCorsHeaders(new Response('Only data URL screenshots are supported', { status: 400 }));
     }
 
     const result = await db.execute({
@@ -199,7 +188,7 @@ export async function POST(request, { params }) {
         projectId, // Now using the resolved numeric project ID
         title,
         description || null,
-        screenshotFilename || screenshotBlob || null, // Filename preferred, fallback to base64
+        screenshotFilename || null, // Only filename, no Data URLs
         screenshotUrl || null,  // R2 URLs and external URLs
         url,
         selected_area ? JSON.stringify(selected_area) : null,
@@ -216,7 +205,7 @@ export async function POST(request, { params }) {
       project_id: Number(projectId),
       title,
       description,
-      screenshot: screenshotFilename || screenshotBlob,
+      screenshot: screenshotFilename,
       screenshot_url: screenshotUrl,
       url,
       status: 'open',
