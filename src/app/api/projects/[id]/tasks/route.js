@@ -113,7 +113,9 @@ export async function POST(request, { params }) {
         });
         
         try {
-          const { uploadDataUrlToR2 } = await import('@/lib/cloudflare-r2-v2.ts');
+          // Use dynamic import for ES modules compatibility
+          const r2Module = await import('../../../../../lib/cloudflare-r2-v2.js');
+          const { uploadDataUrlToR2 } = r2Module;
           console.log('R2 v2 function imported successfully');
           const uploadResult = await uploadDataUrlToR2(screenshot);
           console.log('R2 v2 upload result:', uploadResult);
