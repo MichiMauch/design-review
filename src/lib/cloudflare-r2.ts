@@ -37,6 +37,41 @@ export async function uploadScreenshotToR2(
   };
 }
 
+export async function uploadDataUrlToR2(dataUrl: string): Promise<{ success: boolean; filename?: string; url?: string; error?: string }> {
+  try {
+    // Extract content type and base64 data
+    const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) {
+      return { success: false, error: 'Invalid data URL format' };
+    }
+    
+    const contentType = matches[1];
+    const base64Data = matches[2];
+    
+    // Convert base64 to buffer
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Generate filename with proper extension
+    const ext = contentType.split('/')[1] || 'png';
+    const timestamp = Date.now();
+    const filename = `task-${timestamp}.${ext}`;
+    
+    // Upload to R2
+    const result = await uploadScreenshotToR2(buffer, filename, contentType);
+    
+    return {
+      success: true,
+      filename: result.filename,
+      url: result.url
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
 export function getScreenshotUrl(filename: string): string {
   return `https://pub-${accountId}.r2.dev/screenshots/${filename}`;
 }

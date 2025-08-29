@@ -25,7 +25,10 @@
       "Bash(find:*)",
       "Bash(cp:*)",
       "Bash(sqlite3:*)",
-      "Bash(turso db:*)"
+      "Bash(turso db:*)",
+      "Bash(env)",
+      "WebSearch",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

@@ -19,9 +19,11 @@ import {
   X,
   ExternalLink as JiraIcon,
   Settings,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
 import Link from 'next/link';
+import { downloadExcel } from '@/utils/excelExport';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -58,13 +60,15 @@ export default function ProjectPage() {
   });
   const [jiraUsers, setJiraUsers] = useState([]);
   const [jiraSprintsOptions, setJiraSprintsOptions] = useState([]);
-  const [loadingJiraData, setLoadingJiraData] = useState(false);
+  const [jiraBoardId, setJiraBoardId] = useState(null);
+  const [loadingJiraModal, setLoadingJiraModal] = useState(null); // stores task.id when loading modal data
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [toast, setToast] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const snippetCode = project ? 
     `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
@@ -443,6 +447,42 @@ export default function ProjectPage() {
     }
   };
 
+  const handleExcelExport = async () => {
+    setExportingExcel(true);
+    try {
+      // First, identify non-JIRA tasks without loaded screenshots
+      const nonJiraTasks = tasks.filter(t => !t.jira_key);
+      const tasksNeedingScreenshots = nonJiraTasks.filter(t => 
+        !t.screenshot_display && !t.screenshot_url && !t.screenshot
+      );
+      
+      // Load screenshots if needed
+      if (tasksNeedingScreenshots.length > 0) {
+        showToast(`Lade Screenshots für ${tasksNeedingScreenshots.length} Tasks...`, 'info');
+        
+        // Load screenshots in parallel
+        await Promise.all(
+          tasksNeedingScreenshots.map(task => loadTaskScreenshot(task.id))
+        );
+        
+        // Wait a moment for state to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Now export with loaded screenshots and fetch R2 URLs
+      const result = await downloadExcel(tasks, project.name);
+      if (result.success) {
+        showToast(result.message, 'success');
+      } else {
+        showToast(result.message, 'error');
+      }
+    } catch (error) {
+      showToast('Fehler beim Exportieren: ' + error.message, 'error');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   const saveJiraConfig = async () => {
     try {
       // Save JIRA config to localStorage
@@ -634,6 +674,11 @@ export default function ProjectPage() {
         return;
       }
 
+      // Load screenshot if not already loaded
+      if (!task.screenshot_display && !task.screenshot_url) {
+        await loadTaskScreenshot(task.id);
+      }
+
       setSelectedTask(task);
       setJiraTaskData({
         title: task.title,
@@ -644,17 +689,17 @@ export default function ProjectPage() {
       });
       
       // Load JIRA users and sprints before showing modal
-      setLoadingJiraData(true);
+      setLoadingJiraModal(task.id);
       await Promise.all([
         loadJiraUsers(),
         loadJiraSprints()
       ]);
-      setLoadingJiraData(false);
+      setLoadingJiraModal(null);
       
       setShowJiraModal(true);
       
     } catch {
-      setLoadingJiraData(false);
+      setLoadingJiraModal(null);
       showToast('Fehler beim Laden der JIRA-Daten', 'error');
     }
   };
@@ -699,6 +744,7 @@ export default function ProjectPage() {
       const boardsResult = await boardsResponse.json();
       if (boardsResult.success && boardsResult.boards && boardsResult.boards.length > 0) {
         const boardId = boardsResult.boards[0].id; // Use first board
+        setJiraBoardId(boardId); // Save board ID for later use
         
         // Now get sprints for this board
         const sprintsParams = new URLSearchParams({
@@ -725,6 +771,9 @@ export default function ProjectPage() {
   const createJiraTask = async () => {
     if (!selectedTask) return;
     
+    // Get the current task from state to ensure we have the latest screenshot URL
+    const currentTask = tasks.find(t => t.id === selectedTask.id) || selectedTask;
+    
     setCreatingJira(selectedTask.id);
     try {
       const response = await fetch('/api/jira', {
@@ -734,20 +783,21 @@ export default function ProjectPage() {
         },          body: JSON.stringify({
             action: 'createTicket',
             feedback: {
-              title: jiraTaskData.title || selectedTask.title,
-              description: jiraTaskData.description || selectedTask.description || '',
-              url: selectedTask.url,
-              selected_area: selectedTask.selected_area,
-              screenshot: selectedTask.screenshot ? (
-                selectedTask.screenshot.startsWith('http') 
-                  ? selectedTask.screenshot 
-                  : getScreenshotUrl(selectedTask.screenshot)
-              ) : null
+              title: jiraTaskData.title || currentTask.title,
+              description: jiraTaskData.description || currentTask.description || '',
+              url: currentTask.url,
+              selected_area: currentTask.selected_area,
+              screenshot: currentTask.screenshot_display || currentTask.screenshot_url || (currentTask.screenshot ? (
+                currentTask.screenshot.startsWith('http') 
+                  ? currentTask.screenshot 
+                  : getScreenshotUrl(currentTask.screenshot)
+              ) : null)
             },
           jiraConfig: {
             ...jiraConfig,
             defaultAssignee: jiraTaskData.assignee,
             selectedSprint: jiraTaskData.sprint,
+            selectedBoardId: jiraBoardId,
             defaultLabels: jiraTaskData.labels ? jiraTaskData.labels.split(',').map(l => l.trim()) : []
           }
         })
@@ -1172,7 +1222,7 @@ export default function ProjectPage() {
                               </div>
                               <button
                                 onClick={() => openJiraModal(task)}
-                                disabled={creatingJira === task.id || loadingJiraData}
+                                disabled={creatingJira === task.id || loadingJiraModal === task.id}
                                 className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm ml-auto"
                                 title="JIRA-Task erstellen"
                               >
@@ -1181,7 +1231,7 @@ export default function ProjectPage() {
                                     <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                     Erstelle...
                                   </>
-                                ) : loadingJiraData ? (
+                                ) : loadingJiraModal === task.id ? (
                                   <>
                                     <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                     Lade...
@@ -1595,14 +1645,34 @@ export default function ProjectPage() {
             {/* Project Actions */}
             <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-3 text-sm">Projekt-Aktionen</h3>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="w-full px-3 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 transition-colors flex items-center justify-center gap-1"
-                title="Projekt löschen"
-              >
-                <X className="h-3 w-3" />
-                Projekt löschen
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={handleExcelExport}
+                  disabled={exportingExcel || tasks.filter(t => !t.jira_key).length === 0}
+                  className="w-full px-3 py-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded border border-green-200 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Excel-Export der Nicht-JIRA Tasks"
+                >
+                  {exportingExcel ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600"></div>
+                      Exportiere...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3 w-3" />
+                      Excel Export ({tasks.filter(t => !t.jira_key).length} Tasks)
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full px-3 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 transition-colors flex items-center justify-center gap-1"
+                  title="Projekt löschen"
+                >
+                  <X className="h-3 w-3" />
+                  Projekt löschen
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1801,10 +1871,10 @@ export default function ProjectPage() {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={createJiraTask}
-                  disabled={!jiraTaskData.title || creatingJira}
+                  disabled={!jiraTaskData.title || creatingJira === selectedTask?.id}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg"
                 >
-                  {creatingJira ? (
+                  {creatingJira === selectedTask?.id ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       Erstelle...

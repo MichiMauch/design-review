@@ -300,8 +300,30 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   }
 
   // Sprint-Zuweisung falls konfiguriert
-  if (selectedSprint && selectedBoardId && responseData.key) {
+  if (selectedSprint && responseData.key) {
     try {
+      // If no board ID provided, try to get it from the project
+      let boardId = selectedBoardId;
+      
+      if (!boardId) {
+        // Try to find a board for this project
+        const boardsResponse = await fetch(`${serverUrl}/rest/agile/1.0/board?projectKeyOrId=${projectKey}&maxResults=50`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (boardsResponse.ok) {
+          const boardsData = await boardsResponse.json();
+          if (boardsData.values && boardsData.values.length > 0) {
+            boardId = boardsData.values[0].id;
+          }
+        }
+      }
+      
+      // Now add to sprint
       await addIssueToSprint({
         serverUrl,
         username,
@@ -309,8 +331,9 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         sprintId: selectedSprint,
         issueKey: responseData.key
       });
-    } catch {
+    } catch (error) {
       // Ticket wurde erstellt, nur Sprint-Zuweisung fehlgeschlagen
+      console.error('Sprint assignment failed:', error);
     }
   }
 

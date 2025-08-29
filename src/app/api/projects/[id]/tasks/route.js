@@ -38,7 +38,6 @@ export async function GET(request, { params }) {
       
       return {
         ...row,
-        screenshot: null, // Excluded from query for performance, but we'll load it via separate call
         screenshot_display: screenshotDisplay
       };
     });
@@ -104,8 +103,34 @@ export async function POST(request, { params }) {
     if (screenshot) {
       // Check if it's a filename (R2), URL, or base64 data
       if (screenshot.startsWith('data:')) {
-        // Base64 data - store as blob (fallback)
-        screenshotBlob = screenshot;
+        // Base64 data - upload to R2 and get R2 URL
+        console.log('Attempting R2 upload for screenshot...');
+        console.log('Environment check:', {
+          hasAccountId: !!process.env.CLOUDFLARE_ACCOUNT_ID,
+          hasBucket: !!process.env.CLOUDFLARE_R2_BUCKET,
+          hasAccessKey: !!process.env.CLOUDFLARE_ACCESS_KEY_ID,
+          hasSecretKey: !!process.env.CLOUDFLARE_SECRET_ACCESS_KEY
+        });
+        
+        try {
+          const { uploadDataUrlToR2 } = await import('@/lib/cloudflare-r2.ts');
+          console.log('R2 function imported successfully');
+          const uploadResult = await uploadDataUrlToR2(screenshot);
+          console.log('R2 upload result:', uploadResult);
+          
+          if (uploadResult.success) {
+            screenshotFilename = uploadResult.filename;
+            screenshotUrl = uploadResult.url;
+            console.log('R2 upload SUCCESS:', { filename: screenshotFilename, url: screenshotUrl });
+          } else {
+            console.error('R2 upload FAILED:', uploadResult.error);
+            throw new Error(`R2 upload failed: ${uploadResult.error}`);
+          }
+        } catch (error) {
+          console.error('R2 upload EXCEPTION:', error.message);
+          console.error('Stack trace:', error.stack);
+          throw new Error(`R2 upload exception: ${error.message}`);
+        }
       } else if (screenshot.startsWith('http')) {
         // Full URL - extract filename and store both
         screenshotUrl = screenshot;
