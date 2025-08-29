@@ -86,12 +86,12 @@ export async function GET(request, { params }) {
       } else if (task.screenshot && (task.screenshot.includes('.png') || task.screenshot.includes('.jpg') || task.screenshot.includes('.jpeg'))) {
         // Filename only - load directly from R2 with authentication
         try {
-          const AWS = require('aws-sdk');
-          const https = require('https');
+          const AWS = await import('aws-sdk');
+          const https = await import('https');
           
           const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
           
-          const s3 = new AWS.S3({
+          const s3 = new AWS.default.S3({
             endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
             accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
             secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
@@ -100,7 +100,7 @@ export async function GET(request, { params }) {
             region: 'auto',
             sslEnabled: true,
             httpOptions: {
-              agent: https.globalAgent,
+              agent: https.default.globalAgent,
               timeout: 120000,
             }
           });
