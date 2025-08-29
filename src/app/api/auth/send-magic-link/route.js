@@ -1,4 +1,5 @@
 import { getDb, initDatabase } from '../../../../../lib/db.js';
+import { sendMagicLinkEmail } from '../../../../../lib/email.js';
 import crypto from 'crypto';
 
 // Rate limiting in memory (in production use Redis)
@@ -18,26 +19,6 @@ function checkRateLimit(email) {
   
   validAttempts.push(now);
   rateLimitMap.set(key, validAttempts);
-  return true;
-}
-
-async function sendMagicLinkEmail(email, token, name) {
-  const magicLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/auth/magic?token=${token}`;
-  
-  // For development: log to console
-  if (process.env.NODE_ENV === 'development') {
-    console.log('\n🪄 MAGIC LINK EMAIL');
-    console.log('To:', email);
-    console.log('Name:', name);
-    console.log('Link:', magicLink);
-    console.log('Valid for: 15 minutes\n');
-    return true;
-  }
-  
-  // TODO: Implement actual email sending with SMTP
-  // For now, just log the link
-  console.log('Magic Link for', email, ':', magicLink);
-  
   return true;
 }
 
@@ -95,7 +76,12 @@ export async function POST(request) {
     });
 
     // Send magic link email
-    await sendMagicLinkEmail(normalizedEmail, token, userData.name);
+    const emailSent = await sendMagicLinkEmail(normalizedEmail, token, userData.name);
+    
+    if (!emailSent) {
+      console.error('Failed to send magic link email to:', normalizedEmail);
+      // We still return success for security reasons
+    }
 
     return Response.json({
       success: true,
