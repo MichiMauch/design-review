@@ -28,7 +28,22 @@
       "Bash(turso db:*)",
       "Bash(env)",
       "WebSearch",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Read(/Users/michaelmauch/Documents/Development/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/src/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/src/payload/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/src/payload/collections/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo2/app/admin/api/upload-image/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)",
+      "Read(/Users/michaelmauch/Documents/Development/kokomo2/**)"
     ],
     "deny": []
   }

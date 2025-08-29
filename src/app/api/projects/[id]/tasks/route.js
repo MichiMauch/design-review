@@ -103,8 +103,8 @@ export async function POST(request, { params }) {
     if (screenshot) {
       // Check if it's a filename (R2), URL, or base64 data
       if (screenshot.startsWith('data:')) {
-        // Base64 data - upload to R2 and get R2 URL
-        console.log('Attempting R2 upload for screenshot...');
+        // Base64 data - upload to R2 using AWS SDK v2
+        console.log('Uploading screenshot to R2 using AWS SDK v2...');
         console.log('Environment check:', {
           hasAccountId: !!process.env.CLOUDFLARE_ACCOUNT_ID,
           hasBucket: !!process.env.CLOUDFLARE_R2_BUCKET,
@@ -113,23 +113,23 @@ export async function POST(request, { params }) {
         });
         
         try {
-          const { uploadDataUrlToR2 } = await import('@/lib/cloudflare-r2.ts');
-          console.log('R2 function imported successfully');
+          const { uploadDataUrlToR2 } = await import('@/lib/cloudflare-r2-v2.ts');
+          console.log('R2 v2 function imported successfully');
           const uploadResult = await uploadDataUrlToR2(screenshot);
-          console.log('R2 upload result:', uploadResult);
+          console.log('R2 v2 upload result:', uploadResult);
           
           if (uploadResult.success) {
             screenshotFilename = uploadResult.filename;
             screenshotUrl = uploadResult.url;
-            console.log('R2 upload SUCCESS:', { filename: screenshotFilename, url: screenshotUrl });
+            console.log('R2 v2 upload SUCCESS:', { filename: screenshotFilename, url: screenshotUrl });
           } else {
-            console.error('R2 upload FAILED:', uploadResult.error);
-            throw new Error(`R2 upload failed: ${uploadResult.error}`);
+            console.error('R2 v2 upload FAILED:', uploadResult.error);
+            throw new Error(`R2 v2 upload failed: ${uploadResult.error}`);
           }
         } catch (error) {
-          console.error('R2 upload EXCEPTION:', error.message);
+          console.error('R2 v2 upload EXCEPTION:', error.message);
           console.error('Stack trace:', error.stack);
-          throw new Error(`R2 upload exception: ${error.message}`);
+          throw new Error(`R2 v2 upload exception: ${error.message}`);
         }
       } else if (screenshot.startsWith('http')) {
         // Full URL - extract filename and store both

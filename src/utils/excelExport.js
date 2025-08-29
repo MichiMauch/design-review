@@ -45,33 +45,21 @@ export async function exportTasksToExcel(tasks, projectName) {
       willCallEndpoint: !task.screenshot_display && !task.screenshot_url
     });
     
-    // Priority: screenshot_display > screenshot_url > load from endpoint
-    if (task.screenshot_display) {
+    // Priority: R2 URLs > screenshot_url > screenshot_display > endpoint fallback
+    if (task.screenshot_url && task.screenshot_url.startsWith('https://pub-')) {
+      // Use R2 URL directly - this is the best option
+      screenshotUrl = task.screenshot_url;
+      console.log(`Task ${task.id} - Using R2 URL: ${screenshotUrl}`);
+    } else if (task.screenshot_display && task.screenshot_display.startsWith('http')) {
       screenshotUrl = task.screenshot_display;
       console.log(`Task ${task.id} - Using screenshot_display: ${screenshotUrl}`);
-    } else if (task.screenshot_url) {
+    } else if (task.screenshot_url && task.screenshot_url.startsWith('http')) {
       screenshotUrl = task.screenshot_url;
       console.log(`Task ${task.id} - Using screenshot_url: ${screenshotUrl}`);
     } else {
-      // Load R2 URL from screenshot endpoint
-      try {
-        const response = await fetch(`/api/projects/${task.project_id}/tasks/${task.id}/screenshot`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Task ${task.id} - Screenshot endpoint response:`, data);
-          if (data.screenshot_url && data.screenshot_url.startsWith('http')) {
-            screenshotUrl = data.screenshot_url;
-            console.log(`Task ${task.id} - Got R2 URL from endpoint: ${screenshotUrl}`);
-          } else {
-            screenshotUrl = 'Kein R2-Screenshot verfügbar';
-            console.log(`Task ${task.id} - No valid R2 URL from endpoint, got:`, data.screenshot_url);
-          }
-        } else {
-          screenshotUrl = 'Screenshot-Endpoint nicht erreichbar';
-        }
-      } catch {
-        screenshotUrl = 'Fehler beim Laden der Screenshot-URL';
-      }
+      // Generate full endpoint URL for localhost (will work in Excel)
+      screenshotUrl = `http://localhost:3000/api/projects/${task.project_id}/tasks/${task.id}/screenshot`;
+      console.log(`Task ${task.id} - Using screenshot endpoint fallback: ${screenshotUrl}`);
     }
     
     // If no screenshot URL found, mark as not available
