@@ -642,13 +642,37 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => openProjectManager(user)}
-                            className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-gray-700 flex items-center gap-1"
-                          >
-                            <Users className="h-3 w-3" />
-                            Verwalten
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap gap-1">
+                              {user.projects && user.projects.length > 0 ? (
+                                user.projects.map((project, index) => (
+                                  <span
+                                    key={project.id}
+                                    title={project.domain}
+                                    className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
+                                      index % 4 === 0 ? 'bg-blue-100 text-blue-800' :
+                                      index % 4 === 1 ? 'bg-green-100 text-green-800' :
+                                      index % 4 === 2 ? 'bg-purple-100 text-purple-800' :
+                                      'bg-orange-100 text-orange-800'
+                                    }`}
+                                  >
+                                    {project.name.length > 15 ? `${project.name.substring(0, 15)}...` : project.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-gray-500 italic">
+                                  Keine Projekte
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => openProjectManager(user)}
+                              className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded text-gray-600 flex items-center gap-1 ml-1"
+                              title="Projekt-Zugriffe verwalten"
+                            >
+                              <Users className="h-3 w-3" />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {user.created_at ? formatDate(user.created_at) : 'Unbekannt'}

@@ -15,13 +15,51 @@ export async function GET() {
     await initDatabase();
     const db = getDb();
 
-    const result = await db.execute({
+    // Get all users with their project access in one query
+    const usersResult = await db.execute({
       sql: 'SELECT id, email, name, role, created_at, last_login FROM authorized_users ORDER BY created_at DESC'
     });
 
+    // Get project access for all users
+    const projectAccessResult = await db.execute({
+      sql: `
+        SELECT 
+          au.id as user_id,
+          p.id as project_id,
+          p.name as project_name,
+          p.domain as project_domain
+        FROM authorized_users au
+        LEFT JOIN user_project_access upa ON au.email = upa.user_email
+        LEFT JOIN projects p ON upa.project_id = p.id
+        ORDER BY au.id, p.name
+      `
+    });
+
+    // Group project access by user
+    const projectAccessByUser = {};
+    projectAccessResult.rows.forEach(row => {
+      if (!projectAccessByUser[row.user_id]) {
+        projectAccessByUser[row.user_id] = [];
+      }
+      // Only add projects that exist (not NULL from LEFT JOIN)
+      if (row.project_id) {
+        projectAccessByUser[row.user_id].push({
+          id: row.project_id,
+          name: row.project_name,
+          domain: row.project_domain
+        });
+      }
+    });
+
+    // Combine users with their project access
+    const usersWithProjects = usersResult.rows.map(user => ({
+      ...user,
+      projects: projectAccessByUser[user.id] || []
+    }));
+
     return Response.json({
       success: true,
-      users: result.rows
+      users: usersWithProjects
     });
 
   } catch (error) {
