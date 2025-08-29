@@ -1,7 +1,17 @@
 import { getDb, initDatabase } from '../../../../lib/db.js';
+import { getUser } from '../../../../lib/auth.js';
 
 export async function POST(request) {
   try {
+    // Check authentication and admin role
+    const user = await getUser();
+    if (!user || user.role !== 'admin') {
+      return Response.json(
+        { success: false, error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
     const { name, domain } = await request.json();
 
     if (!name || !domain) {
@@ -48,19 +58,53 @@ export async function POST(request) {
 
 export async function GET() {
   try {
+    // Check authentication
+    const user = await getUser();
+    if (!user) {
+      return Response.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     // Ensure database is initialized
     await initDatabase();
     const db = getDb();
 
-    // Get all projects
-    const projectsResult = await db.execute(`
-      SELECT * FROM projects ORDER BY created_at DESC
-    `);
+    let projectsResult;
+    
+    if (user.role === 'admin') {
+      // Admin sees all projects
+      projectsResult = await db.execute(`
+        SELECT * FROM projects ORDER BY created_at DESC
+      `);
+    } else {
+      // Non-admin sees only assigned projects
+      projectsResult = await db.execute(`
+        SELECT p.* FROM projects p
+        JOIN user_project_access upa ON p.id = upa.project_id
+        WHERE upa.user_email = ?
+        ORDER BY p.created_at DESC
+      `, [user.email]);
+    }
 
-    // Get all tasks for all projects
-    const tasksResult = await db.execute(`
-      SELECT * FROM tasks ORDER BY created_at DESC
-    `);
+    // Get tasks based on user access
+    let tasksResult;
+    
+    if (user.role === 'admin') {
+      // Admin sees all tasks
+      tasksResult = await db.execute(`
+        SELECT * FROM tasks ORDER BY created_at DESC
+      `);
+    } else {
+      // Non-admin sees only tasks from assigned projects
+      tasksResult = await db.execute(`
+        SELECT t.* FROM tasks t
+        JOIN user_project_access upa ON t.project_id = upa.project_id
+        WHERE upa.user_email = ?
+        ORDER BY t.created_at DESC
+      `, [user.email]);
+    }
 
     // Group tasks by project_id
     const tasksByProject = {};
