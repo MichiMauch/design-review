@@ -1338,15 +1338,15 @@ export default function ProjectPage() {
                 </div>
               ) : viewMode === 'list' ? (
                 <div className="space-y-4">
-                  {/* Non-JIRA Tasks */}
-                  {getFilteredTasks(tasks.filter(t => !t.jira_key)).length > 0 && (
+                  {/* All Tasks */}
+                  {getFilteredTasks(tasks).length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <AlertCircle className="h-5 w-5 text-red-500" />
-                        Tasks ({getFilteredTasks(tasks.filter(t => !t.jira_key)).length})
+                        Tasks ({getFilteredTasks(tasks).length})
                       </h3>
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                        {getFilteredTasks(tasks.filter(t => !t.jira_key)).map((task) => (
+                        {getFilteredTasks(tasks).map((task) => (
                           <div key={task.id} className="bg-white border border-red-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
@@ -1385,12 +1385,29 @@ export default function ProjectPage() {
                                   </div>
                                 ) : (
                                   <>
-                                    <h4 className="font-medium text-gray-900 mb-1" style={{
-                                      display: '-webkit-box',
-                                      WebkitLineClamp: 2,
-                                      WebkitBoxOrient: 'vertical',
-                                      overflow: 'hidden'
-                                    }}>{task.title}</h4>
+                                    <div className="flex items-start gap-2 mb-1">
+                                      <h4 className="font-medium text-gray-900 flex-1" style={{
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                      }}>{task.title}</h4>
+                                      {task.jira_key && (
+                                        <div className="flex items-center gap-1">
+                                          <a
+                                            href={task.jira_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
+                                            title={`JIRA: ${task.jira_key}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <JiraIcon className="h-3 w-3" />
+                                            {task.jira_key}
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
                                     {task.description && (
                                       <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                                     )}
@@ -1690,7 +1707,7 @@ export default function ProjectPage() {
                 /* Board View */
                 <div className="flex gap-4 h-[calc(100vh-200px)] overflow-x-auto pb-4">
                   {TASK_STATUSES.map(status => {
-                    const statusTasks = tasks.filter(t => !t.jira_key && (t.status || 'open') === status.value);
+                    const statusTasks = tasks.filter(t => (t.status || 'open') === status.value);
                     return (
                       <div 
                         key={status.value} 
@@ -1738,14 +1755,29 @@ export default function ProjectPage() {
                                 onDragEnd={handleDragEnd}
                               >
                                 <div className="space-y-2">
-                                  <h4 className="font-medium text-sm text-gray-900" style={{
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden'
-                                  }}>
-                                    {task.title}
-                                  </h4>
+                                  <div className="flex items-start gap-2">
+                                    <h4 className="font-medium text-sm text-gray-900 flex-1" style={{
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden'
+                                    }}>
+                                      {task.title}
+                                    </h4>
+                                    {task.jira_key && (
+                                      <a
+                                        href={task.jira_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200 transition-colors"
+                                        title={`JIRA: ${task.jira_key}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <JiraIcon className="h-2 w-2" />
+                                        {task.jira_key}
+                                      </a>
+                                    )}
+                                  </div>
                                   <div className="flex items-center justify-between text-xs text-gray-500">
                                     <span>{formatTime(task.created_at)}</span>
                                     <div className="flex items-center gap-1">
@@ -1796,7 +1828,7 @@ export default function ProjectPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-red-50 rounded-lg text-center">
                     <div className="text-lg font-bold text-red-600">
-                      {tasks.filter(t => !t.jira_key && t.status === 'open').length}
+                      {tasks.filter(t => t.status === 'open').length}
                     </div>
                     <div className="text-xs text-red-600">Offen</div>
                   </div>
@@ -1804,7 +1836,7 @@ export default function ProjectPage() {
                     <div className="text-lg font-bold text-blue-600">
                       {tasks.filter(t => t.jira_key).length}
                     </div>
-                    <div className="text-xs text-blue-600">JIRA</div>
+                    <div className="text-xs text-blue-600">Mit JIRA</div>
                   </div>
                 </div>
               </div>
@@ -1986,9 +2018,9 @@ export default function ProjectPage() {
               <div className="space-y-2">
                 <button
                   onClick={handleExcelExport}
-                  disabled={exportingExcel || tasks.filter(t => !t.jira_key).length === 0}
+                  disabled={exportingExcel || tasks.length === 0}
                   className="w-full px-3 py-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded border border-green-200 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Excel-Export der Nicht-JIRA Tasks"
+                  title="Excel-Export aller Tasks"
                 >
                   {exportingExcel ? (
                     <>
@@ -1998,7 +2030,7 @@ export default function ProjectPage() {
                   ) : (
                     <>
                       <Download className="h-3 w-3" />
-                      Excel Export ({tasks.filter(t => !t.jira_key).length} Tasks)
+                      Excel Export ({tasks.length} Tasks)
                     </>
                   )}
                 </button>
@@ -2359,6 +2391,33 @@ export default function ProjectPage() {
                           <ExternalLink className="h-4 w-4" />
                           Öffnen
                         </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* JIRA Integration */}
+                  {selectedTaskForModal.jira_key && selectedTaskForModal.jira_url && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">JIRA Ticket</label>
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <JiraIcon className="h-5 w-5 text-blue-600" />
+                            <div>
+                              <div className="font-medium text-blue-900">{selectedTaskForModal.jira_key}</div>
+                              <div className="text-xs text-blue-700">JIRA Ticket verknüpft</div>
+                            </div>
+                          </div>
+                          <a
+                            href={selectedTaskForModal.jira_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            In JIRA öffnen
+                          </a>
+                        </div>
                       </div>
                     </div>
                   )}
