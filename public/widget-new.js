@@ -446,6 +446,10 @@
                     <!-- Sidebar Content -->
                     <div style="flex: 1; padding: 16px; overflow-y: auto;">
                         <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Dein Name:</label>
+                            <input id="annotation-feedback-name" placeholder="z.B. Michi" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
+                        </div>
+                        <div style="margin-bottom: 16px;">
                             <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Titel:</label>
                             <input id="annotation-feedback-title" placeholder="Kurzer, aussagekräftiger Titel..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
                         </div>
@@ -1163,8 +1167,12 @@
         const submitText = document.getElementById('submit-text');
         const submitSpinner = document.getElementById('submit-spinner');
 
+        const name = document.getElementById('annotation-feedback-name').value.trim();
         const title = document.getElementById('annotation-feedback-title').value.trim();
         const description = document.getElementById('annotation-feedback-text').value.trim();
+        
+        // Combine name and title if name is provided
+        const combinedTitle = name ? `${name} - ${title}` : title;
         const createJira = document.getElementById('annotation-create-jira').checked;
         const jiraStatusMessage = document.getElementById('jira-status-message');
 
@@ -1199,12 +1207,12 @@
             finalCtx.drawImage(canvas, 0, 0, canvas.width * scaleX, canvas.height * scaleY);
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
             // Submit feedback (DB) and get task ID
-            const taskResult = await submitFeedback(title, description, annotatedScreenshot);
+            const taskResult = await submitFeedback(combinedTitle, description, annotatedScreenshot);
             
             // Optional: JIRA-Konfiguration-Modal anzeigen
             if (createJira && projectConfig?.jira_server_url) {
                 const feedbackData = {
-                    title: title,
+                    title: combinedTitle,
                     description: description,
                     screenshot: annotatedScreenshot,
                     url: window.location.href,
@@ -1227,7 +1235,7 @@
                 closeAnnotationInterface();
             }
         } catch (error) {
-            await submitFeedback(title, description, null);
+            await submitFeedback(combinedTitle, description, null);
             closeAnnotationInterface();
         } finally {
             // Hide spinner and re-enable button
