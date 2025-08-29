@@ -1217,6 +1217,8 @@
             // Submit feedback (DB) and get task ID
             const taskResult = await submitFeedback(combinedTitle, description, annotatedScreenshot);
             
+            // JIRA functionality temporarily disabled
+            /*
             // Optional: JIRA-Konfiguration-Modal anzeigen
             if (createJira && projectConfig?.jira_server_url) {
                 const feedbackData = {
@@ -1228,8 +1230,6 @@
                     projectId: taskResult.projectId  // Add numeric project ID
                 };
                 
-                // JIRA functionality temporarily disabled
-                /*
                 // Show JIRA configuration modal
                 showJiraConfigModal(feedbackData);
             } else if (createJira && !projectConfig?.jira_server_url) {
@@ -1241,10 +1241,13 @@
                 // Close annotation interface
                 closeAnnotationInterface();
             } else {
-                */
                 // No JIRA - just close annotation interface
                 closeAnnotationInterface();
-            // }
+            }
+            */
+            
+            // No JIRA - just close annotation interface
+            closeAnnotationInterface();
         } catch (error) {
             await submitFeedback(combinedTitle, description, null);
             closeAnnotationInterface();
