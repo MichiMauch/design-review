@@ -134,7 +134,39 @@ async function createJiraTicket({ feedback, jiraConfig }) {
           ]),
           {
             type: "paragraph",
-            content: [{ type: "text", text: `URL: ${feedback.url}` }]
+            content: [
+              { type: "text", text: "URL: " },
+              { 
+                type: "text", 
+                text: feedback.url || "Keine URL angegeben",
+                marks: feedback.url ? [
+                  {
+                    type: "link",
+                    attrs: {
+                      href: feedback.url
+                    }
+                  }
+                ] : []
+              }
+            ]
+          },
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Original Task: " },
+              { 
+                type: "text", 
+                text: `Task #${feedback.id}`,
+                marks: [
+                  {
+                    type: "link",
+                    attrs: {
+                      href: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/project/${feedback.projectId}`
+                    }
+                  }
+                ]
+              }
+            ]
           },
           ...(feedback.selected_area ? (() => {
             try {
@@ -274,14 +306,20 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   let attachmentInfo = null;
   if (feedback.screenshot && responseData.key) {
     try {
+      console.log(`Uploading screenshot to JIRA issue ${responseData.key}`);
+      console.log(`Screenshot type: ${feedback.screenshot.startsWith('data:') ? 'base64' : feedback.screenshot.startsWith('http') ? 'URL' : 'unknown'}`);
+      
       attachmentInfo = await uploadScreenshotToJira({
         serverUrl,
         username,
         apiToken,
         issueKey: responseData.key,
         screenshot: feedback.screenshot,
-        feedbackId: feedback.id
+        feedbackId: feedback.id,
+        projectId: feedback.projectId
       });
+      
+      console.log('Screenshot upload successful:', attachmentInfo);
       
       // Add image to description if attachment was successful
       if (attachmentInfo && attachmentInfo.length > 0) {
@@ -294,9 +332,12 @@ async function createJiraTicket({ feedback, jiraConfig }) {
           originalDescription: issueData.fields.description
         });
       }
-    } catch {
+    } catch (error) {
       // Ticket wurde erstellt, nur Screenshot-Upload fehlgeschlagen
+      console.error('Screenshot upload failed:', error.message);
     }
+  } else {
+    console.log('No screenshot to upload or no issue key');
   }
 
   // Sprint-Zuweisung falls konfiguriert
@@ -362,43 +403,129 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   });
 }
 
-async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey, screenshot, feedbackId }) {
+async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey, screenshot, feedbackId, projectId }) {
+  console.log('Starting screenshot upload to JIRA:', {
+    issueKey,
+    screenshotType: screenshot ? (screenshot.startsWith('data:') ? 'base64' : 'url') : 'none',
+    screenshotLength: screenshot ? screenshot.length : 0,
+    feedbackId
+  });
+
   let buffer;
-  let filename = `feedback-${feedbackId}-screenshot.png`;
+  let filename = `feedback-${feedbackId || Date.now()}-screenshot.png`;
+  let correctedScreenshotUrl = screenshot;
   
   if (screenshot.startsWith('data:image')) {
+    console.log('Processing base64 screenshot...');
     // Base64 Data URL
     const base64Data = screenshot.replace(/^data:image\/[a-z]+;base64,/, '');
     buffer = Buffer.from(base64Data, 'base64');
+    console.log('Base64 screenshot processed, buffer size:', buffer.length);
   } else if (screenshot.startsWith('http')) {
-    // URL - download the image first
-    try {
-      const imageResponse = await fetch(screenshot);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to download image: ${imageResponse.status}`);
-      }
-      const arrayBuffer = await imageResponse.arrayBuffer();
-      buffer = Buffer.from(arrayBuffer);
+    console.log('Downloading screenshot from URL:', screenshot);
+    
+    // Check if this is an R2 URL - if so, try direct server access first
+    if (screenshot.includes('r2.dev') || screenshot.includes('cloudflare')) {
+      console.log('Detected R2 URL, attempting server-side direct access...');
       
-      // Extract filename from URL if possible
-      const urlParts = screenshot.split('/');
-      const lastPart = urlParts[urlParts.length - 1];
-      if (lastPart && lastPart.includes('.')) {
-        filename = lastPart;
+      // Fix legacy account ID in URL if present
+      const correctAccountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
+      const legacyAccountId = '6a52908bab2567e2a24d0dec042053d5';
+      
+      if (screenshot.includes(legacyAccountId)) {
+        correctedScreenshotUrl = screenshot.replace(legacyAccountId, correctAccountId);
+        console.log('Fixed legacy account ID in screenshot URL:', {
+          original: screenshot,
+          corrected: correctedScreenshotUrl
+        });
       }
-    } catch (error) {
-      throw new Error(`Screenshot download failed: ${error.message}`);
+      
+      try {
+        // Try to get the screenshot directly from our API instead of public URL
+        const urlParts = correctedScreenshotUrl.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        console.log('Extracted filename from R2 URL:', fileName);
+        
+        // Try to find the task ID from feedbackId and get screenshot directly
+        if (feedbackId) {
+          console.log('Attempting direct R2 access via internal API for task:', feedbackId);
+          // This will use the server-side R2 access with credentials
+          const directAccessUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/projects/${projectId}/tasks/${feedbackId}/screenshot`;
+          const directResponse = await fetch(directAccessUrl, {
+            headers: { 'Accept': 'image/*' }
+          });
+          
+          if (directResponse.ok) {
+            const arrayBuffer = await directResponse.arrayBuffer();
+            buffer = Buffer.from(arrayBuffer);
+            filename = fileName;
+            console.log('Successfully accessed screenshot via direct R2 API, buffer size:', buffer.length);
+          } else {
+            console.warn('Direct R2 access failed, falling back to public URL');
+            throw new Error('Direct access failed');
+          }
+        } else {
+          throw new Error('No feedbackId for direct access');
+        }
+      } catch (directError) {
+        console.warn('Direct R2 access failed:', directError.message, 'falling back to public URL fetch');
+        // Fallback to public URL fetch
+      }
     }
+    
+    // Fallback: Regular URL fetch (for non-R2 URLs or if direct access failed)
+    if (!buffer) {
+      try {
+        // Use corrected URL for fallback fetch as well
+        const urlToFetch = correctedScreenshotUrl || screenshot;
+        console.log('Fallback: fetching screenshot from URL:', urlToFetch);
+        const imageResponse = await fetch(urlToFetch);
+        console.log('Image fetch response:', {
+          status: imageResponse.status,
+          statusText: imageResponse.statusText,
+          contentType: imageResponse.headers.get('content-type'),
+          contentLength: imageResponse.headers.get('content-length')
+        });
+        
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+        }
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
+        console.log('Screenshot downloaded successfully via public URL, buffer size:', buffer.length);
+        
+        // Extract filename from URL if possible
+        const urlParts = (correctedScreenshotUrl || screenshot).split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        if (lastPart && lastPart.includes('.')) {
+          filename = lastPart;
+        }
+      } catch (error) {
+        console.error('Screenshot download failed:', {
+          error: error.message,
+          stack: error.stack,
+          url: screenshot
+        });
+        throw new Error(`Screenshot download failed: ${error.message}`);
+      }
+    }
+    console.log('Using filename:', filename);
   } else {
+    console.error('Invalid screenshot format:', screenshot);
     throw new Error('Invalid screenshot format - must be data URL or HTTP URL');
   }
   
   // FormData für File Upload erstellen
+  console.log('Creating FormData for JIRA upload...');
   const formData = new FormData();
   const blob = new Blob([buffer], { type: 'image/png' });
   formData.append('file', blob, filename);
+  console.log('FormData created with file:', { filename, blobSize: blob.size, blobType: blob.type });
 
-  const response = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}/attachments`, {
+  const jiraUploadUrl = `${serverUrl}/rest/api/3/issue/${issueKey}/attachments`;
+  console.log('Uploading to JIRA URL:', jiraUploadUrl);
+
+  const response = await fetch(jiraUploadUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
@@ -407,12 +534,37 @@ async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey,
     body: formData
   });
 
+  console.log('JIRA upload response:', {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries([...response.headers.entries()]),
+    url: response.url
+  });
+
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Screenshot upload failed: ${errorData.errorMessages?.join(', ') || response.statusText}`);
+    let errorData;
+    const responseText = await response.text();
+    console.error('JIRA upload failed - response body:', responseText);
+    
+    try {
+      errorData = JSON.parse(responseText);
+    } catch {
+      errorData = { message: responseText };
+    }
+    
+    console.error('JIRA upload error details:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData: errorData,
+      issueKey: issueKey
+    });
+    
+    throw new Error(`Screenshot upload failed: ${errorData.errorMessages?.join(', ') || errorData.message || response.statusText}`);
   }
 
-  return await response.json();
+  const responseData = await response.json();
+  console.log('JIRA upload successful, response:', responseData);
+  return responseData;
 }
 
 async function addImageToDescription({ serverUrl, username, apiToken, issueKey, attachment, originalDescription }) {

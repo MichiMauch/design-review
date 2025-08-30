@@ -67,11 +67,13 @@ export default function ProjectPage() {
     description: '',
     assignee: '',
     sprint: '',
-    labels: ''
+    labels: '',
+    column: ''
   });
   const [jiraUsers, setJiraUsers] = useState([]);
   const [jiraSprintsOptions, setJiraSprintsOptions] = useState([]);
   const [jiraBoardId, setJiraBoardId] = useState(null);
+  const [jiraBoardColumns, setJiraBoardColumns] = useState([]);
   const [loadingJiraModal, setLoadingJiraModal] = useState(null); // stores task.id when loading modal data
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
@@ -202,9 +204,15 @@ export default function ProjectPage() {
 
   const loadTasks = async () => {
     try {
+      console.log('Loading tasks from API...');
       const response = await fetch(`/api/projects/${params.id}/tasks`);
       if (response.ok) {
         const tasksData = await response.json();
+        console.log('Tasks loaded from API:', {
+          totalTasks: tasksData.length,
+          tasksWithJira: tasksData.filter(t => t.jira_key).length,
+          taskStatuses: tasksData.map(t => ({ id: t.id, status: t.status, jira_key: t.jira_key }))
+        });
         setTasks(tasksData);
         
         // Lade JIRA-Statuses für neue Tasks
@@ -754,13 +762,20 @@ export default function ProjectPage() {
       }
     });
 
-    // Nicht existierende JIRA Tasks automatisch löschen
+    // JIRA-Verknüpfung für nicht existierende JIRA Tasks entfernen (NICHT die Tasks löschen!)
     if (tasksToDelete.length > 0) {
       
-      const deletePromises = tasksToDelete.map(async (taskId) => {
+      const unlinkPromises = tasksToDelete.map(async (taskId) => {
         try {
           const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}`, {
-            method: 'DELETE'
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              jira_key: null,
+              jira_url: null
+            })
           });
           if (response.ok) {
             return taskId;
@@ -770,13 +785,37 @@ export default function ProjectPage() {
         return null;
       });
 
-      const deletedTasks = await Promise.all(deletePromises);
-      const successfullyDeleted = deletedTasks.filter(Boolean);
+      const unlinkedTasks = await Promise.all(unlinkPromises);
+      const successfullyUnlinked = unlinkedTasks.filter(Boolean);
       
-      if (successfullyDeleted.length > 0) {
-        showToast(`${successfullyDeleted.length} nicht existierende JIRA Task(s) automatisch gelöscht`, 'info');
-        // Tasks neu laden nach dem Löschen
-        setTimeout(() => loadTasks(), 1000);
+      if (successfullyUnlinked.length > 0) {
+        showToast(`${successfullyUnlinked.length} JIRA-Verknüpfung(en) aufgehoben - Tasks wurden nicht gelöscht`, 'info');
+        
+        // Update local state instead of reloading all tasks
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            successfullyUnlinked.includes(task.id) 
+              ? { ...task, jira_key: null, jira_url: null }
+              : task
+          )
+        );
+        
+        // Remove from JIRA status maps
+        setJiraStatuses(prev => {
+          const newMap = { ...prev };
+          successfullyUnlinked.forEach(taskId => {
+            delete newMap[taskId];
+          });
+          return newMap;
+        });
+        
+        setJiraTaskSprints(prev => {
+          const newMap = { ...prev };
+          successfullyUnlinked.forEach(taskId => {
+            delete newMap[taskId];
+          });
+          return newMap;
+        });
       }
     }
     
@@ -916,28 +955,112 @@ export default function ProjectPage() {
         return;
       }
 
-      // Load screenshot if not already loaded
-      if (!task.screenshot_display && !task.screenshot_url) {
-        await loadTaskScreenshot(task.id);
-      }
-
+      // Always set the task immediately - no race conditions
       setSelectedTask(task);
+      
+      // Load screenshot if not already loaded
+      let taskWithScreenshot = task;
+      const hasScreenshot = task.screenshot_display || task.screenshot_url || task.screenshot;
+      
+      console.log('Screenshot loading check for task:', {
+        taskId: task.id,
+        hasScreenshot: hasScreenshot,
+        screenshot_display: !!task.screenshot_display,
+        screenshot_url: !!task.screenshot_url,
+        screenshot: !!task.screenshot
+      });
+      
+      if (!hasScreenshot) {
+        console.log('Loading and validating screenshot for task:', task.id);
+        
+        // Use direct API call instead of loadTaskScreenshot to avoid race conditions
+        try {
+          const response = await fetch(`/api/projects/${params.id}/tasks/${task.id}/screenshot?format=json`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Screenshot loaded from API:', {
+              taskId: task.id,
+              screenshot_url: data.screenshot_url,
+              hasUrl: !!data.screenshot_url,
+              urlLength: data.screenshot_url ? data.screenshot_url.length : 0
+            });
+            
+            if (data.screenshot_url && data.screenshot_url.trim() !== '') {
+              console.log('Screenshot URL found, proceeding without validation:', {
+                taskId: task.id,
+                url: data.screenshot_url,
+                urlLength: data.screenshot_url.length
+              });
+              
+              taskWithScreenshot = { ...task, screenshot_display: data.screenshot_url };
+              setSelectedTask(taskWithScreenshot);
+              // Also update the tasks array to keep it in sync
+              setTasks(prevTasks => 
+                prevTasks.map(t => 
+                  t.id === task.id 
+                    ? { ...t, screenshot_display: data.screenshot_url }
+                    : t
+                )
+              );
+            } else {
+              console.log('No valid screenshot URL returned for task:', task.id);
+            }
+          } else {
+            console.warn('Screenshot API response not OK:', {
+              taskId: task.id,
+              status: response.status,
+              statusText: response.statusText
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load screenshot for task:', {
+            taskId: task.id,
+            error: error.message,
+            stack: error.stack
+          });
+          showToast(`Screenshot konnte nicht geladen werden für Task ${task.id}. JIRA-Task wird ohne Bild erstellt.`, 'warning');
+        }
+      } else {
+        console.log('Screenshot already available, validating existing URL for task:', {
+          taskId: task.id,
+          url: task.screenshot_display || taskWithScreenshot?.screenshot_display
+        });
+        
+        // Log existing screenshot URL without validation
+        const existingUrl = task.screenshot_display || taskWithScreenshot?.screenshot_display;
+        if (existingUrl) {
+          console.log('Screenshot already available for task:', {
+            taskId: task.id,
+            url: existingUrl,
+            urlLength: existingUrl.length
+          });
+        }
+      }
+      
+      // Always use the original task parameter to avoid state confusion
       setJiraTaskData({
         title: task.title,
         description: task.description || '',
         assignee: '',
         sprint: '',
-        labels: ''
+        labels: '',
+        column: ''
       });
       
-      // Load JIRA users and sprints before showing modal
+      // Load JIRA data before showing modal
       setLoadingJiraModal(task.id);
+      
+      // First load boards to get board ID
+      const boardId = await loadJiraBoards();
+      
+      // Then load users, sprints, and columns in parallel
       await Promise.all([
         loadJiraUsers(),
-        loadJiraSprints()
+        loadJiraSprints(boardId),
+        loadJiraBoardColumns(boardId)
       ]);
-      setLoadingJiraModal(null);
       
+      setLoadingJiraModal(null);
       setShowJiraModal(true);
       
     } catch {
@@ -968,9 +1091,8 @@ export default function ProjectPage() {
     }
   };
 
-  const loadJiraSprints = async () => {
+  const loadJiraBoards = async () => {
     try {
-      // First get boards for the project
       const boardsParams = new URLSearchParams({
         action: 'getBoards',
         serverUrl: jiraConfig.serverUrl,
@@ -987,23 +1109,72 @@ export default function ProjectPage() {
       if (boardsResult.success && boardsResult.boards && boardsResult.boards.length > 0) {
         const boardId = boardsResult.boards[0].id; // Use first board
         setJiraBoardId(boardId); // Save board ID for later use
-        
-        // Now get sprints for this board
-        const sprintsParams = new URLSearchParams({
-          action: 'getSprints',
-          serverUrl: jiraConfig.serverUrl,
-          username: jiraConfig.username,
-          apiToken: jiraConfig.apiToken,
-          boardId: boardId
-        });
+        return boardId;
+      }
+    } catch {
+    }
+    return null;
+  };
 
-        const sprintsResponse = await fetch(`/api/jira?${sprintsParams}`, {
-          method: 'GET',
-        });
+  const loadJiraSprints = async (boardId) => {
+    try {
+      if (!boardId) return;
+      
+      // Get sprints for this board
+      const sprintsParams = new URLSearchParams({
+        action: 'getSprints',
+        serverUrl: jiraConfig.serverUrl,
+        username: jiraConfig.username,
+        apiToken: jiraConfig.apiToken,
+        boardId: boardId
+      });
 
-        const sprintsResult = await sprintsResponse.json();
-        if (sprintsResult.success && sprintsResult.sprints) {
-          setJiraSprintsOptions(sprintsResult.sprints);
+      const sprintsResponse = await fetch(`/api/jira?${sprintsParams}`, {
+        method: 'GET',
+      });
+
+      const sprintsResult = await sprintsResponse.json();
+      if (sprintsResult.success && sprintsResult.sprints) {
+        setJiraSprintsOptions(sprintsResult.sprints);
+      }
+    } catch {
+    }
+  };
+
+  const loadJiraBoardColumns = async (boardId) => {
+    try {
+      if (!boardId) return;
+      
+      const columnsParams = new URLSearchParams({
+        action: 'getBoardColumns',
+        serverUrl: jiraConfig.serverUrl,
+        username: jiraConfig.username,
+        apiToken: jiraConfig.apiToken,
+        boardId: boardId
+      });
+
+      const columnsResponse = await fetch(`/api/jira?${columnsParams}`, {
+        method: 'GET'
+      });
+
+      if (columnsResponse.ok) {
+        const columnsData = await columnsResponse.json();
+        if (columnsData.success && columnsData.columns) {
+          // Flatten the columns structure to get statuses
+          const columnOptions = [];
+          columnsData.columns.forEach(column => {
+            if (column.statuses && column.statuses.length > 0) {
+              // Use the first status of each column as the target status
+              columnOptions.push({
+                id: column.statuses[0].id,
+                name: column.name,
+                statusId: column.statuses[0].id,
+                statusName: column.statuses[0].name,
+                statusCategory: column.statuses[0].category
+              });
+            }
+          });
+          setJiraBoardColumns(columnOptions);
         }
       }
     } catch {
@@ -1013,8 +1184,66 @@ export default function ProjectPage() {
   const createJiraTask = async () => {
     if (!selectedTask) return;
     
-    // Get the current task from state to ensure we have the latest screenshot URL
-    const currentTask = tasks.find(t => t.id === selectedTask.id) || selectedTask;
+    // Get the most current task data (prioritize selectedTask which was set correctly)
+    const currentTask = selectedTask;
+    
+    // Also get task from tasks array for any updates that might have happened
+    const taskFromState = tasks.find(t => t.id === selectedTask.id);
+    
+    // Ensure we have the latest screenshot data by checking both sources
+    let screenshotUrl = null;
+    
+    // Check selectedTask first (most reliable)
+    if (currentTask.screenshot_display) {
+      screenshotUrl = currentTask.screenshot_display;
+    } else if (currentTask.screenshot_url) {
+      screenshotUrl = currentTask.screenshot_url;
+    } 
+    // Fallback to task from state
+    else if (taskFromState?.screenshot_display) {
+      screenshotUrl = taskFromState.screenshot_display;
+    } else if (taskFromState?.screenshot_url) {
+      screenshotUrl = taskFromState.screenshot_url;
+    }
+    // Finally check original screenshot field
+    else if (currentTask.screenshot) {
+      if (currentTask.screenshot.startsWith('http') || currentTask.screenshot.startsWith('data:')) {
+        screenshotUrl = currentTask.screenshot;
+      } else {
+        screenshotUrl = getScreenshotUrl(currentTask.screenshot);
+      }
+    }
+    
+    // Final screenshot URL verification and debug logs
+    console.log('Creating JIRA task for:', {
+      taskId: currentTask.id,
+      title: currentTask.title,
+      hasScreenshot: !!screenshotUrl,
+      screenshotType: screenshotUrl ? (screenshotUrl.startsWith('data:') ? 'base64' : 'url') : 'none',
+      screenshotUrl: screenshotUrl ? screenshotUrl.substring(0, 100) + '...' : null,
+      currentTaskScreenshots: {
+        screenshot_display: currentTask.screenshot_display ? 'available' : 'missing',
+        screenshot_url: currentTask.screenshot_url ? 'available' : 'missing',
+        screenshot: currentTask.screenshot ? 'available' : 'missing'
+      },
+      taskFromStateScreenshots: taskFromState ? {
+        screenshot_display: taskFromState.screenshot_display ? 'available' : 'missing',
+        screenshot_url: taskFromState.screenshot_url ? 'available' : 'missing',
+        screenshot: taskFromState.screenshot ? 'available' : 'missing'
+      } : 'no taskFromState'
+    });
+
+    // Validate screenshot URL before sending
+    if (screenshotUrl) {
+      if (!screenshotUrl.startsWith('data:') && !screenshotUrl.startsWith('http')) {
+        console.warn('Invalid screenshot URL format:', screenshotUrl);
+        showToast('Warnung: Screenshot-Format ungültig, wird möglicherweise nicht hochgeladen', 'warning');
+      } else {
+        console.log('Screenshot URL validated and ready for JIRA upload');
+      }
+    } else {
+      console.warn('No screenshot will be uploaded to JIRA - no valid screenshot URL found');
+    }
     
     setCreatingJira(selectedTask.id);
     try {
@@ -1029,17 +1258,16 @@ export default function ProjectPage() {
               description: jiraTaskData.description || currentTask.description || '',
               url: currentTask.url,
               selected_area: currentTask.selected_area,
-              screenshot: currentTask.screenshot_display || currentTask.screenshot_url || (currentTask.screenshot ? (
-                currentTask.screenshot.startsWith('http') 
-                  ? currentTask.screenshot 
-                  : getScreenshotUrl(currentTask.screenshot)
-              ) : null)
+              screenshot: screenshotUrl,
+              id: currentTask.id, // Add task ID for proper filename generation
+              projectId: params.id // Add project ID for Direct R2 Access
             },
           jiraConfig: {
             ...jiraConfig,
             defaultAssignee: jiraTaskData.assignee,
             selectedSprint: jiraTaskData.sprint,
             selectedBoardId: jiraBoardId,
+            selectedColumn: jiraTaskData.column,
             defaultLabels: jiraTaskData.labels ? jiraTaskData.labels.split(',').map(l => l.trim()) : []
           }
         })
@@ -1048,6 +1276,13 @@ export default function ProjectPage() {
       const result = await response.json();
       
       if (result.success) {
+        console.log('JIRA task creation result:', {
+          success: result.success,
+          jiraKey: result.jiraKey || result.ticket?.key,
+          jiraUrl: result.jiraUrl || result.ticket?.url,
+          screenshotUploaded: screenshotUrl ? 'attempted' : 'not_provided'
+        });
+        
         // Update task with JIRA key
         const updateResponse = await fetch(`/api/projects/${params.id}/tasks/${selectedTask.id}`, {
           method: 'PATCH',
@@ -1061,9 +1296,38 @@ export default function ProjectPage() {
         });
 
         if (updateResponse.ok) {
-          showToast(`JIRA-Task erfolgreich erstellt: ${result.jiraKey || result.ticket?.key}`, 'success');
+          const jiraKey = result.jiraKey || result.ticket?.key;
+          const jiraUrl = result.jiraUrl || result.ticket?.url;
+          
+          console.log('JIRA task created successfully, updating task locally:', {
+            totalTasks: tasks.length,
+            taskId: currentTask.id,
+            jiraKey: jiraKey
+          });
+          
+          // Update the task locally instead of reloading all tasks
+          setTasks(prevTasks => 
+            prevTasks.map(task => 
+              task.id === currentTask.id 
+                ? { ...task, jira_key: jiraKey, jira_url: jiraUrl }
+                : task
+            )
+          );
+          
+          // Also update selectedTask if it matches
+          if (selectedTask && selectedTask.id === currentTask.id) {
+            setSelectedTask(prev => ({ ...prev, jira_key: jiraKey, jira_url: jiraUrl }));
+          }
+          
+          showToast(`JIRA-Task erfolgreich erstellt: ${jiraKey}`, 'success');
           setShowJiraModal(false);
-          loadTasks(); // Refresh tasks
+          
+          // Load JIRA statuses for the new task
+          if (jiraConfig.serverUrl) {
+            setTimeout(() => {
+              loadJiraStatuses();
+            }, 500);
+          }
         } else {
           showToast('Task erstellt, aber Update fehlgeschlagen', 'error');
         }
@@ -1391,7 +1655,7 @@ export default function ProjectPage() {
                                         WebkitLineClamp: 2,
                                         WebkitBoxOrient: 'vertical',
                                         overflow: 'hidden'
-                                      }}>{task.title}</h4>
+                                      }}>#{task.id} - {task.title}</h4>
                                       {task.jira_key && (
                                         <div className="flex items-center gap-1">
                                           <a
@@ -1573,7 +1837,7 @@ export default function ProjectPage() {
                           <div key={task.id} className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <h4 className="font-medium text-gray-900 mb-1">{task.title}</h4>
+                                <h4 className="font-medium text-gray-900 mb-1">#{task.id} - {task.title}</h4>
                                 {task.description && (
                                   <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                                 )}
@@ -1707,7 +1971,29 @@ export default function ProjectPage() {
                 /* Board View */
                 <div className="flex gap-4 h-[calc(100vh-200px)] overflow-x-auto pb-4">
                   {TASK_STATUSES.map(status => {
-                    const statusTasks = tasks.filter(t => (t.status || 'open') === status.value);
+                    // Robust filtering - handle undefined, null, empty string
+                    const statusTasks = tasks.filter(t => {
+                      const taskStatus = t.status || 'open'; // Default to 'open' for undefined/null
+                      return taskStatus === status.value;
+                    });
+                    
+                    // Debug logging for board filter
+                    if (status.value === 'open') {
+                      console.log(`Board filter for "${status.value}":`, {
+                        totalTasks: tasks.length,
+                        statusTasks: statusTasks.length,
+                        tasksWithUndefinedStatus: tasks.filter(t => !t.status).length,
+                        tasksWithEmptyStatus: tasks.filter(t => t.status === '').length,
+                        allTaskStatuses: tasks.map(t => ({ 
+                          id: t.id, 
+                          status: t.status, 
+                          normalizedStatus: t.status || 'open',
+                          title: t.title ? t.title.substring(0, 30) : 'No title',
+                          jira_key: t.jira_key 
+                        }))
+                      });
+                    }
+                    
                     return (
                       <div 
                         key={status.value} 
@@ -1762,7 +2048,7 @@ export default function ProjectPage() {
                                       WebkitBoxOrient: 'vertical',
                                       overflow: 'hidden'
                                     }}>
-                                      {task.title}
+                                      #{task.id} - {task.title}
                                     </h4>
                                     {task.jira_key && (
                                       <a
@@ -2160,7 +2446,12 @@ export default function ProjectPage() {
         {user?.role === 'admin' && showJiraModal && selectedTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[65] p-4">
             <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">JIRA-Task erstellen</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                JIRA-Task erstellen
+                <span className="text-xs text-gray-500 ml-2">
+                  (Task ID: {selectedTask.id})
+                </span>
+              </h3>
               
               <div className="space-y-4">
                 <div>
@@ -2220,6 +2511,24 @@ export default function ProjectPage() {
                     {jiraSprintsOptions.map(sprint => (
                       <option key={sprint.id} value={sprint.id}>
                         {sprint.name} ({sprint.state})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Board-Spalte
+                  </label>
+                  <select
+                    value={jiraTaskData.column}
+                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, column: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Standard (To Do)</option>
+                    {jiraBoardColumns.map(column => (
+                      <option key={column.id} value={column.statusId || column.id}>
+                        {column.name}
                       </option>
                     ))}
                   </select>
