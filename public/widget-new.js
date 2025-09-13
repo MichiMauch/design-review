@@ -421,9 +421,9 @@
                             <div>
                                 <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
                                 <div style="display: flex; gap: 6px;">
-                                    <button class="color-tool" data-color="#000000" style="width: 28px; height: 28px; border-radius: 50%; background: #000000; border: 2px solid #ddd; cursor: pointer; transition: all 0.2s;"></button>
-                                    <button class="color-tool" data-color="#ff0000" style="width: 28px; height: 28px; border-radius: 50%; background: #ff0000; border: 2px solid #ddd; cursor: pointer; transition: all 0.2s;"></button>
-                                    <button class="color-tool" data-color="#00ff00" style="width: 28px; height: 28px; border-radius: 50%; background: #00ff00; border: 2px solid #ddd; cursor: pointer; transition: all 0.2s;"></button>
+                                    <button class="color-tool" data-color="#000000" style="width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #000000 !important; border: 3px solid #ddd !important; cursor: pointer; transition: all 0.2s; box-sizing: border-box !important; min-width: 32px !important;"></button>
+                                    <button class="color-tool" data-color="#ff0000" style="width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #ff0000 !important; border: 3px solid #ddd !important; cursor: pointer; transition: all 0.2s; box-sizing: border-box !important; min-width: 32px !important;"></button>
+                                    <button class="color-tool" data-color="#00ff00" style="width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #00ff00 !important; border: 3px solid #ddd !important; cursor: pointer; transition: all 0.2s; box-sizing: border-box !important; min-width: 32px !important;"></button>
                                 </div>
                             </div>
                         </div>
@@ -1237,7 +1237,12 @@
             const taskResult = await submitFeedback(combinedTitle, description, annotatedScreenshot);
 
             // Optional: JIRA-Konfiguration anzeigen
+            console.log('Widget: JIRA Debug - createJira:', createJira);
+            console.log('Widget: JIRA Debug - projectConfig:', projectConfig);
+            console.log('Widget: JIRA Debug - jira_server_url:', projectConfig?.jira_server_url);
+
             if (createJira && projectConfig?.jira_server_url) {
+                console.log('Widget: JIRA Debug - Opening JIRA modal');
                 // Show JIRA configuration step instead of closing
                 showJiraConfigurationStep({
                     title: combinedTitle,
@@ -1248,6 +1253,7 @@
                     projectId: taskResult.projectId
                 });
             } else if (createJira && !projectConfig?.jira_server_url) {
+                console.log('Widget: JIRA Debug - JIRA checkbox checked but no server URL configured');
                 jiraStatusMessage.style.display = 'inline';
                 jiraStatusMessage.style.color = '#ffc107';
                 jiraStatusMessage.textContent = 'JIRA ist nicht konfiguriert.';
@@ -1256,6 +1262,7 @@
                     closeAnnotationInterface();
                 }, 3000);
             } else {
+                console.log('Widget: JIRA Debug - No JIRA requested, showing success');
                 // No JIRA - show success and close
                 showSuccessAndClose('Feedback erfolgreich gesendet!');
             }
