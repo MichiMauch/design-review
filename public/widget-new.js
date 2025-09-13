@@ -1301,13 +1301,34 @@
     
     async function loadProjectConfig() {
         try {
-                // Try to load by name first (for backward compatibility)
-            const response = await fetch(`${baseUrl}/api/projects/by-name/${encodeURIComponent(projectId)}`);
+            console.log(`Widget: Loading project config for "${projectId}"`);
+
+            // Try to load by name first (for backward compatibility)
+            let response = await fetch(`${baseUrl}/api/projects/by-name/${encodeURIComponent(projectId)}`);
             if (response.ok) {
                 projectConfig = await response.json();
-            } else {
+                console.log('Widget: Project loaded by name:', projectConfig?.name);
+                return;
             }
+
+            // If name lookup failed, try by ID if projectId looks numeric
+            if (/^\d+$/.test(projectId)) {
+                console.log(`Widget: Name lookup failed, trying by ID: ${projectId}`);
+                response = await fetch(`${baseUrl}/api/projects/${projectId}`);
+                if (response.ok) {
+                    projectConfig = await response.json();
+                    console.log('Widget: Project loaded by ID:', projectConfig?.name);
+                    return;
+                }
+            }
+
+            // Try a different approach - load all projects and find by name
+            console.log('Widget: Trying alternative project lookup...');
+            // This won't work due to auth, but let's see if we get a better error
+
+            console.error(`Widget: Could not load project "${projectId}"`);
         } catch (error) {
+            console.error('Widget: Error loading project config:', error);
         }
     }
     
