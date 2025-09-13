@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Widget Test</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0;">
+    <h1>Simple Widget Test</h1>
+
+    <p>This page tests if the widget loads at all.</p>
+
+    <div style="background: white; padding: 20px; border: 1px solid #ddd; margin: 20px 0;">
+        <h2>Test Content</h2>
+        <p>This is some test content that can be screenshotted.</p>
+        <div style="background: #e8f5e8; padding: 15px; border-radius: 5px;">
+            <p><strong>Success:</strong> This is a success message.</p>
+        </div>
+        <div style="background: #ffe6e6; padding: 15px; border-radius: 5px; margin-top: 10px;">
+            <p><strong>Error:</strong> This is an error message.</p>
+        </div>
+    </div>
+
+    <div id="widget-status" style="background: #fff3cd; padding: 10px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;">
+        <strong>Widget Status:</strong> <span id="status-text">Loading...</span>
+    </div>
+
+    <script>
+        // Simple status tracking
+        function updateStatus(message, color = '#333') {
+            const statusText = document.getElementById('status-text');
+            if (statusText) {
+                statusText.textContent = message;
+                statusText.style.color = color;
+            }
+            console.log('Widget Status:', message);
+        }
+
+        // Check if widget loads
+        let checkCount = 0;
+        const maxChecks = 20;
+
+        function checkWidget() {
+            checkCount++;
+
+            if (window.feedbackWidget) {
+                updateStatus(`✅ Widget loaded after ${checkCount} checks`, 'green');
+
+                // Test functions
+                if (typeof window.feedbackWidget.createScreenshotAndAnnotate === 'function') {
+                    updateStatus(`✅ Screenshot function available`, 'green');
+                } else {
+                    updateStatus(`❌ Screenshot function not available`, 'red');
+                }
+
+                return;
+            }
+
+            if (checkCount < maxChecks) {
+                updateStatus(`⏳ Checking widget... (${checkCount}/${maxChecks})`);
+                setTimeout(checkWidget, 500);
+            } else {
+                updateStatus(`❌ Widget failed to load after ${maxChecks} checks`, 'red');
+            }
+        }
+
+        // Start checking
+        setTimeout(checkWidget, 100);
+
+        // Catch errors
+        window.addEventListener('error', function(e) {
+            updateStatus(`❌ JavaScript Error: ${e.message}`, 'red');
+            console.error('JS Error:', e);
+        });
+    </script>
+
+    <!-- Load the widget -->
+    <script src="widget-new.js" data-project-id="doityourself.rocks"></script>
+</body>
+</html>
