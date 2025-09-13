@@ -1364,6 +1364,13 @@
                     showToast(`JIRA-Task erstellt: <a href="${jiraUrl}" target="_blank" style="color: #fff; text-decoration: underline; font-weight: bold;">${jiraKey}</a>`, 'success', 6000);
                 }
 
+                // Close the JIRA modal overlay immediately when toast appears
+                const jiraModal = document.getElementById('jira-overlay-modal');
+                if (jiraModal) {
+                    console.log('Widget: Closing JIRA modal after successful task creation');
+                    jiraModal.remove();
+                }
+
                 showSuccessAndClose(successMessage);
 
             } else {
@@ -1375,6 +1382,13 @@
 
             // Show error message
             showToast(`❌ JIRA-Task konnte nicht erstellt werden: ${error.message}`, 'error', 5000);
+
+            // Close the JIRA modal overlay on error as well
+            const jiraModal = document.getElementById('jira-overlay-modal');
+            if (jiraModal) {
+                console.log('Widget: Closing JIRA modal after error');
+                jiraModal.remove();
+            }
 
             // Reset button state
             if (createBtn) createBtn.disabled = false;
