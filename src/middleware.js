@@ -13,8 +13,7 @@ const protectedRoutes = [
 // API routes that require authentication
 const protectedApiRoutes = [
   '/api/admin',
-  '/api/projects/.*/edit',
-  '/api/jira'
+  '/api/projects/.*/edit'
 ];
 
 // Public routes that should NOT redirect to login (for widget compatibility)
@@ -25,6 +24,8 @@ const publicRoutes = [
   '/api/projects/.*/widget-ping',
   '/api/projects/.*/widget-status',
   '/api/simple-screenshot',
+  '/api/jira', // JIRA API for widget usage
+  '/api/jira-modal', // JIRA modal for widget usage
   '/auth',
   '/login'
 ];
@@ -158,7 +159,6 @@ export const config = {
     '/projects',
     '/admin/:path*',
     '/api/admin/:path*',
-    '/api/projects/:path*/edit',
-    '/api/jira/:path*'
+    '/api/projects/:path*/edit'
   ],
 };

@@ -47,10 +47,10 @@ export async function POST(request) {
         result = await getJiraBoardColumnsForWidget(data);
         break;
       default:
-        result = NextResponse.json({ 
-          success: false, 
-          error: 'Invalid action' 
-        }, { status: 400 });
+        result = withCORS(NextResponse.json({
+          success: false,
+          error: 'Invalid action'
+        }, { status: 400 }));
     }
     return withCORS(result);
   } catch (error) {
@@ -393,14 +393,14 @@ async function createJiraTicket({ feedback, jiraConfig }) {
     }
   }
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     ticket: {
       key: responseData.key,
       url: `${serverUrl}/browse/${responseData.key}`,
       id: responseData.id
     }
-  });
+  }));
 }
 
 async function uploadScreenshotToJira({ serverUrl, username, apiToken, issueKey, screenshot, feedbackId, projectId }) {
@@ -708,14 +708,14 @@ async function testJiraConnection({ serverUrl, username, apiToken }) {
 
   const userData = await response.json();
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     user: {
       displayName: userData.displayName,
       emailAddress: userData.emailAddress,
       accountId: userData.accountId
     }
-  });
+  }));
 }
 
 // GET für Projekt-Informationen abrufen
@@ -757,10 +757,10 @@ export async function GET(request) {
     }, { status: 400 });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message 
-    }, { status: 500 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 }));
   }
 }
 
@@ -784,7 +784,7 @@ async function getJiraProjects({ serverUrl, username, apiToken }) {
 
   const data = await response.json();
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     projects: data.values.map(project => ({
       key: project.key,
@@ -792,7 +792,7 @@ async function getJiraProjects({ serverUrl, username, apiToken }) {
       id: project.id,
       projectTypeKey: project.projectTypeKey
     }))
-  });
+  }));
 }
 
 async function getJiraUsers({ serverUrl, username, apiToken, projectKey }) {
@@ -822,7 +822,7 @@ async function getJiraUsers({ serverUrl, username, apiToken, projectKey }) {
 
   const data = await response.json();
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     users: data.map(user => ({
       accountId: user.accountId,
@@ -830,7 +830,7 @@ async function getJiraUsers({ serverUrl, username, apiToken, projectKey }) {
       emailAddress: user.emailAddress,
       active: user.active
     })).filter(user => user.active) // Nur aktive User
-  });
+  }));
 }
 
 async function getJiraBoards({ serverUrl, username, apiToken, projectKey }) {
@@ -858,7 +858,7 @@ async function getJiraBoards({ serverUrl, username, apiToken, projectKey }) {
 
   const data = await response.json();
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     boards: data.values.map(board => ({
       id: board.id,
@@ -866,7 +866,7 @@ async function getJiraBoards({ serverUrl, username, apiToken, projectKey }) {
       type: board.type,
       projectKey: board.location?.projectKey
     }))
-  });
+  }));
 }
 
 async function getJiraSprints({ serverUrl, username, apiToken, boardId }) {
@@ -895,7 +895,7 @@ async function getJiraSprints({ serverUrl, username, apiToken, boardId }) {
 
   const data = await response.json();
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     sprints: data.values.map(sprint => ({
       id: sprint.id,
@@ -904,7 +904,7 @@ async function getJiraSprints({ serverUrl, username, apiToken, boardId }) {
       startDate: sprint.startDate,
       endDate: sprint.endDate
     }))
-  });
+  }));
 }
 
 async function getJiraBoardColumns({ serverUrl, username, apiToken, boardId }) {
@@ -927,7 +927,7 @@ async function getJiraBoardColumns({ serverUrl, username, apiToken, boardId }) {
 
   const data = await response.json();
 
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     columns: data.columnConfig?.columns?.map(column => ({
       name: column.name,
@@ -937,18 +937,18 @@ async function getJiraBoardColumns({ serverUrl, username, apiToken, boardId }) {
         category: status.statusCategory?.name
       }))
     })) || []
-  });
+  }));
 }
 
 // POST API wrappers for widget usage
 async function getJiraUsersForWidget({ jiraConfig }) {
   const { serverUrl, username, apiToken, projectKey } = jiraConfig;
-  
+
   if (!serverUrl || !username || !apiToken) {
-    return NextResponse.json({ 
-      success: false, 
-      error: 'JIRA Konfiguration unvollständig' 
-    }, { status: 400 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: 'JIRA Konfiguration unvollständig'
+    }, { status: 400 }));
   }
 
   let url = `${serverUrl}/rest/api/3/users/search?maxResults=50`;
@@ -967,15 +967,15 @@ async function getJiraUsersForWidget({ jiraConfig }) {
   });
 
   if (!response.ok) {
-    return NextResponse.json({ 
-      success: false, 
-      error: `JIRA API Error: ${response.status}` 
-    }, { status: response.status });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: `JIRA API Error: ${response.status}`
+    }, { status: response.status }));
   }
 
   const data = await response.json();
   
-  return NextResponse.json({
+  return withCORS(NextResponse.json({
     success: true,
     data: data.map(user => ({
       accountId: user.accountId,
@@ -984,17 +984,17 @@ async function getJiraUsersForWidget({ jiraConfig }) {
       emailAddress: user.emailAddress,
       active: user.active !== false
     }))
-  });
+  }));
 }
 
 async function getJiraBoardsForWidget({ jiraConfig }) {
   const { serverUrl, username, apiToken, projectKey } = jiraConfig;
   
   if (!serverUrl || !username || !apiToken) {
-    return NextResponse.json({ 
-      success: false, 
-      error: 'JIRA Konfiguration unvollständig' 
-    }, { status: 400 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: 'JIRA Konfiguration unvollständig'
+    }, { status: 400 }));
   }
 
   try {
@@ -1027,10 +1027,10 @@ async function getJiraBoardsForWidget({ jiraConfig }) {
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message 
-    }, { status: 500 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 }));
   }
 }
 
@@ -1038,10 +1038,10 @@ async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
   const { serverUrl, username, apiToken } = jiraConfig;
   
   if (!serverUrl || !username || !apiToken) {
-    return NextResponse.json({ 
-      success: false, 
-      error: 'JIRA Konfiguration unvollständig' 
-    }, { status: 400 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: 'JIRA Konfiguration unvollständig'
+    }, { status: 400 }));
   }
   
   if (!boardId) {
@@ -1084,10 +1084,10 @@ async function getJiraSprintsForWidget({ jiraConfig, boardId }) {
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message 
-    }, { status: 500 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 }));
   }
 }
 
@@ -1095,10 +1095,10 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
   const { serverUrl, username, apiToken } = jiraConfig;
   
   if (!serverUrl || !username || !apiToken) {
-    return NextResponse.json({ 
-      success: false, 
-      error: 'JIRA Konfiguration unvollständig' 
-    }, { status: 400 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: 'JIRA Konfiguration unvollständig'
+    }, { status: 400 }));
   }
   
   if (!boardId) {
@@ -1207,10 +1207,10 @@ async function getJiraSwimlanes({ jiraConfig, boardId }) {
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message 
-    }, { status: 500 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 }));
   }
 }
 
@@ -1218,10 +1218,10 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
   const { serverUrl, username, apiToken } = jiraConfig;
   
   if (!serverUrl || !username || !apiToken) {
-    return NextResponse.json({ 
-      success: false, 
-      error: 'JIRA Konfiguration unvollständig' 
-    }, { status: 400 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: 'JIRA Konfiguration unvollständig'
+    }, { status: 400 }));
   }
   
   if (!boardId) {
@@ -1285,10 +1285,10 @@ async function getJiraBoardColumnsForWidget({ jiraConfig, boardId }) {
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message 
-    }, { status: 500 });
+    return withCORS(NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 }));
   }
 }
 
