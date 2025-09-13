@@ -42,7 +42,7 @@
             color: white;
             font-family: Arial, sans-serif;
             font-size: 14px;
-            z-index: 10003;
+            z-index: 9999999;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             max-width: 300px;
             word-wrap: break-word;
@@ -896,6 +896,7 @@
 
             if (response.ok && result.success) {
                 // Success
+                console.log('Widget: JIRA task creation successful:', result);
                 if (statusContainer) {
                     statusContainer.innerHTML = `
                         <div style="text-align: center !important; padding: 20px !important; color: #28a745 !important;">
@@ -911,17 +912,26 @@
                                     → JIRA-Task öffnen
                                 </a>
                             ` : ''}
+                            <p style="margin: 16px 0 0 0 !important; color: #666 !important; font-size: 12px !important;">
+                                Schließt automatisch in 4 Sekunden...
+                            </p>
                         </div>
                     `;
                 }
 
-                // Auto-close overlay modal after 3 seconds
+                // Auto-close overlay modal after 4 seconds
+                console.log('Widget: JIRA task created successfully, closing modal in 4 seconds...');
                 setTimeout(() => {
-                    if (overlayModal) {
-                        overlayModal.remove();
+                    console.log('Widget: Closing JIRA modal and annotation interface');
+                    try {
+                        if (overlayModal && overlayModal.parentNode) {
+                            overlayModal.remove();
+                        }
+                        closeAnnotationInterface();
+                    } catch (closeError) {
+                        console.error('Widget: Error closing modal:', closeError);
                     }
-                    closeAnnotationInterface();
-                }, 3000);
+                }, 4000);
 
             } else {
                 throw new Error(result.error || 'JIRA-Task konnte nicht erstellt werden');
