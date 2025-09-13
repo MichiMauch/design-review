@@ -13,7 +13,7 @@
         <div id="debug-log"></div>
     </div>
 
-    <script src="widget-new.js" data-project-id="3"></script>
+    <script src="widget-new.js" data-project-id="doityourself.rocks"></script>
 
     <script>
         // Debug function
@@ -34,6 +34,7 @@
 
                 if (projectConfig.jira_server_url) {
                     debugLog('✅ JIRA configured: ' + projectConfig.jira_server_url);
+                    debugLog('✅ JIRA show_checkbox: ' + projectConfig.show_jira_checkbox);
                 } else {
                     debugLog('❌ JIRA not configured in project');
                 }
@@ -41,15 +42,34 @@
                 debugLog('❌ projectConfig not loaded or getProjectConfig not available');
             }
 
-            // Try to trigger screenshot
-            debugLog('Triggering screenshot...');
-            if (window.feedbackWidget && window.feedbackWidget.createScreenshotAndAnnotate) {
-                window.feedbackWidget.createScreenshotAndAnnotate();
+            // Check feedbackWidget availability
+            if (window.feedbackWidget) {
+                debugLog('✅ feedbackWidget available');
+                if (window.feedbackWidget.createScreenshotAndAnnotate) {
+                    debugLog('✅ createScreenshotAndAnnotate function available');
+
+                    // Check if widget button exists
+                    const widgetButton = document.getElementById('feedback-widget-button');
+                    if (widgetButton) {
+                        debugLog('✅ Widget button exists in DOM');
+                        debugLog('Triggering screenshot...');
+                        try {
+                            window.feedbackWidget.createScreenshotAndAnnotate();
+                            debugLog('✅ Screenshot function called successfully');
+                        } catch (error) {
+                            debugLog('❌ Error calling screenshot function: ' + error.message);
+                        }
+                    } else {
+                        debugLog('❌ Widget button not found in DOM');
+                    }
+                } else {
+                    debugLog('❌ createScreenshotAndAnnotate not available');
+                }
             } else {
-                debugLog('❌ feedbackWidget.createScreenshotAndAnnotate not available');
+                debugLog('❌ feedbackWidget not available');
             }
 
-        }, 2000);
+        }, 3000);
 
     </script>
 </body>
