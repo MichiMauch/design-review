@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Widget JIRA</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <h1>Widget JIRA Test</h1>
+
+    <div id="test-output" style="border: 1px solid #ddd; padding: 20px; background: #f9f9f9; margin: 20px 0;">
+        <h3>Debug Output:</h3>
+        <div id="debug-log"></div>
+    </div>
+
+    <script src="widget-new.js" data-project-id="doityouself.rocks"></script>
+
+    <script>
+        // Debug function
+        function debugLog(message) {
+            const debugDiv = document.getElementById('debug-log');
+            debugDiv.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+            console.log('DEBUG:', message);
+        }
+
+        // Wait for widget to load, then test
+        setTimeout(async () => {
+            debugLog('Testing widget...');
+
+            // Check if project config loaded
+            const projectConfig = window.getProjectConfig ? window.getProjectConfig() : null;
+            if (projectConfig) {
+                debugLog('✅ projectConfig loaded: ' + JSON.stringify(projectConfig));
+
+                if (projectConfig.jira_server_url) {
+                    debugLog('✅ JIRA configured: ' + projectConfig.jira_server_url);
+                } else {
+                    debugLog('❌ JIRA not configured in project');
+                }
+            } else {
+                debugLog('❌ projectConfig not loaded or getProjectConfig not available');
+            }
+
+            // Try to trigger screenshot
+            debugLog('Triggering screenshot...');
+            if (window.feedbackWidget && window.feedbackWidget.createScreenshotAndAnnotate) {
+                window.feedbackWidget.createScreenshotAndAnnotate();
+            } else {
+                debugLog('❌ feedbackWidget.createScreenshotAndAnnotate not available');
+            }
+
+        }, 2000);
+
+    </script>
+</body>
+</html>

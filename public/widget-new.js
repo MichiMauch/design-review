@@ -1402,6 +1402,9 @@
         createScreenshotAndAnnotate: createScreenshotAndAnnotate,
         closeAnnotationInterface: closeAnnotationInterface
     };
+
+    // Expose projectConfig for debugging
+    window.getProjectConfig = () => projectConfig;
     
     initWidget();
     
