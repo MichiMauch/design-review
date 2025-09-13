@@ -13,6 +13,8 @@ export async function OPTIONS() {
 
 export async function GET(request, { params }) {
   try {
+    console.log(`Looking for project with name: "${params.name}"`);
+
     await initDatabase();
     const db = getDb();
 
@@ -21,13 +23,22 @@ export async function GET(request, { params }) {
       args: [params.name]
     });
 
+    console.log(`Query result: ${result.rows.length} rows found`);
+
     if (result.rows.length === 0) {
-      return addCorsHeaders(new Response('Projekt nicht gefunden', { status: 404 }));
+      // Also try to list all projects for debugging
+      const allProjects = await db.execute({
+        sql: 'SELECT id, name FROM projects ORDER BY id'
+      });
+      console.log('All projects:', allProjects.rows.map(p => `${p.id}: ${p.name}`).join(', '));
+
+      return addCorsHeaders(new Response(`Projekt "${params.name}" nicht gefunden`, { status: 404 }));
     }
 
     return addCorsHeaders(Response.json(result.rows[0]));
 
-  } catch {
-    return addCorsHeaders(new Response('Fehler beim Laden des Projekts', { status: 500 }));
+  } catch (error) {
+    console.error('Error in projects/by-name API:', error);
+    return addCorsHeaders(new Response(`Fehler beim Laden des Projekts: ${error.message}`, { status: 500 }));
   }
 }

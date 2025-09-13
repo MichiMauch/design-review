@@ -48,7 +48,8 @@
       "Bash(gh api:*)",
       "Bash(npx next lint:*)",
       "WebFetch(domain:pub-cac1d67ee1dc4cb6814dff593983d703.r2.dev)",
-      "WebFetch(domain:pub-6a52908bab2567e2a24d0dec042053d5.r2.dev)"
+      "WebFetch(domain:pub-6a52908bab2567e2a24d0dec042053d5.r2.dev)",
+      "WebFetch(domain:design-review-phi.vercel.app)"
     ],
     "deny": []
   }
