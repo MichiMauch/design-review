@@ -912,7 +912,13 @@
                                     → JIRA-Task öffnen
                                 </a>
                             ` : ''}
-                            <p style="margin: 16px 0 0 0 !important; color: #666 !important; font-size: 12px !important;">
+                            <button onclick="document.getElementById('jira-overlay-modal')?.remove(); window.feedbackWidget.closeAnnotationInterface();"
+                                    style="margin: 16px 0 0 0 !important; padding: 8px 16px !important; background: #28a745 !important;
+                                           color: white !important; border: none !important; border-radius: 4px !important;
+                                           cursor: pointer !important; font-size: 14px !important;">
+                                ✅ Schließen
+                            </button>
+                            <p style="margin: 8px 0 0 0 !important; color: #666 !important; font-size: 12px !important;">
                                 Schließt automatisch in 4 Sekunden...
                             </p>
                         </div>
@@ -921,17 +927,41 @@
 
                 // Auto-close overlay modal after 4 seconds
                 console.log('Widget: JIRA task created successfully, closing modal in 4 seconds...');
-                setTimeout(() => {
-                    console.log('Widget: Closing JIRA modal and annotation interface');
-                    try {
-                        if (overlayModal && overlayModal.parentNode) {
-                            overlayModal.remove();
-                        }
-                        closeAnnotationInterface();
-                    } catch (closeError) {
-                        console.error('Widget: Error closing modal:', closeError);
+
+                // Countdown timer
+                let countdown = 4;
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    console.log(`Widget: Auto-close countdown: ${countdown} seconds remaining`);
+
+                    const countdownP = document.querySelector('#jira-status-container p:last-child');
+                    if (countdownP) {
+                        countdownP.textContent = `Schließt automatisch in ${countdown} Sekunden...`;
                     }
-                }, 4000);
+
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        console.log('Widget: Countdown finished, attempting to close modal');
+
+                        try {
+                            const modalToClose = document.getElementById('jira-overlay-modal');
+                            console.log('Widget: Modal element found:', !!modalToClose);
+
+                            if (modalToClose && modalToClose.parentNode) {
+                                console.log('Widget: Removing modal from DOM');
+                                modalToClose.remove();
+                                console.log('Widget: Modal removed successfully');
+                            }
+
+                            console.log('Widget: Calling closeAnnotationInterface()');
+                            closeAnnotationInterface();
+                            console.log('Widget: closeAnnotationInterface() completed');
+
+                        } catch (closeError) {
+                            console.error('Widget: Error during auto-close:', closeError);
+                        }
+                    }
+                }, 1000);
 
             } else {
                 throw new Error(result.error || 'JIRA-Task konnte nicht erstellt werden');
