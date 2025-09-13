@@ -565,7 +565,9 @@
 
         // Update sidebar to show JIRA creation
         const sidebar = document.querySelector('.sidebar');
+        console.log('Widget: JIRA Debug - Sidebar element found:', !!sidebar);
         if (sidebar) {
+            console.log('Widget: JIRA Debug - Updating sidebar with JIRA modal content');
             sidebar.innerHTML = `
                 <div style="padding: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -602,10 +604,11 @@
                 </div>
             `;
 
-            // Automatically create JIRA task
+            // Automatically create JIRA task (with longer delay to see the modal)
+            console.log('Widget: JIRA Debug - Modal displayed, creating JIRA task in 2 seconds...');
             setTimeout(() => {
                 createJiraTaskSimplified(feedbackData);
-            }, 500);
+            }, 2000);
         }
     }
 
