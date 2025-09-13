@@ -421,17 +421,9 @@
                             <div>
                                 <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
                                 <div style="display: flex; gap: 6px;">
-                                    <button class="color-tool" data-color="#ff0000" style="width: 24px; height: 24px; border-radius: 50%; background: #ff0000; border: 2px solid #000; cursor: pointer;"></button>
-                                    <button class="color-tool" data-color="#0000ff" style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 2px solid #fff; cursor: pointer;"></button>
-                                    <button class="color-tool" data-color="#00ff00" style="width: 24px; height: 24px; border-radius: 50%; background: #00ff00; border: 2px solid #fff; cursor: pointer;"></button>
-                                </div>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Liniendicke:</label>
-                                <div style="display: flex; gap: 6px;">
-                                    <button class="thickness-tool" data-thickness="2" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #000; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">2</button>
-                                    <button class="thickness-tool" data-thickness="4" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">4</button>
-                                    <button class="thickness-tool" data-thickness="6" style="width: 24px; height: 24px; border-radius: 50%; background: #ccc; border: 2px solid #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;">6</button>
+                                    <button class="color-tool" data-color="#000000" style="width: 28px; height: 28px; border-radius: 50%; background: #000000; border: 2px solid #ddd; cursor: pointer; transition: all 0.2s;"></button>
+                                    <button class="color-tool" data-color="#ff0000" style="width: 28px; height: 28px; border-radius: 50%; background: #ff0000; border: 2px solid #ddd; cursor: pointer; transition: all 0.2s;"></button>
+                                    <button class="color-tool" data-color="#00ff00" style="width: 28px; height: 28px; border-radius: 50%; background: #00ff00; border: 2px solid #ddd; cursor: pointer; transition: all 0.2s;"></button>
                                 </div>
                             </div>
                         </div>
@@ -566,11 +558,12 @@
         }, 3000);
     }
 
-    // Show JIRA configuration step
-    function showJiraConfigurationStep(feedbackData) {
+    // Simplified JIRA integration - create task directly
+    async function showJiraConfigurationStep(feedbackData) {
         currentFeedbackData = feedbackData;
+        window.currentFeedbackData = feedbackData; // Store globally for retry
 
-        // Update sidebar to show JIRA configuration
+        // Update sidebar to show JIRA creation
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) {
             sidebar.innerHTML = `
@@ -593,49 +586,26 @@
                         </p>
                     </div>
 
-                    <div id="jira-loading-container" style="text-align: center; padding: 20px;">
-                        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                        <p style="margin-top: 10px; color: #666; font-family: Arial, sans-serif; font-size: 14px;">Lade JIRA-Daten...</p>
-                    </div>
-
-                    <div id="jira-form-container" style="display: none;">
-                        <!-- JIRA form will be populated here -->
+                    <div id="jira-status-container">
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            <p style="margin-top: 10px; color: #666; font-family: Arial, sans-serif; font-size: 14px;">Erstelle JIRA-Task...</p>
+                        </div>
                     </div>
 
                     <div style="display: flex; gap: 8px; margin-top: 20px;">
-                        <button id="jira-back-btn"
+                        <button onclick="window.feedbackWidget.closeAnnotationInterface()"
                                 style="flex: 1; padding: 10px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px;">
-                            ← Zurück
-                        </button>
-                        <button id="jira-skip-btn"
-                                style="flex: 1; padding: 10px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px;">
-                            Überspringen
+                            Schließen
                         </button>
                     </div>
                 </div>
             `;
 
-            // Add event listeners for navigation
+            // Automatically create JIRA task
             setTimeout(() => {
-                const backBtn = document.getElementById('jira-back-btn');
-                const skipBtn = document.getElementById('jira-skip-btn');
-
-                if (backBtn) {
-                    backBtn.onclick = () => {
-                        // Go back to feedback form (reload original interface)
-                        location.reload();
-                    };
-                }
-
-                if (skipBtn) {
-                    skipBtn.onclick = () => {
-                        showSuccessAndClose('Feedback erfolgreich gesendet!');
-                    };
-                }
-
-                // Load JIRA configuration
-                loadJiraConfigurationInline();
-            }, 0);
+                createJiraTaskSimplified(feedbackData);
+            }, 500);
         }
     }
 
@@ -644,38 +614,81 @@
         showJiraConfigurationStep(feedbackData);
     }
 
-    // Load JIRA configuration inline
-    async function loadJiraConfigurationInline() {
+    // Simplified JIRA task creation for widget
+    async function createJiraTaskSimplified(feedbackData) {
+        const statusContainer = document.getElementById('jira-status-container');
+
         try {
-            // Show loading
-            const loadingContainer = document.getElementById('jira-loading-container');
-            const formContainer = document.getElementById('jira-form-container');
+            // Build JIRA configuration from project config (both app-level and project-level)
+            const jiraConfig = {
+                serverUrl: projectConfig.jira_server_url,        // App-level
+                username: projectConfig.jira_username,          // App-level
+                apiToken: projectConfig.jira_api_token,         // App-level
+                projectKey: projectConfig.jira_project_key,     // Project-level
+                issueType: projectConfig.jira_issue_type || 'Bug' // Project-level (with fallback)
+            };
 
-            if (loadingContainer) loadingContainer.style.display = 'block';
-            if (formContainer) formContainer.style.display = 'none';
+            console.log('Widget: Creating JIRA task with config:', {
+                serverUrl: jiraConfig.serverUrl,
+                projectKey: jiraConfig.projectKey,
+                issueType: jiraConfig.issueType
+            });
 
-            // Load JIRA data
-            const jiraData = await loadJiraDataForWidget();
+            // Create JIRA task directly
+            const response = await fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'createTicket',
+                    feedback: feedbackData,
+                    jiraConfig: jiraConfig
+                })
+            });
 
-            // Hide loading and show form
-            if (loadingContainer) loadingContainer.style.display = 'none';
-            if (formContainer) {
-                formContainer.style.display = 'block';
-                formContainer.innerHTML = createJiraFormHTML(jiraData);
+            const result = await response.json();
 
-                // Add event listeners to form
-                attachJiraFormListeners();
+            if (response.ok && result.success) {
+                // Success
+                if (statusContainer) {
+                    statusContainer.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #28a745;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                            <h4 style="margin: 0 0 8px 0; font-family: Arial, sans-serif;">JIRA-Task erstellt!</h4>
+                            <p style="margin: 0; font-family: Arial, sans-serif; font-size: 14px;">
+                                <strong>${result.ticket?.key}</strong>
+                            </p>
+                            ${result.ticket?.url ? `
+                                <a href="${result.ticket.url}" target="_blank"
+                                   style="display: inline-block; margin-top: 12px; color: #007bff; text-decoration: none; font-size: 14px;">
+                                    → JIRA-Task öffnen
+                                </a>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // Auto-close after 3 seconds
+                setTimeout(() => {
+                    closeAnnotationInterface();
+                }, 3000);
+
+            } else {
+                throw new Error(result.error || 'JIRA-Task konnte nicht erstellt werden');
             }
 
         } catch (error) {
-            console.error('Error loading JIRA configuration:', error);
-            const loadingContainer = document.getElementById('jira-loading-container');
-            if (loadingContainer) {
-                loadingContainer.innerHTML = `
-                    <div style="text-align: center; color: #dc3545; padding: 20px;">
-                        <p>❌ Fehler beim Laden der JIRA-Daten</p>
-                        <button onclick="loadJiraConfigurationInline()"
-                                style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            console.error('Widget: Error creating JIRA task:', error);
+
+            if (statusContainer) {
+                statusContainer.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #dc3545;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                        <h4 style="margin: 0 0 8px 0; font-family: Arial, sans-serif;">Fehler</h4>
+                        <p style="margin: 0 0 16px 0; font-family: Arial, sans-serif; font-size: 14px;">
+                            ${error.message}
+                        </p>
+                        <button onclick="window.feedbackWidget.createJiraTaskSimplified(window.currentFeedbackData)"
+                                style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif;">
                             Erneut versuchen
                         </button>
                     </div>
@@ -683,6 +696,8 @@
             }
         }
     }
+
+    // All old complex JIRA logic has been replaced by createJiraTaskSimplified()
 
     // Load JIRA data for widget
     async function loadJiraDataForWidget() {
@@ -980,8 +995,8 @@
         let annotations = [];
         let currentPath = [];
         let currentTool = 'rectangle';
-        let currentColor = '#ff0000';
-        let currentThickness = 3;
+        let currentColor = '#000000';
+        let currentThickness = 5;
         const ctx = canvas.getContext('2d');
 
         // Wait for image to load
@@ -1024,17 +1039,7 @@
             });
         });
 
-        // Thickness selection
-        document.querySelectorAll('.thickness-tool').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                currentThickness = parseInt(e.target.dataset.thickness);
-                // Update active thickness
-                document.querySelectorAll('.thickness-tool').forEach(b => {
-                    b.style.border = '2px solid #fff';
-                });
-                e.target.style.border = '2px solid #000';
-            });
-        });
+        // Thickness is now fixed at 5px - no selection needed
 
         // Clear annotations
         document.getElementById('tool-clear').addEventListener('click', () => {
@@ -1098,8 +1103,8 @@
         });
 
         function drawShape(x1, y1, x2, y2, tool, color, thickness) {
-            ctx.strokeStyle = color || '#ff0000';
-            ctx.lineWidth = thickness || 3;
+            ctx.strokeStyle = color || '#000000';
+            ctx.lineWidth = thickness || 5;
             ctx.beginPath();
             switch (tool) {
                 case 'rectangle':
@@ -1120,8 +1125,8 @@
         }
 
         function drawFreehand(path, color, thickness) {
-            ctx.strokeStyle = color || '#ff0000';
-            ctx.lineWidth = thickness || 3;
+            ctx.strokeStyle = color || '#000000';
+            ctx.lineWidth = thickness || 5;
             ctx.beginPath();
             ctx.moveTo(path[0].x, path[0].y);
             for (let i = 1; i < path.length; i++) {
@@ -1421,8 +1426,12 @@
     // Start the widget and expose global reference for error modal
     window.feedbackWidget = {
         createScreenshotAndAnnotate: createScreenshotAndAnnotate,
-        closeAnnotationInterface: closeAnnotationInterface
+        closeAnnotationInterface: closeAnnotationInterface,
+        createJiraTaskSimplified: createJiraTaskSimplified
     };
+
+    // Store current feedback data globally for retry functionality
+    window.currentFeedbackData = null;
 
     // Expose projectConfig for debugging
     window.getProjectConfig = () => projectConfig;
