@@ -132,3 +132,4 @@ MIT License - siehe [LICENSE](LICENSE) für Details.
 ## 🐛 Issues & Support
 
 Bei Problemen oder Fragen erstellen Sie bitte ein [Issue](https://github.com/your-repo/design-review/issues).
+# Deploy trigger
