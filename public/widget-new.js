@@ -420,10 +420,10 @@
                         <div style="display: flex; gap: 12px; margin-bottom: 12px;">
                             <div>
                                 <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Farbe:</label>
-                                <div style="display: flex; gap: 6px;">
-                                    <button class="color-tool" data-color="#000000" style="width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #000000 !important; border: 3px solid #ddd !important; cursor: pointer; transition: all 0.2s; box-sizing: border-box !important; min-width: 32px !important;"></button>
-                                    <button class="color-tool" data-color="#ff0000" style="width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #ff0000 !important; border: 3px solid #ddd !important; cursor: pointer; transition: all 0.2s; box-sizing: border-box !important; min-width: 32px !important;"></button>
-                                    <button class="color-tool" data-color="#00ff00" style="width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #00ff00 !important; border: 3px solid #ddd !important; cursor: pointer; transition: all 0.2s; box-sizing: border-box !important; min-width: 32px !important;"></button>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="color-tool" data-color="#000000" style="width: 36px !important; height: 36px !important; border-radius: 18px !important; background-color: #000000 !important; border: 3px solid #ddd !important; cursor: pointer !important; transition: all 0.2s !important; box-sizing: border-box !important; min-width: 36px !important; max-width: 36px !important; min-height: 36px !important; max-height: 36px !important; padding: 0 !important; margin: 0 !important; outline: none !important;"></button>
+                                    <button class="color-tool" data-color="#ff0000" style="width: 36px !important; height: 36px !important; border-radius: 18px !important; background-color: #ff0000 !important; border: 3px solid #ddd !important; cursor: pointer !important; transition: all 0.2s !important; box-sizing: border-box !important; min-width: 36px !important; max-width: 36px !important; min-height: 36px !important; max-height: 36px !important; padding: 0 !important; margin: 0 !important; outline: none !important;"></button>
+                                    <button class="color-tool" data-color="#00ff00" style="width: 36px !important; height: 36px !important; border-radius: 18px !important; background-color: #00ff00 !important; border: 3px solid #ddd !important; cursor: pointer !important; transition: all 0.2s !important; box-sizing: border-box !important; min-width: 36px !important; max-width: 36px !important; min-height: 36px !important; max-height: 36px !important; padding: 0 !important; margin: 0 !important; outline: none !important;"></button>
                                 </div>
                             </div>
                         </div>
@@ -1270,8 +1270,16 @@
                 showSuccessAndClose('Feedback erfolgreich gesendet!');
             }
         } catch (error) {
-            await submitFeedback(combinedTitle, description, null);
-            showSuccessAndClose('Feedback gesendet (ohne Screenshot)!');
+            console.error('Widget: Error in submitAnnotatedFeedback:', error);
+            console.log('Widget: JIRA Debug - Error occurred, falling back to simple feedback submission');
+
+            try {
+                await submitFeedback(combinedTitle, description, null);
+                showSuccessAndClose('Feedback gesendet (Fehler bei Screenshot)!');
+            } catch (submitError) {
+                console.error('Widget: Error in fallback submitFeedback:', submitError);
+                showSuccessAndClose('Feedback-Fehler aufgetreten!');
+            }
         } finally {
             // Hide spinner and re-enable button
             submitBtn.disabled = false;
