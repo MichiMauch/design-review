@@ -457,14 +457,13 @@
                             <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Beschreibung:</label>
                             <textarea id="annotation-feedback-text" placeholder="Beschreiben Sie detailliert, was Sie in den markierten Bereichen verbessern möchten..." style="width: 100%; height: 120px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; resize: vertical; box-sizing: border-box; font-size: 14px;"></textarea>
                         </div>
-                        <!-- JIRA section temporarily commented out -->
-                        <!-- <div style="margin-bottom: 20px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;" id="jira-section">
+                        <div style="margin-bottom: 20px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;" id="jira-section">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                                 <input type="checkbox" id="annotation-create-jira" style="margin: 0;" />
                                 <label for="annotation-create-jira" style="font-family: Arial, sans-serif; color: #007bff; font-weight: bold; cursor: pointer; font-size: 14px;">Direkt als JIRA-Task anlegen</label>
                             </div>
                             <span id="jira-status-message" style="color: #28a745; font-size: 12px; display: none;"></span>
-                        </div> -->
+                        </div>
                     </div>
                     
                     <!-- Sidebar Footer -->
@@ -523,8 +522,8 @@
             const closeBtn = document.getElementById('annotation-close');
             const cancelBtn = document.getElementById('annotation-cancel');
             const submitBtn = document.getElementById('annotation-submit');
-            // const jiraSection = document.getElementById('jira-section');
-            
+            const jiraSection = document.getElementById('jira-section');
+
             if (closeBtn) closeBtn.onclick = closeAnnotationInterface;
             if (cancelBtn) cancelBtn.onclick = closeAnnotationInterface;
             if (submitBtn) submitBtn.onclick = submitAnnotatedFeedback;
@@ -539,14 +538,10 @@
                 };
             }
             
-            // JIRA functionality temporarily disabled
-            /*
             // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
-            const jiraSection = document.getElementById('jira-section');
             if (jiraSection) {
-                    jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
+                jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
             }
-            */
         }, 0);
         
         // Initialize annotation functionality after DOM elements are created
@@ -1179,10 +1174,8 @@
         
         // Combine name and title if name is provided
         const combinedTitle = name ? `${name} - ${title}` : title;
-        // JIRA functionality temporarily disabled
-        // const createJira = document.getElementById('annotation-create-jira').checked;
-        const createJira = false; // Always false for now
-        // const jiraStatusMessage = document.getElementById('jira-status-message');
+        const createJira = document.getElementById('annotation-create-jira').checked;
+        const jiraStatusMessage = document.getElementById('jira-status-message');
 
         if (!title) {
             alert('Bitte geben Sie einen Titel ein.');
@@ -1216,9 +1209,7 @@
             const annotatedScreenshot = finalCanvas.toDataURL('image/jpeg', 0.9);
             // Submit feedback (DB) and get task ID
             const taskResult = await submitFeedback(combinedTitle, description, annotatedScreenshot);
-            
-            // JIRA functionality temporarily disabled
-            /*
+
             // Optional: JIRA-Konfiguration-Modal anzeigen
             if (createJira && projectConfig?.jira_server_url) {
                 const feedbackData = {
@@ -1229,7 +1220,7 @@
                     taskId: taskResult.taskId,  // Add task ID for later update
                     projectId: taskResult.projectId  // Add numeric project ID
                 };
-                
+
                 // Show JIRA configuration modal
                 showJiraConfigModal(feedbackData);
             } else if (createJira && !projectConfig?.jira_server_url) {
@@ -1237,17 +1228,13 @@
                 jiraStatusMessage.style.color = '#ffc107';
                 jiraStatusMessage.textContent = 'JIRA ist nicht konfiguriert.';
                 setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 8000);
-                
+
                 // Close annotation interface
                 closeAnnotationInterface();
             } else {
                 // No JIRA - just close annotation interface
                 closeAnnotationInterface();
             }
-            */
-            
-            // No JIRA - just close annotation interface
-            closeAnnotationInterface();
         } catch (error) {
             await submitFeedback(combinedTitle, description, null);
             closeAnnotationInterface();
