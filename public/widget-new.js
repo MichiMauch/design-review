@@ -607,16 +607,24 @@
                     </p>
                 </div>
 
-                <div id="jira-status-container" style="text-align: center !important; padding: 20px !important;">
+                <div id="jira-loading-container" style="text-align: center !important; padding: 20px !important;">
                     <div style="display: inline-block !important; width: 24px !important; height: 24px !important;
                                 border: 3px solid #f3f3f3 !important; border-top: 3px solid #007bff !important;
                                 border-radius: 50% !important; animation: spin 1s linear infinite !important; margin-bottom: 16px !important;"></div>
                     <p style="margin: 0 !important; color: #666 !important; font-size: 16px !important; font-weight: bold !important;">
-                        Erstelle JIRA-Task...
+                        Lade JIRA-Daten...
                     </p>
                     <p style="margin: 8px 0 0 0 !important; color: #888 !important; font-size: 14px !important;">
-                        Bitte warten...
+                        Benutzer, Sprints & Spalten werden geladen...
                     </p>
+                </div>
+
+                <div id="jira-form-container" style="display: none !important;">
+                    <!-- JIRA form will be populated here -->
+                </div>
+
+                <div id="jira-status-container" style="display: none !important; text-align: center !important; padding: 20px !important;">
+                    <!-- Status messages during task creation -->
                 </div>
             </div>
         `;
@@ -624,11 +632,321 @@
         document.body.appendChild(jiraModal);
         console.log('Widget: JIRA Debug - Overlay modal added to DOM');
 
-        // Create JIRA task after 1 second
+        // Load JIRA data for form
         setTimeout(() => {
-            console.log('Widget: JIRA Debug - Starting JIRA task creation...');
-            createJiraTaskSimplified(feedbackData);
-        }, 1000);
+            console.log('Widget: JIRA Debug - Loading JIRA data for form...');
+            loadJiraFormData(feedbackData);
+        }, 500);
+    }
+
+    // Load JIRA data for interactive form
+    async function loadJiraFormData(feedbackData) {
+        try {
+            // Build JIRA configuration from project config
+            const jiraConfig = {
+                serverUrl: projectConfig.jira_server_url,
+                username: projectConfig.jira_username,
+                apiToken: projectConfig.jira_api_token,
+                projectKey: projectConfig.jira_project_key
+            };
+
+            console.log('Widget: Loading JIRA data with config:', jiraConfig);
+
+            // Load boards first to get board ID
+            const boardsResponse = await fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'getBoards',
+                    jiraConfig: jiraConfig
+                })
+            });
+
+            let boardId = null;
+            if (boardsResponse.ok) {
+                const boardsResult = await boardsResponse.json();
+                if (boardsResult.success && boardsResult.data && boardsResult.data.length > 0) {
+                    boardId = boardsResult.data[0].id;
+                    console.log('Widget: Found board ID:', boardId);
+                }
+            }
+
+            // Load users, sprints, and columns in parallel
+            const promises = [
+                fetch(`${baseUrl}/api/jira`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getUsers',
+                        jiraConfig: jiraConfig
+                    })
+                }),
+                boardId ? fetch(`${baseUrl}/api/jira`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getSprints',
+                        jiraConfig: jiraConfig,
+                        boardId: boardId
+                    })
+                }) : Promise.resolve({ ok: false }),
+                boardId ? fetch(`${baseUrl}/api/jira`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getBoardColumns',
+                        jiraConfig: jiraConfig,
+                        boardId: boardId
+                    })
+                }) : Promise.resolve({ ok: false })
+            ];
+
+            const [usersResponse, sprintsResponse, columnsResponse] = await Promise.all(promises);
+
+            // Process responses
+            const jiraData = {
+                users: [],
+                sprints: [],
+                columns: []
+            };
+
+            if (usersResponse.ok) {
+                const result = await usersResponse.json();
+                if (result.success) jiraData.users = result.data || [];
+            }
+
+            if (sprintsResponse.ok) {
+                const result = await sprintsResponse.json();
+                if (result.success) jiraData.sprints = result.data || [];
+            }
+
+            if (columnsResponse.ok) {
+                const result = await columnsResponse.json();
+                if (result.success) jiraData.columns = result.data || [];
+            }
+
+            console.log('Widget: JIRA data loaded:', jiraData);
+
+            // Hide loading and show form
+            const loadingContainer = document.getElementById('jira-loading-container');
+            const formContainer = document.getElementById('jira-form-container');
+
+            if (loadingContainer) loadingContainer.style.display = 'none';
+            if (formContainer) {
+                formContainer.style.display = 'block';
+                formContainer.innerHTML = createJiraFormHTML(jiraData, feedbackData);
+
+                // Attach event listeners
+                attachJiraFormListeners(feedbackData, jiraConfig);
+            }
+
+        } catch (error) {
+            console.error('Widget: Error loading JIRA data:', error);
+
+            const loadingContainer = document.getElementById('jira-loading-container');
+            if (loadingContainer) {
+                loadingContainer.innerHTML = `
+                    <div style="text-align: center !important; color: #dc3545 !important; padding: 20px !important;">
+                        <div style="font-size: 48px !important; margin-bottom: 16px !important;">❌</div>
+                        <h4 style="margin: 0 0 8px 0 !important;">Fehler beim Laden</h4>
+                        <p style="margin: 0 0 16px 0 !important; font-size: 14px !important;">
+                            ${error.message}
+                        </p>
+                        <button onclick="window.feedbackWidget.loadJiraFormData(window.currentFeedbackData)"
+                                style="padding: 8px 16px !important; background: #007bff !important; color: white !important;
+                                       border: none !important; border-radius: 4px !important; cursor: pointer !important;">
+                            Erneut versuchen
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Create JIRA form HTML for overlay modal
+    function createJiraFormHTML(jiraData, feedbackData) {
+        return `
+            <div style="margin-bottom: 20px !important;">
+                <label style="display: block !important; margin-bottom: 6px !important; font-weight: bold !important;
+                              color: #555 !important; font-size: 14px !important;">Zugewiesen an:</label>
+                <select id="jira-assignee" style="width: 100% !important; padding: 10px !important; border: 1px solid #ddd !important;
+                                                  border-radius: 6px !important; background: white !important; font-size: 14px !important;">
+                    <option value="">Nicht zugewiesen</option>
+                    ${jiraData.users.map(user =>
+                        `<option value="${user.accountId}">${user.displayName} (${user.emailAddress})</option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px !important;">
+                <label style="display: block !important; margin-bottom: 6px !important; font-weight: bold !important;
+                              color: #555 !important; font-size: 14px !important;">Sprint:</label>
+                <select id="jira-sprint" style="width: 100% !important; padding: 10px !important; border: 1px solid #ddd !important;
+                                                border-radius: 6px !important; background: white !important; font-size: 14px !important;">
+                    <option value="">Kein Sprint</option>
+                    ${jiraData.sprints.map(sprint =>
+                        `<option value="${sprint.id}">${sprint.name} (${sprint.state})</option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px !important;">
+                <label style="display: block !important; margin-bottom: 6px !important; font-weight: bold !important;
+                              color: #555 !important; font-size: 14px !important;">Board-Spalte:</label>
+                <select id="jira-column" style="width: 100% !important; padding: 10px !important; border: 1px solid #ddd !important;
+                                                border-radius: 6px !important; background: white !important; font-size: 14px !important;">
+                    <option value="">Standard (To Do)</option>
+                    ${jiraData.columns.map(column =>
+                        `<option value="${column.statusId || column.id}">${column.name}</option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <div style="display: flex !important; gap: 12px !important; margin-top: 24px !important;">
+                <button id="jira-cancel-btn" style="flex: 1 !important; padding: 12px !important; border: 1px solid #ddd !important;
+                                                    background: white !important; color: #666 !important; border-radius: 6px !important;
+                                                    cursor: pointer !important; font-size: 14px !important;">
+                    Abbrechen
+                </button>
+                <button id="jira-create-btn" style="flex: 2 !important; padding: 12px !important; background: #28a745 !important;
+                                                     color: white !important; border: none !important; border-radius: 6px !important;
+                                                     cursor: pointer !important; font-size: 14px !important; font-weight: bold !important;">
+                    🎯 JIRA-Task erstellen
+                </button>
+            </div>
+        `;
+    }
+
+    // Attach event listeners to JIRA form
+    function attachJiraFormListeners(feedbackData, jiraConfig) {
+        const createBtn = document.getElementById('jira-create-btn');
+        const cancelBtn = document.getElementById('jira-cancel-btn');
+
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                const overlayModal = document.getElementById('jira-overlay-modal');
+                if (overlayModal) {
+                    overlayModal.remove();
+                }
+                closeAnnotationInterface();
+            };
+        }
+
+        if (createBtn) {
+            createBtn.onclick = async () => {
+                const assignee = document.getElementById('jira-assignee')?.value || '';
+                const sprint = document.getElementById('jira-sprint')?.value || '';
+                const column = document.getElementById('jira-column')?.value || '';
+
+                console.log('Widget: Creating JIRA task with selections:', { assignee, sprint, column });
+
+                // Show status container and hide form
+                const formContainer = document.getElementById('jira-form-container');
+                const statusContainer = document.getElementById('jira-status-container');
+
+                if (formContainer) formContainer.style.display = 'none';
+                if (statusContainer) {
+                    statusContainer.style.display = 'block';
+                    statusContainer.innerHTML = `
+                        <div style="text-align: center !important; padding: 20px !important;">
+                            <div style="display: inline-block !important; width: 24px !important; height: 24px !important;
+                                        border: 3px solid #f3f3f3 !important; border-top: 3px solid #007bff !important;
+                                        border-radius: 50% !important; animation: spin 1s linear infinite !important; margin-bottom: 16px !important;"></div>
+                            <p style="margin: 0 !important; color: #666 !important; font-size: 16px !important; font-weight: bold !important;">
+                                Erstelle JIRA-Task...
+                            </p>
+                        </div>
+                    `;
+                }
+
+                // Create JIRA task with user selections
+                await createJiraTaskWithSelections(feedbackData, jiraConfig, { assignee, sprint, column });
+            };
+        }
+    }
+
+    // Create JIRA task with user selections
+    async function createJiraTaskWithSelections(feedbackData, jiraConfig, selections) {
+        const statusContainer = document.getElementById('jira-status-container');
+        const overlayModal = document.getElementById('jira-overlay-modal');
+
+        try {
+            // Enhanced JIRA configuration with user selections
+            const enhancedJiraConfig = {
+                ...jiraConfig,
+                issueType: 'Bug',
+                defaultAssignee: selections.assignee,
+                selectedSprint: selections.sprint,
+                selectedColumn: selections.column
+            };
+
+            console.log('Widget: Creating JIRA task with enhanced config:', enhancedJiraConfig);
+
+            const response = await fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'createTicket',
+                    feedback: feedbackData,
+                    jiraConfig: enhancedJiraConfig
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Success
+                if (statusContainer) {
+                    statusContainer.innerHTML = `
+                        <div style="text-align: center !important; padding: 20px !important; color: #28a745 !important;">
+                            <div style="font-size: 48px !important; margin-bottom: 16px !important;">✅</div>
+                            <h4 style="margin: 0 0 8px 0 !important;">JIRA-Task erstellt!</h4>
+                            <p style="margin: 0 !important; font-size: 14px !important;">
+                                <strong>${result.ticket?.key}</strong>
+                            </p>
+                            ${result.ticket?.url ? `
+                                <a href="${result.ticket.url}" target="_blank"
+                                   style="display: inline-block !important; margin-top: 12px !important; color: #007bff !important;
+                                          text-decoration: none !important; font-size: 14px !important;">
+                                    → JIRA-Task öffnen
+                                </a>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // Auto-close overlay modal after 3 seconds
+                setTimeout(() => {
+                    if (overlayModal) {
+                        overlayModal.remove();
+                    }
+                    closeAnnotationInterface();
+                }, 3000);
+
+            } else {
+                throw new Error(result.error || 'JIRA-Task konnte nicht erstellt werden');
+            }
+
+        } catch (error) {
+            console.error('Widget: Error creating JIRA task with selections:', error);
+
+            if (statusContainer) {
+                statusContainer.innerHTML = `
+                    <div style="text-align: center !important; padding: 20px !important; color: #dc3545 !important;">
+                        <div style="font-size: 48px !important; margin-bottom: 16px !important;">❌</div>
+                        <h4 style="margin: 0 0 8px 0 !important;">Fehler</h4>
+                        <p style="margin: 0 0 16px 0 !important; font-size: 14px !important;">
+                            ${error.message}
+                        </p>
+                        <button onclick="window.feedbackWidget.loadJiraFormData(window.currentFeedbackData)"
+                                style="padding: 8px 16px !important; background: #007bff !important; color: white !important;
+                                       border: none !important; border-radius: 4px !important; cursor: pointer !important;">
+                            Zurück zum Formular
+                        </button>
+                    </div>
+                `;
+            }
+        }
     }
 
     // Legacy function - now redirects to inline step
@@ -1468,7 +1786,8 @@
     window.feedbackWidget = {
         createScreenshotAndAnnotate: createScreenshotAndAnnotate,
         closeAnnotationInterface: closeAnnotationInterface,
-        createJiraTaskSimplified: createJiraTaskSimplified
+        createJiraTaskSimplified: createJiraTaskSimplified,
+        loadJiraFormData: loadJiraFormData
     };
 
     // Store current feedback data globally for retry functionality
