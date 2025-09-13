@@ -558,58 +558,77 @@
         }, 3000);
     }
 
-    // Simplified JIRA integration - create task directly
+    // Simplified JIRA integration - create task directly with overlay modal
     async function showJiraConfigurationStep(feedbackData) {
         currentFeedbackData = feedbackData;
         window.currentFeedbackData = feedbackData; // Store globally for retry
 
-        // Update sidebar to show JIRA creation
-        const sidebar = document.querySelector('.sidebar');
-        console.log('Widget: JIRA Debug - Sidebar element found:', !!sidebar);
-        if (sidebar) {
-            console.log('Widget: JIRA Debug - Updating sidebar with JIRA modal content');
-            sidebar.innerHTML = `
-                <div style="padding: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif; font-size: 18px;">JIRA-Task erstellen</h3>
-                        <button onclick="window.feedbackWidget.closeAnnotationInterface()"
-                                style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 4px; border-radius: 3px;">×</button>
-                    </div>
+        console.log('Widget: JIRA Debug - Creating overlay JIRA modal');
 
-                    <div style="margin-bottom: 16px; padding: 12px; background: #e8f5e8; border-radius: 6px; border: 1px solid #d4edda;">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                            <div style="width: 16px; height: 16px; background: #28a745; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <span style="color: white; font-size: 12px;">✓</span>
-                            </div>
-                            <span style="font-family: Arial, sans-serif; color: #155724; font-weight: bold; font-size: 14px;">Feedback gespeichert!</span>
-                        </div>
-                        <p style="margin: 0; color: #155724; font-family: Arial, sans-serif; font-size: 12px;">
-                            Task-ID: ${feedbackData.taskId || 'Widget'} | ${feedbackData.title}
-                        </p>
-                    </div>
+        // Create overlay modal that appears over everything
+        const jiraModal = document.createElement('div');
+        jiraModal.id = 'jira-overlay-modal';
+        jiraModal.style.cssText = `
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(0, 0, 0, 0.8) !important;
+            z-index: 999999 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-family: Arial, sans-serif !important;
+        `;
 
-                    <div id="jira-status-container">
-                        <div style="text-align: center; padding: 20px;">
-                            <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                            <p style="margin-top: 10px; color: #666; font-family: Arial, sans-serif; font-size: 14px;">Erstelle JIRA-Task...</p>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 8px; margin-top: 20px;">
-                        <button onclick="window.feedbackWidget.closeAnnotationInterface()"
-                                style="flex: 1; padding: 10px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px;">
-                            Schließen
-                        </button>
-                    </div>
+        jiraModal.innerHTML = `
+            <div style="background: white !important; padding: 24px !important; border-radius: 12px !important;
+                        max-width: 400px !important; width: 90% !important; box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
+                        position: relative !important;">
+                <div style="text-align: center !important; margin-bottom: 20px !important;">
+                    <h2 style="margin: 0 !important; color: #333 !important; font-size: 20px !important;">🎯 JIRA-Task erstellen</h2>
                 </div>
-            `;
 
-            // Automatically create JIRA task (with longer delay to see the modal)
-            console.log('Widget: JIRA Debug - Modal displayed, creating JIRA task in 2 seconds...');
-            setTimeout(() => {
-                createJiraTaskSimplified(feedbackData);
-            }, 2000);
-        }
+                <div style="padding: 16px !important; background: #e8f5e8 !important; border-radius: 8px !important;
+                            border: 1px solid #d4edda !important; margin-bottom: 20px !important;">
+                    <div style="display: flex !important; align-items: center !important; gap: 8px !important; margin-bottom: 8px !important;">
+                        <div style="width: 20px !important; height: 20px !important; background: #28a745 !important;
+                                    border-radius: 50% !important; display: flex !important; align-items: center !important;
+                                    justify-content: center !important;">
+                            <span style="color: white !important; font-size: 14px !important;">✓</span>
+                        </div>
+                        <span style="color: #155724 !important; font-weight: bold !important; font-size: 16px !important;">
+                            Feedback gespeichert!
+                        </span>
+                    </div>
+                    <p style="margin: 0 !important; color: #155724 !important; font-size: 14px !important;">
+                        <strong>Task-ID:</strong> ${feedbackData.taskId || 'Widget'} | ${feedbackData.title}
+                    </p>
+                </div>
+
+                <div id="jira-status-container" style="text-align: center !important; padding: 20px !important;">
+                    <div style="display: inline-block !important; width: 24px !important; height: 24px !important;
+                                border: 3px solid #f3f3f3 !important; border-top: 3px solid #007bff !important;
+                                border-radius: 50% !important; animation: spin 1s linear infinite !important; margin-bottom: 16px !important;"></div>
+                    <p style="margin: 0 !important; color: #666 !important; font-size: 16px !important; font-weight: bold !important;">
+                        Erstelle JIRA-Task...
+                    </p>
+                    <p style="margin: 8px 0 0 0 !important; color: #888 !important; font-size: 14px !important;">
+                        Bitte warten...
+                    </p>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(jiraModal);
+        console.log('Widget: JIRA Debug - Overlay modal added to DOM');
+
+        // Create JIRA task after 1 second
+        setTimeout(() => {
+            console.log('Widget: JIRA Debug - Starting JIRA task creation...');
+            createJiraTaskSimplified(feedbackData);
+        }, 1000);
     }
 
     // Legacy function - now redirects to inline step
@@ -620,6 +639,7 @@
     // Simplified JIRA task creation for widget
     async function createJiraTaskSimplified(feedbackData) {
         const statusContainer = document.getElementById('jira-status-container');
+        const overlayModal = document.getElementById('jira-overlay-modal');
 
         try {
             // Build JIRA configuration from project config (both app-level and project-level)
@@ -670,8 +690,11 @@
                     `;
                 }
 
-                // Auto-close after 3 seconds
+                // Auto-close overlay modal after 3 seconds
                 setTimeout(() => {
+                    if (overlayModal) {
+                        overlayModal.remove();
+                    }
                     closeAnnotationInterface();
                 }, 3000);
 
