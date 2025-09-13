@@ -904,6 +904,7 @@
 
             const result = await response.json();
             console.log('Widget: JIRA API Result:', result);
+            console.log('Widget: Checking success conditions - response.ok:', response.ok, 'result.success:', result.success);
 
             if (response.ok && result.success) {
                 console.log('Widget: ENTERING SUCCESS BLOCK - this should show if success works');
