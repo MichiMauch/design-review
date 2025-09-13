@@ -542,65 +542,303 @@
         initializeAnnotation();
     }
     
-    // Open JIRA modal window via backend
-    function openJiraModalWindow(feedbackData) {
+    // Show success message and close widget
+    function showSuccessAndClose(message) {
+        // Update sidebar to show success
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            sidebar.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                    <h3 style="margin: 0 0 12px 0; color: #28a745; font-family: Arial, sans-serif; font-size: 18px;">Erfolgreich!</h3>
+                    <p style="color: #666; margin: 0 0 20px 0; font-family: Arial, sans-serif; font-size: 14px;">${message}</p>
+                    <button onclick="window.feedbackWidget.closeAnnotationInterface()"
+                            style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif;">
+                        Schließen
+                    </button>
+                </div>
+            `;
+        }
+
+        // Auto-close after 3 seconds
+        setTimeout(() => {
+            closeAnnotationInterface();
+        }, 3000);
+    }
+
+    // Show JIRA configuration step
+    function showJiraConfigurationStep(feedbackData) {
         currentFeedbackData = feedbackData;
 
-        // Build modal URL with parameters
-        const modalUrl = new URL(`${baseUrl}/api/jira-modal`);
-        modalUrl.searchParams.set('projectId', projectId);
-        modalUrl.searchParams.set('taskId', feedbackData.taskId || 'widget');
-        modalUrl.searchParams.set('title', feedbackData.title || '');
-        modalUrl.searchParams.set('description', feedbackData.description || '');
+        // Update sidebar to show JIRA configuration
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            sidebar.innerHTML = `
+                <div style="padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0; color: #333; font-family: Arial, sans-serif; font-size: 18px;">JIRA-Task erstellen</h3>
+                        <button onclick="window.feedbackWidget.closeAnnotationInterface()"
+                                style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 4px; border-radius: 3px;">×</button>
+                    </div>
 
-        // Open modal in popup window
-        jiraModalWindow = window.open(
-            modalUrl.toString(),
-            'jira-modal',
-            'width=600,height=700,scrollbars=yes,resizable=yes,centerscreen=yes'
-        );
+                    <div style="margin-bottom: 16px; padding: 12px; background: #e8f5e8; border-radius: 6px; border: 1px solid #d4edda;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <div style="width: 16px; height: 16px; background: #28a745; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <span style="color: white; font-size: 12px;">✓</span>
+                            </div>
+                            <span style="font-family: Arial, sans-serif; color: #155724; font-weight: bold; font-size: 14px;">Feedback gespeichert!</span>
+                        </div>
+                        <p style="margin: 0; color: #155724; font-family: Arial, sans-serif; font-size: 12px;">
+                            Task-ID: ${feedbackData.taskId || 'Widget'} | ${feedbackData.title}
+                        </p>
+                    </div>
 
-        // Listen for messages from the modal
-        const messageListener = (event) => {
-            // Verify origin for security
-            const allowedOrigins = [window.location.origin, baseUrl];
-            if (!allowedOrigins.includes(event.origin)) {
-                return;
-            }
+                    <div id="jira-loading-container" style="text-align: center; padding: 20px;">
+                        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <p style="margin-top: 10px; color: #666; font-family: Arial, sans-serif; font-size: 14px;">Lade JIRA-Daten...</p>
+                    </div>
 
-            if (event.data.type === 'jira-task-created') {
-                if (event.data.success) {
-                    // Show success toast
-                    const jiraKey = event.data.jiraKey;
-                    const jiraUrl = event.data.jiraUrl;
-                    if (jiraKey && jiraUrl) {
-                        showToast(`✅ JIRA-Task erstellt: <a href="${jiraUrl}" target="_blank" style="color: #fff; text-decoration: underline; font-weight: bold;">${jiraKey}</a>`, 'success', 6000);
-                    } else {
-                        showToast('✅ JIRA-Task erfolgreich erstellt!', 'success', 4000);
-                    }
+                    <div id="jira-form-container" style="display: none;">
+                        <!-- JIRA form will be populated here -->
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-top: 20px;">
+                        <button id="jira-back-btn"
+                                style="flex: 1; padding: 10px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px;">
+                            ← Zurück
+                        </button>
+                        <button id="jira-skip-btn"
+                                style="flex: 1; padding: 10px; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px;">
+                            Überspringen
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Add event listeners for navigation
+            setTimeout(() => {
+                const backBtn = document.getElementById('jira-back-btn');
+                const skipBtn = document.getElementById('jira-skip-btn');
+
+                if (backBtn) {
+                    backBtn.onclick = () => {
+                        // Go back to feedback form (reload original interface)
+                        location.reload();
+                    };
                 }
 
-                // Clean up
-                window.removeEventListener('message', messageListener);
-                closeAnnotationInterface();
+                if (skipBtn) {
+                    skipBtn.onclick = () => {
+                        showSuccessAndClose('Feedback erfolgreich gesendet!');
+                    };
+                }
 
-            } else if (event.data.type === 'jira-modal-close') {
-                // Clean up
-                window.removeEventListener('message', messageListener);
-                closeAnnotationInterface();
+                // Load JIRA configuration
+                loadJiraConfigurationInline();
+            }, 0);
+        }
+    }
+
+    // Legacy function - now redirects to inline step
+    function openJiraModalWindow(feedbackData) {
+        showJiraConfigurationStep(feedbackData);
+    }
+
+    // Load JIRA configuration inline
+    async function loadJiraConfigurationInline() {
+        try {
+            // Show loading
+            const loadingContainer = document.getElementById('jira-loading-container');
+            const formContainer = document.getElementById('jira-form-container');
+
+            if (loadingContainer) loadingContainer.style.display = 'block';
+            if (formContainer) formContainer.style.display = 'none';
+
+            // Load JIRA data
+            const jiraData = await loadJiraDataForWidget();
+
+            // Hide loading and show form
+            if (loadingContainer) loadingContainer.style.display = 'none';
+            if (formContainer) {
+                formContainer.style.display = 'block';
+                formContainer.innerHTML = createJiraFormHTML(jiraData);
+
+                // Add event listeners to form
+                attachJiraFormListeners();
             }
+
+        } catch (error) {
+            console.error('Error loading JIRA configuration:', error);
+            const loadingContainer = document.getElementById('jira-loading-container');
+            if (loadingContainer) {
+                loadingContainer.innerHTML = `
+                    <div style="text-align: center; color: #dc3545; padding: 20px;">
+                        <p>❌ Fehler beim Laden der JIRA-Daten</p>
+                        <button onclick="loadJiraConfigurationInline()"
+                                style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Erneut versuchen
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Load JIRA data for widget
+    async function loadJiraDataForWidget() {
+        const jiraConfig = {
+            serverUrl: projectConfig.jira_server_url,
+            username: projectConfig.jira_username,
+            apiToken: projectConfig.jira_api_token,
+            projectKey: projectConfig.jira_project_key
         };
 
-        window.addEventListener('message', messageListener);
+        // Load boards first to get board ID
+        const boardsResponse = await fetch(`${baseUrl}/api/jira`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'getBoards',
+                jiraConfig: jiraConfig
+            })
+        });
 
-        // Clean up if window is closed manually
-        const checkClosed = setInterval(() => {
-            if (jiraModalWindow && jiraModalWindow.closed) {
-                window.removeEventListener('message', messageListener);
-                clearInterval(checkClosed);
-                closeAnnotationInterface();
+        let boardId = null;
+        if (boardsResponse.ok) {
+            const boardsResult = await boardsResponse.json();
+            if (boardsResult.success && boardsResult.data && boardsResult.data.length > 0) {
+                boardId = boardsResult.data[0].id;
             }
-        }, 1000);
+        }
+
+        // Load users, sprints, and columns in parallel
+        const promises = [
+            fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'getUsers',
+                    jiraConfig: jiraConfig
+                })
+            }),
+            boardId ? fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'getSprints',
+                    jiraConfig: jiraConfig,
+                    boardId: boardId
+                })
+            }) : Promise.resolve({ ok: false }),
+            boardId ? fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'getBoardColumns',
+                    jiraConfig: jiraConfig,
+                    boardId: boardId
+                })
+            }) : Promise.resolve({ ok: false })
+        ];
+
+        const [usersResponse, sprintsResponse, columnsResponse] = await Promise.all(promises);
+
+        const result = {
+            users: [],
+            sprints: [],
+            columns: [],
+            boardId: boardId
+        };
+
+        // Process users
+        if (usersResponse.ok) {
+            const usersResult = await usersResponse.json();
+            if (usersResult.success) {
+                result.users = usersResult.data || [];
+            }
+        }
+
+        // Process sprints
+        if (sprintsResponse.ok) {
+            const sprintsResult = await sprintsResponse.json();
+            if (sprintsResult.success) {
+                result.sprints = sprintsResult.data || [];
+            }
+        }
+
+        // Process columns
+        if (columnsResponse.ok) {
+            const columnsResult = await columnsResponse.json();
+            if (columnsResult.success) {
+                result.columns = columnsResult.data || [];
+            }
+        }
+
+        return result;
+    }
+
+    // Create JIRA form HTML (based on backend design)
+    function createJiraFormHTML(jiraData) {
+        return `
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Issue-Typ:</label>
+                <select id="jira-issue-type" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px; background: white;">
+                    <option value="Bug" selected>Bug</option>
+                    <option value="Task">Task</option>
+                    <option value="Story">Story</option>
+                    <option value="Improvement">Improvement</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Zugewiesen an:</label>
+                <select id="jira-assignee" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px; background: white;">
+                    <option value="">Nicht zugewiesen</option>
+                    ${jiraData.users.map(user =>
+                        `<option value="${user.accountId}" ${user.emailAddress === projectConfig.jira_username ? 'selected' : ''}>
+                            ${user.displayName} (${user.emailAddress})
+                        </option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Sprint:</label>
+                <select id="jira-sprint" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px; background: white;">
+                    <option value="">Kein Sprint</option>
+                    ${jiraData.sprints.map(sprint =>
+                        `<option value="${sprint.id}" ${sprint.state === 'active' ? 'selected' : ''}>
+                            ${sprint.name} (${sprint.state})
+                        </option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Board-Spalte:</label>
+                <select id="jira-column" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px; background: white;">
+                    <option value="">Standard (To Do)</option>
+                    ${jiraData.columns.map(column =>
+                        `<option value="${column.statusId || column.id}" ${column.statusCategory === 'new' ? 'selected' : ''}>
+                            ${column.name}
+                        </option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: bold; color: #555; font-family: Arial, sans-serif; font-size: 13px;">Labels (kommagetrennt):</label>
+                <input id="jira-labels" type="text" placeholder="bug, frontend, ui" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
+            </div>
+
+            <button id="jira-create-btn" style="width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px;" fill="currentColor">
+                    <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-6c0-2.4-1.96-4.4-4.4-4.4H11.53zm-6.77 6.77c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-6c0-2.4-1.96-4.4-4.4-4.4H4.76zm6.77 6.77c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-6c0-2.4-1.96-4.4-4.4-4.4h-6.08z"/>
+                </svg>
+                <span id="jira-create-text">JIRA-Task erstellen</span>
+                <div id="jira-create-spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            </button>
+        `;
     }
 
     // Legacy function - redirects to new implementation
@@ -608,9 +846,129 @@
         openJiraModalWindow(feedbackData);
     }
     
-    // Legacy functions - no longer used (functionality moved to backend modal)
+    // Attach event listeners to JIRA form
+    function attachJiraFormListeners() {
+        const createBtn = document.getElementById('jira-create-btn');
+
+        if (createBtn) {
+            createBtn.onclick = async (e) => {
+                e.preventDefault();
+                await createJiraTaskInline();
+            };
+        }
+    }
+
+    // Create JIRA task inline
+    async function createJiraTaskInline() {
+        const createBtn = document.getElementById('jira-create-btn');
+        const createText = document.getElementById('jira-create-text');
+        const createSpinner = document.getElementById('jira-create-spinner');
+
+        // Show loading state
+        if (createBtn) createBtn.disabled = true;
+        if (createText) createText.textContent = 'Erstelle...';
+        if (createSpinner) createSpinner.style.display = 'block';
+
+        try {
+            // Get form values
+            const issueType = document.getElementById('jira-issue-type')?.value || 'Bug';
+            const assignee = document.getElementById('jira-assignee')?.value || '';
+            const sprint = document.getElementById('jira-sprint')?.value || '';
+            const column = document.getElementById('jira-column')?.value || '';
+            const labelsInput = document.getElementById('jira-labels')?.value || '';
+
+            // Parse labels
+            const labels = labelsInput.split(',').map(label => label.trim()).filter(label => label);
+
+            // Get stored board ID from earlier load
+            const jiraData = await loadJiraDataForWidget();
+
+            // Create JIRA payload
+            const jiraPayload = {
+                action: 'createTicket',
+                feedback: {
+                    id: currentFeedbackData.taskId,
+                    title: currentFeedbackData.title,
+                    description: currentFeedbackData.description,
+                    screenshot: currentFeedbackData.screenshot,
+                    url: currentFeedbackData.url,
+                    projectId: currentFeedbackData.projectId
+                },
+                jiraConfig: {
+                    serverUrl: projectConfig.jira_server_url,
+                    username: projectConfig.jira_username,
+                    apiToken: projectConfig.jira_api_token,
+                    projectKey: projectConfig.jira_project_key,
+                    issueType: issueType,
+                    defaultAssignee: assignee,
+                    defaultLabels: labels,
+                    selectedSprint: sprint,
+                    selectedBoardId: jiraData.boardId,
+                    selectedColumn: column
+                }
+            };
+
+            const response = await fetch(`${baseUrl}/api/jira`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(jiraPayload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Update the task in database with JIRA key
+                if (currentFeedbackData.taskId && result.ticket && result.ticket.key) {
+                    try {
+                        const updateResponse = await fetch(`${baseUrl}/api/projects/${currentFeedbackData.projectId}/tasks/${currentFeedbackData.taskId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jira_key: result.ticket.key,
+                                jira_url: result.ticket.url
+                            })
+                        });
+
+                        if (!updateResponse.ok) {
+                            console.warn('Failed to update task with JIRA key');
+                        }
+                    } catch (error) {
+                        console.error('Error updating task:', error);
+                    }
+                }
+
+                // Show success message
+                const jiraKey = result.ticket?.key;
+                const jiraUrl = result.ticket?.url;
+                let successMessage = '✅ JIRA-Task erfolgreich erstellt!';
+
+                if (jiraKey && jiraUrl) {
+                    successMessage = `✅ JIRA-Task erstellt: ${jiraKey}`;
+                    showToast(`JIRA-Task erstellt: <a href="${jiraUrl}" target="_blank" style="color: #fff; text-decoration: underline; font-weight: bold;">${jiraKey}</a>`, 'success', 6000);
+                }
+
+                showSuccessAndClose(successMessage);
+
+            } else {
+                throw new Error(result.error || 'Unbekannter Fehler');
+            }
+
+        } catch (error) {
+            console.error('Error creating JIRA task:', error);
+
+            // Show error message
+            showToast(`❌ JIRA-Task konnte nicht erstellt werden: ${error.message}`, 'error', 5000);
+
+            // Reset button state
+            if (createBtn) createBtn.disabled = false;
+            if (createText) createText.textContent = 'JIRA-Task erstellen';
+            if (createSpinner) createSpinner.style.display = 'none';
+        }
+    }
+
+    // Legacy functions - no longer used (functionality moved to inline)
     function closeJiraConfigModal() {
-        // Compatibility function - actual closing is handled by backend modal
+        // Compatibility function - actual closing is handled inline
     }
     
     // Initialize annotation functionality
@@ -873,9 +1231,10 @@
             // Submit feedback (DB) and get task ID
             const taskResult = await submitFeedback(combinedTitle, description, annotatedScreenshot);
 
-            // Optional: JIRA-Modal über Backend anzeigen
+            // Optional: JIRA-Konfiguration anzeigen
             if (createJira && projectConfig?.jira_server_url) {
-                openJiraModalWindow({
+                // Show JIRA configuration step instead of closing
+                showJiraConfigurationStep({
                     title: combinedTitle,
                     description: description,
                     screenshot: annotatedScreenshot,
@@ -887,17 +1246,17 @@
                 jiraStatusMessage.style.display = 'inline';
                 jiraStatusMessage.style.color = '#ffc107';
                 jiraStatusMessage.textContent = 'JIRA ist nicht konfiguriert.';
-                setTimeout(function() { jiraStatusMessage.style.display = 'none'; }, 8000);
-
-                // Close annotation interface
-                closeAnnotationInterface();
+                setTimeout(function() {
+                    jiraStatusMessage.style.display = 'none';
+                    closeAnnotationInterface();
+                }, 3000);
             } else {
-                // No JIRA - just close annotation interface
-                closeAnnotationInterface();
+                // No JIRA - show success and close
+                showSuccessAndClose('Feedback erfolgreich gesendet!');
             }
         } catch (error) {
             await submitFeedback(combinedTitle, description, null);
-            closeAnnotationInterface();
+            showSuccessAndClose('Feedback gesendet (ohne Screenshot)!');
         } finally {
             // Hide spinner and re-enable button
             submitBtn.disabled = false;
@@ -1040,7 +1399,8 @@
     
     // Start the widget and expose global reference for error modal
     window.feedbackWidget = {
-        createScreenshotAndAnnotate: createScreenshotAndAnnotate
+        createScreenshotAndAnnotate: createScreenshotAndAnnotate,
+        closeAnnotationInterface: closeAnnotationInterface
     };
     
     initWidget();
