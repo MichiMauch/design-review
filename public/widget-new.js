@@ -586,8 +586,15 @@
             <div style="background: white !important; padding: 24px !important; border-radius: 12px !important;
                         max-width: 400px !important; width: 90% !important; box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
                         position: relative !important;">
-                <div style="text-align: center !important; margin-bottom: 20px !important;">
+                <div style="display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 20px !important;">
                     <h2 style="margin: 0 !important; color: #333 !important; font-size: 20px !important;">🎯 JIRA-Task erstellen</h2>
+                    <button onclick="document.getElementById('jira-overlay-modal')?.remove(); window.feedbackWidget?.closeAnnotationInterface();"
+                            style="background: none !important; border: none !important; font-size: 24px !important;
+                                   cursor: pointer !important; color: #666 !important; padding: 4px !important;
+                                   border-radius: 3px !important; width: 32px !important; height: 32px !important;
+                                   display: flex !important; align-items: center !important; justify-content: center !important;">
+                        ×
+                    </button>
                 </div>
 
                 <div style="padding: 16px !important; background: #e8f5e8 !important; border-radius: 8px !important;
@@ -892,9 +899,14 @@
                 })
             });
 
+            console.log('Widget: JIRA API Response status:', response.status);
+            console.log('Widget: JIRA API Response ok:', response.ok);
+
             const result = await response.json();
+            console.log('Widget: JIRA API Result:', result);
 
             if (response.ok && result.success) {
+                console.log('Widget: ENTERING SUCCESS BLOCK - this should show if success works');
                 // Success
                 console.log('Widget: JIRA task creation successful:', result);
                 if (statusContainer) {
@@ -964,11 +976,16 @@
                 }, 1000);
 
             } else {
+                console.log('Widget: ELSE BLOCK - API call succeeded but result.success is false');
+                console.log('Widget: Response status:', response.status);
+                console.log('Widget: Result.success:', result.success);
+                console.log('Widget: Full result object:', result);
                 throw new Error(result.error || 'JIRA-Task konnte nicht erstellt werden');
             }
 
         } catch (error) {
-            console.error('Widget: Error creating JIRA task with selections:', error);
+            console.error('Widget: CATCH BLOCK - Error creating JIRA task with selections:', error);
+            console.log('Widget: This means either fetch failed or JSON parsing failed');
 
             if (statusContainer) {
                 statusContainer.innerHTML = `
