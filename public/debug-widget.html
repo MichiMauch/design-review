@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Widget JavaScript Errors</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <h1>Debug Widget Errors</h1>
+
+    <div id="error-log" style="border: 1px solid #red; padding: 20px; background: #ffe6e6; margin: 20px 0;">
+        <h3>JavaScript Errors:</h3>
+        <div id="error-messages"></div>
+    </div>
+
+    <div id="debug-log" style="border: 1px solid #ddd; padding: 20px; background: #f9f9f9; margin: 20px 0;">
+        <h3>Debug Messages:</h3>
+        <div id="debug-messages"></div>
+    </div>
+
+    <script>
+        // Catch all JavaScript errors
+        window.addEventListener('error', function(e) {
+            const errorDiv = document.getElementById('error-messages');
+            errorDiv.innerHTML += '<p style="color: red;"><strong>Error:</strong> ' + e.message + ' (Line: ' + e.lineno + ')</p>';
+            console.error('JavaScript Error:', e);
+        });
+
+        // Debug function
+        function debugLog(message) {
+            const debugDiv = document.getElementById('debug-messages');
+            debugDiv.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+            console.log('DEBUG:', message);
+        }
+
+        debugLog('Starting widget load...');
+    </script>
+
+    <!-- Load the widget -->
+    <script src="widget-new.js" data-project-id="doityourself.rocks"></script>
+
+    <script>
+        // Monitor widget loading
+        let checkCount = 0;
+        const maxChecks = 10;
+
+        const checkWidget = () => {
+            checkCount++;
+            debugLog(`Check ${checkCount}/${maxChecks}: Checking widget status...`);
+
+            if (window.feedbackWidget) {
+                debugLog('✅ window.feedbackWidget exists');
+                if (typeof window.feedbackWidget.createScreenshotAndAnnotate === 'function') {
+                    debugLog('✅ createScreenshotAndAnnotate is a function');
+                } else {
+                    debugLog('❌ createScreenshotAndAnnotate is not a function: ' + typeof window.feedbackWidget.createScreenshotAndAnnotate);
+                }
+
+                if (window.getProjectConfig) {
+                    const config = window.getProjectConfig();
+                    if (config) {
+                        debugLog('✅ Project config loaded: ' + config.name);
+                        debugLog('JIRA URL: ' + config.jira_server_url);
+                        debugLog('Show JIRA checkbox: ' + config.show_jira_checkbox);
+                    } else {
+                        debugLog('❌ Project config is null');
+                    }
+                } else {
+                    debugLog('❌ getProjectConfig not available');
+                }
+
+                // Check if widget button exists
+                const button = document.getElementById('feedback-widget-button');
+                if (button) {
+                    debugLog('✅ Widget button found in DOM');
+                } else {
+                    debugLog('❌ Widget button not found in DOM');
+                }
+
+                return; // Stop checking
+            } else {
+                debugLog('❌ window.feedbackWidget not available yet');
+            }
+
+            if (checkCount < maxChecks) {
+                setTimeout(checkWidget, 1000);
+            } else {
+                debugLog('❌ Widget loading timeout after ' + maxChecks + ' seconds');
+            }
+        };
+
+        // Start checking after a short delay
+        setTimeout(checkWidget, 500);
+    </script>
+</body>
+</html>
