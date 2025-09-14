@@ -14,19 +14,11 @@ import DeleteTaskModal from '../../../components/modals/DeleteTaskModal';
 import JiraModal from '../../../components/modals/JiraModal';
 import ScreenshotLightbox from '../../../components/modals/ScreenshotLightbox';
 import TaskDetailModal from '../../../components/modals/TaskDetailModal';
-import {
-  ExternalLink,
-  MessageSquare,
-  Edit3,
-  Save,
-  X,
-  ExternalLink as JiraIcon,
-  AlertCircle,
-  Calendar
-} from 'lucide-react';
+import TaskList from '../../../components/project/TaskList';
+import TaskBoard from '../../../components/project/TaskBoard';
+import { MessageSquare, X } from 'lucide-react';
 import { downloadExcel } from '@/utils/excelExport';
-import { TASK_STATUSES } from '../../../constants/taskStatuses';
-import { formatTime, getStatusInfo } from '../../../utils/projectUtils';
+// Removed unused imports
 
 export default function ProjectPage() {
   const params = useParams();
@@ -66,8 +58,6 @@ export default function ProjectPage() {
   const [jiraBoardId, setJiraBoardId] = useState(null);
   const [jiraBoardColumns, setJiraBoardColumns] = useState([]);
   const [loadingJiraModal, setLoadingJiraModal] = useState(null); // stores task.id when loading modal data
-  const [jiraStatuses, setJiraStatuses] = useState({});
-  const [jiraTaskSprints, setJiraTaskSprints] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
@@ -452,36 +442,10 @@ export default function ProjectPage() {
     }
   };
 
-  const getJiraStatusColor = (status) => {
-    if (!status) return 'bg-gray-100 text-gray-700';
-    
-    const statusName = status.name?.toLowerCase() || '';
-    const category = status.category?.toLowerCase() || '';
-    
-    // Status-spezifische Farben
-    if (statusName.includes('done') || statusName.includes('resolved') || statusName.includes('closed') || category === 'done') {
-      return 'bg-green-100 text-green-800 border-green-200';
-    }
-    if (statusName.includes('progress') || statusName.includes('development') || statusName.includes('review') || category === 'in progress') {
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-    if (statusName.includes('testing') || statusName.includes('qa')) {
-      return 'bg-purple-100 text-purple-800 border-purple-200';
-    }
-    if (statusName.includes('blocked') || statusName.includes('impediment')) {
-      return 'bg-red-100 text-red-800 border-red-200';
-    }
-    if (statusName.includes('ready') || statusName.includes('todo') || statusName.includes('backlog')) {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    }
-    
-    // Fallback nach Kategorie
-    switch (category) {
-      case 'done': return 'bg-green-100 text-green-800 border-green-200';
-      case 'in progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
+  const getCommentCount = (taskId) => {
+    return commentCounts[taskId] || 0;
   };
+
 
 
   // Manual refresh function
@@ -762,55 +726,6 @@ export default function ProjectPage() {
   };
 
   // Drag & Drop Handlers
-  const handleDragStart = (e, task) => {
-    setDraggedTask(task);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.outerHTML);
-    e.target.style.opacity = '0.5';
-  };
-
-  const handleDragEnd = (e) => {
-    e.target.style.opacity = '1';
-    setDraggedTask(null);
-    setDragOverColumn(null);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDragEnter = (e, statusValue) => {
-    e.preventDefault();
-    setDragOverColumn(statusValue);
-  };
-
-  const handleDragLeave = (e) => {
-    // Only remove highlight if leaving the column entirely
-    if (!e.currentTarget.contains(e.relatedTarget)) {
-      setDragOverColumn(null);
-    }
-  };
-
-  const handleDrop = async (e, statusValue) => {
-    e.preventDefault();
-    setDragOverColumn(null);
-    
-    if (draggedTask && draggedTask.status !== statusValue) {
-      // Optimistically update UI
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === draggedTask.id ? { ...task, status: statusValue } : task
-        )
-      );
-      
-      // Update status on server
-      await updateTaskStatus(draggedTask.id, statusValue);
-    }
-    
-    setDraggedTask(null);
-  };
-
   const saveTask = async (taskId) => {
     try {
       const response = await fetch(`/api/projects/${params.id}/tasks/${taskId}`, {
@@ -1335,501 +1250,52 @@ export default function ProjectPage() {
                   </p>
                 </div>
               ) : viewMode === 'list' ? (
-                <div className="space-y-4">
-                  {/* All Tasks */}
-                  {getFilteredTasks(tasks).length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                        Tasks ({getFilteredTasks(tasks).length})
-                      </h3>
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                        {getFilteredTasks(tasks).map((task) => (
-                          <div key={task.id} className="bg-white border border-red-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                {editingTask === task.id ? (
-                                  <div className="space-y-2">
-                                    <input
-                                      type="text"
-                                      value={editForm.title}
-                                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                      placeholder="Task-Titel"
-                                    />
-                                    <textarea
-                                      value={editForm.description}
-                                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                      rows="2"
-                                      placeholder="Beschreibung (optional)"
-                                    />
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={() => saveTask(task.id)}
-                                        className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                                      >
-                                        <Save className="h-3 w-3" />
-                                        Speichern
-                                      </button>
-                                      <button
-                                        onClick={cancelEditing}
-                                        className="flex items-center gap-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
-                                      >
-                                        <X className="h-3 w-3" />
-                                        Abbrechen
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="flex items-start gap-2 mb-1">
-                                      <h4 className="font-medium text-gray-900 flex-1" style={{
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden'
-                                      }}>#{task.id} - {task.title}</h4>
-                                      {task.jira_key && (
-                                        <div className="flex items-center gap-1">
-                                          <a
-                                            href={task.jira_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
-                                            title={`JIRA: ${task.jira_key}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <JiraIcon className="h-3 w-3" />
-                                            {task.jira_key}
-                                          </a>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {task.description && (
-                                      <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1 ml-2">
-                                <select
-                                  value={task.status || 'open'}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    updateTaskStatus(task.id, e.target.value);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusInfo(task.status).color}`}
-                                >
-                                  {TASK_STATUSES.map(status => (
-                                    <option key={status.value} value={status.value}>
-                                      {status.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                {!editingTask && (
-                                  <>
-                                    <button
-                                      onClick={() => startEditing(task)}
-                                      className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                                      title="Bearbeiten"
-                                    >
-                                      <Edit3 className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => openTaskDeleteModal(task)}
-                                      disabled={deletingTask === task.id}
-                                      className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                                      title="Task löschen"
-                                    >
-                                      {deletingTask === task.id ? (
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                                      ) : (
-                                        <X className="h-4 w-4" />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => setSelectedTaskForModal(task)}
-                                      className="relative p-1 text-gray-400 hover:text-blue-600 rounded"
-                                      title="Kommentare anzeigen"
-                                    >
-                                      <MessageSquare className="h-4 w-4" />
-                                      {commentCounts[task.id] > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
-                                          {commentCounts[task.id]}
-                                        </span>
-                                      )}
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                              <span>{formatTime(task.created_at)}</span>
-                              {task.url && (
-                                <a 
-                                  href={task.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                  Seite
-                                </a>
-                              )}
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <div 
-                                className="w-20 h-20 bg-gray-100 rounded-lg border overflow-hidden relative group cursor-pointer"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const imageUrl = getScreenshotUrl(task.screenshot);
-                                  if (imageUrl) {
-                                    openScreenshotLightbox(imageUrl);
-                                  }
-                                }}
-                              >
-                                {task.screenshot ? (
-                                  <>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={getScreenshotUrl(task.screenshot)}
-                                      alt="Task Screenshot"
-                                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                                    />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                                      <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                        🔍
-                                      </div>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                    {loadingScreenshots[task.id] ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                                    ) : (
-                                      <button 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          loadTaskScreenshot(task.id);
-                                        }}
-                                        className="text-xs text-blue-600 hover:text-blue-800 p-1 transition-colors"
-                                        title="Screenshot laden"
-                                      >
-                                        📷 Laden
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              {user?.role === 'admin' && (
-                                <button
-                                  onClick={() => openJiraModal(task)}
-                                  disabled={creatingJira === task.id || loadingJiraModal === task.id || loadingJiraConfig}
-                                  className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm ml-auto"
-                                  title={loadingJiraConfig ? "JIRA-Konfiguration wird geladen..." : "JIRA-Task erstellen"}
-                                >
-                                  {creatingJira === task.id ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      Erstelle...
-                                    </>
-                                  ) : loadingJiraModal === task.id ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      Lade...
-                                    </>
-                                  ) : loadingJiraConfig ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                      Konfiguration...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <JiraIcon className="h-3 w-3" />
-                                      JIRA
-                                    </>
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* JIRA Tasks */}
-                  {user?.role === 'admin' && tasks.filter(t => t.jira_key).length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <JiraIcon className="h-5 w-5 text-blue-500" />
-                        JIRA Tasks ({tasks.filter(t => t.jira_key).length})
-                      </h3>
-                      <div className="space-y-3">
-                        {tasks.filter(t => t.jira_key).map((task) => (
-                          <div key={task.id} className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-medium text-gray-900 mb-1">#{task.id} - {task.title}</h4>
-                                {task.description && (
-                                  <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 ml-2">
-                                {jiraStatuses[task.id] ? (
-                                  <div className="flex items-center gap-2">
-                                    <a
-                                      href={task.jira_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getJiraStatusColor(jiraStatuses[task.id])}`}
-                                      title={`Status: ${jiraStatuses[task.id]?.name || 'Unbekannt'}`}
-                                    >
-                                      <JiraIcon className="h-3 w-3" />
-                                      {jiraStatuses[task.id]?.name || 'Unbekannt'}
-                                    </a>
-                                    {jiraStatuses[task.id]?.assignee && (
-                                      <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs text-gray-700">
-                                        <span>👤</span>
-                                        <span>{jiraStatuses[task.id].assignee.displayName}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <a
-                                      href={task.jira_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"
-                                      title="JIRA Status wird geladen..."
-                                    >
-                                      <JiraIcon className="h-3 w-3" />
-                                      Lade Status...
-                                    </a>
-                                  </div>
-                                )}
-                                <button
-                                  onClick={() => setSelectedTaskForModal(task)}
-                                  className="relative p-1 text-gray-400 hover:text-blue-600 rounded"
-                                  title="Kommentare anzeigen"
-                                >
-                                  <MessageSquare className="h-4 w-4" />
-                                  {commentCounts[task.id] > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
-                                      {commentCounts[task.id]}
-                                    </span>
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() => openTaskDeleteModal(task)}
-                                  disabled={deletingTask === task.id}
-                                  className="p-1 text-red-400 hover:text-red-600 rounded disabled:opacity-50"
-                                  title="Task aus Projekt entfernen"
-                                >
-                                  {deletingTask === task.id ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                                  ) : (
-                                    <X className="h-4 w-4" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-xs text-gray-500">
-                                <div className="flex items-center gap-4">
-                                  <span>Erstellt {formatTime(task.created_at)}</span>
-                                  {task.jira_key && (
-                                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{task.jira_key}</span>
-                                  )}
-                                  {task.url && (
-                                    <a 
-                                      href={task.url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                      Seite öffnen
-                                    </a>
-                                  )}
-                                </div>
-                                {jiraTaskSprints[task.id] && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                    <Calendar className="h-3 w-3" />
-                                    {jiraTaskSprints[task.id].name}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {/* JIRA Status Details */}
-                              {jiraStatuses[task.id] && (
-                                <div className="flex items-center gap-4 text-xs">
-                                  {jiraStatuses[task.id].priority && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-500">Priorität:</span>
-                                      <span className={`font-medium ${
-                                        jiraStatuses[task.id].priority.name?.toLowerCase().includes('high') ? 'text-red-600' :
-                                        jiraStatuses[task.id].priority.name?.toLowerCase().includes('medium') ? 'text-yellow-600' :
-                                        'text-green-600'
-                                      }`}>
-                                        {jiraStatuses[task.id].priority.name}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {jiraStatuses[task.id].updated && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-500">Zuletzt aktualisiert:</span>
-                                      <span className="text-gray-700">{formatTime(jiraStatuses[task.id].updated)}</span>
-                                    </div>
-                                  )}
-                                  {jiraStatuses[task.id].resolution && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-500">Lösung:</span>
-                                      <span className="text-green-700 font-medium">{jiraStatuses[task.id].resolution.name}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
+                <TaskList
+                  tasks={tasks}
+                  getFilteredTasks={getFilteredTasks}
+                  editingTask={editingTask}
+                  editForm={editForm}
+                  onEditFormChange={setEditForm}
+                  onStartEditing={startEditing}
+                  onSaveTask={saveTask}
+                  onCancelEditing={cancelEditing}
+                  onUpdateStatus={updateTaskStatus}
+                  onOpenTaskModal={setSelectedTaskForModal}
+                  onOpenDeleteModal={openTaskDeleteModal}
+                  onOpenJiraModal={openJiraModal}
+                  getScreenshotUrl={getScreenshotUrl}
+                  getCommentCount={getCommentCount}
+                  user={user}
+                  creatingJira={creatingJira}
+                  loadingJiraModal={loadingJiraModal}
+                  loadingJiraConfig={loadingJiraConfig}
+                  viewMode={viewMode}
+                />
               ) : (
-                /* Board View */
-                <div className="flex gap-4 h-[calc(100vh-200px)] overflow-x-auto pb-4">
-                  {TASK_STATUSES.map(status => {
-                    // Robust filtering - handle undefined, null, empty string
-                    const statusTasks = tasks.filter(t => {
-                      const taskStatus = t.status || 'open'; // Default to 'open' for undefined/null
-                      return taskStatus === status.value;
-                    });
-                    
-                    // Debug logging for board filter
-                    if (status.value === 'open') {
-                      console.log(`Board filter for "${status.value}":`, {
-                        totalTasks: tasks.length,
-                        statusTasks: statusTasks.length,
-                        tasksWithUndefinedStatus: tasks.filter(t => !t.status).length,
-                        tasksWithEmptyStatus: tasks.filter(t => t.status === '').length,
-                        allTaskStatuses: tasks.map(t => ({ 
-                          id: t.id, 
-                          status: t.status, 
-                          normalizedStatus: t.status || 'open',
-                          title: t.title ? t.title.substring(0, 30) : 'No title',
-                          jira_key: t.jira_key 
-                        }))
-                      });
-                    }
-                    
-                    return (
-                      <div 
-                        key={status.value} 
-                        className={`flex flex-col min-w-80 w-80 transition-all ${
-                          dragOverColumn === status.value 
-                            ? 'ring-2 ring-blue-400 ring-opacity-75 bg-blue-50' 
-                            : ''
-                        }`}
-                        onDragOver={handleDragOver}
-                        onDragEnter={(e) => handleDragEnter(e, status.value)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, status.value)}
-                      >
-                        <div className={`p-3 rounded-t-lg border-b-2 ${status.color} font-medium text-sm`}>
-                          <div className="flex items-center justify-between">
-                            <span>{status.label}</span>
-                            <span className="bg-white bg-opacity-50 px-2 py-1 rounded text-xs">
-                              {statusTasks.length}
-                            </span>
-                          </div>
-                        </div>
-                        <div className={`flex-1 rounded-b-lg p-3 overflow-y-auto transition-all ${
-                          dragOverColumn === status.value 
-                            ? 'bg-blue-50' 
-                            : 'bg-gray-100'
-                        }`}>
-                          <div className="space-y-2">
-                            {statusTasks.length === 0 && dragOverColumn === status.value && (
-                              <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center text-blue-500">
-                                <span className="text-sm">Task hier ablegen</span>
-                              </div>
-                            )}
-                            {statusTasks.map(task => (
-                              <div 
-                                key={task.id}
-                                draggable
-                                className="bg-white rounded-lg p-3 shadow-md hover:shadow-lg transition-all cursor-grab active:cursor-grabbing border border-gray-200"
-                                onClick={() => {
-                                  // Prevent modal opening during drag
-                                  if (!draggedTask) {
-                                    setSelectedTaskForModal(task);
-                                  }
-                                }}
-                                onDragStart={(e) => handleDragStart(e, task)}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <div className="space-y-2">
-                                  <div className="flex items-start gap-2">
-                                    <h4 className="font-medium text-sm text-gray-900 flex-1" style={{
-                                      display: '-webkit-box',
-                                      WebkitLineClamp: 2,
-                                      WebkitBoxOrient: 'vertical',
-                                      overflow: 'hidden'
-                                    }}>
-                                      #{task.id} - {task.title}
-                                    </h4>
-                                    {task.jira_key && (
-                                      <a
-                                        href={task.jira_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200 transition-colors"
-                                        title={`JIRA: ${task.jira_key}`}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <JiraIcon className="h-2 w-2" />
-                                        {task.jira_key}
-                                      </a>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center justify-between text-xs text-gray-500">
-                                    <span>{formatTime(task.created_at)}</span>
-                                    <div className="flex items-center gap-1">
-                                      {task.screenshot ? (
-                                        <div className="w-4 h-4 bg-gray-200 rounded text-center text-xs">
-                                          📷
-                                        </div>
-                                      ) : null}
-                                      {commentCounts[task.id] > 0 && (
-                                        <div className="relative">
-                                          <MessageSquare className="h-3 w-3 text-blue-500" />
-                                          <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center font-bold text-xs leading-none">
-                                            {commentCounts[task.id]}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <TaskBoard
+                  tasks={tasks}
+                  editingTask={editingTask}
+                  editForm={editForm}
+                  onEditFormChange={setEditForm}
+                  onStartEditing={startEditing}
+                  onSaveTask={saveTask}
+                  onCancelEditing={cancelEditing}
+                  onUpdateStatus={updateTaskStatus}
+                  onOpenTaskModal={setSelectedTaskForModal}
+                  onOpenDeleteModal={openTaskDeleteModal}
+                  onOpenJiraModal={openJiraModal}
+                  getScreenshotUrl={getScreenshotUrl}
+                  getCommentCount={getCommentCount}
+                  user={user}
+                  creatingJira={creatingJira}
+                  loadingJiraModal={loadingJiraModal}
+                  loadingJiraConfig={loadingJiraConfig}
+                  viewMode={viewMode}
+                  draggedTask={draggedTask}
+                  setDraggedTask={setDraggedTask}
+                  dragOverColumn={dragOverColumn}
+                  setDragOverColumn={setDragOverColumn}
+                />
               )}
             </div>
           </div>
