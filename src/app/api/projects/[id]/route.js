@@ -48,10 +48,8 @@ export async function PUT(request, { params }) {
     const {
       name,
       domain,
-      jira_server_url,
-      jira_username,
-      jira_api_token,
       jira_project_key,
+      jira_issue_type,
       jira_auto_create
     } = body;
 
@@ -66,24 +64,29 @@ export async function PUT(request, { params }) {
       return new Response('Projekt nicht gefunden', { status: 404 });
     }
 
+    // First, try to add the new column if it doesn't exist
+    try {
+      await db.execute({
+        sql: `ALTER TABLE projects ADD COLUMN jira_issue_type TEXT DEFAULT 'Task'`
+      });
+    } catch {
+      // Column already exists, ignore error
+    }
+
     // Try to update with JIRA fields
     await db.execute({
-      sql: `UPDATE projects SET 
-            name = ?, 
-            domain = ?, 
-            jira_server_url = ?, 
-            jira_username = ?, 
-            jira_api_token = ?, 
-            jira_project_key = ?, 
-            jira_auto_create = ? 
+      sql: `UPDATE projects SET
+            name = ?,
+            domain = ?,
+            jira_project_key = ?,
+            jira_issue_type = ?,
+            jira_auto_create = ?
             WHERE id = ?`,
       args: [
         name,
         domain,
-        jira_server_url,
-        jira_username,
-        jira_api_token,
         jira_project_key,
+        jira_issue_type || 'Task',
         jira_auto_create || false,
         resolvedParams.id
       ]

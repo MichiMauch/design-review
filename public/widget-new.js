@@ -27,6 +27,8 @@
     let selectionArea = null;
     let annotationModal = null;
     let projectConfig = null;
+    let jiraConfig = null;
+    let loadingJiraConfig = false;
     let currentFeedbackData = null;
     let jiraModalWindow = null;
     
@@ -524,10 +526,8 @@
                 };
             }
             
-            // JIRA-Checkbox nur anzeigen, wenn JIRA konfiguriert ist
-            if (jiraSection) {
-                jiraSection.style.display = projectConfig?.jira_server_url ? 'block' : 'none';
-            }
+            // JIRA-Checkbox Visibility mit neuer Logik
+            updateJiraCheckboxVisibility();
         }, 0);
         
         // Initialize annotation functionality after DOM elements are created
@@ -649,13 +649,11 @@
     // Load JIRA data for interactive form
     async function loadJiraFormData(feedbackData) {
         try {
-            // Build JIRA configuration from project config
-            const jiraConfig = {
-                serverUrl: projectConfig.jira_server_url,
-                username: projectConfig.jira_username,
-                apiToken: projectConfig.jira_api_token,
-                projectKey: projectConfig.jira_project_key
-            };
+            // Use global JIRA configuration
+            if (!jiraConfig || !jiraConfig.serverUrl || !jiraConfig.projectKey) {
+                console.error('Widget: JIRA not properly configured');
+                return;
+            }
 
             console.log('Widget: Loading JIRA data with config:', jiraConfig);
 
@@ -1018,14 +1016,11 @@
         const overlayModal = document.getElementById('jira-overlay-modal');
 
         try {
-            // Build JIRA configuration from project config (both app-level and project-level)
-            const jiraConfig = {
-                serverUrl: projectConfig.jira_server_url,        // App-level
-                username: projectConfig.jira_username,          // App-level
-                apiToken: projectConfig.jira_api_token,         // App-level
-                projectKey: projectConfig.jira_project_key,     // Project-level
-                issueType: projectConfig.jira_issue_type || 'Bug' // Project-level (with fallback)
-            };
+            // Use global JIRA configuration
+            if (!jiraConfig || !jiraConfig.serverUrl || !jiraConfig.projectKey) {
+                console.error('Widget: JIRA not properly configured');
+                return null;
+            }
 
             console.log('Widget: Creating JIRA task with config:', {
                 serverUrl: jiraConfig.serverUrl,
@@ -1103,12 +1098,10 @@
 
     // Load JIRA data for widget
     async function loadJiraDataForWidget() {
-        const jiraConfig = {
-            serverUrl: projectConfig.jira_server_url,
-            username: projectConfig.jira_username,
-            apiToken: projectConfig.jira_api_token,
-            projectKey: projectConfig.jira_project_key
-        };
+        if (!jiraConfig || !jiraConfig.serverUrl || !jiraConfig.projectKey) {
+            console.error('Widget: JIRA not properly configured for data loading');
+            return;
+        }
 
         // Load boards first to get board ID
         const boardsResponse = await fetch(`${baseUrl}/api/jira`, {
@@ -1312,10 +1305,10 @@
                     projectId: currentFeedbackData.projectId
                 },
                 jiraConfig: {
-                    serverUrl: projectConfig.jira_server_url,
-                    username: projectConfig.jira_username,
-                    apiToken: projectConfig.jira_api_token,
-                    projectKey: projectConfig.jira_project_key,
+                    serverUrl: jiraConfig.serverUrl,
+                    username: jiraConfig.username,
+                    apiToken: jiraConfig.apiToken,
+                    projectKey: jiraConfig.projectKey,
                     issueType: issueType,
                     defaultAssignee: assignee,
                     defaultLabels: labels,
@@ -1655,28 +1648,87 @@
             // Optional: JIRA-Konfiguration anzeigen
             console.log('Widget: JIRA Debug - createJira:', createJira);
             console.log('Widget: JIRA Debug - projectConfig:', projectConfig);
-            console.log('Widget: JIRA Debug - jira_server_url:', projectConfig?.jira_server_url);
+            console.log('Widget: JIRA Debug - JIRA config state:', {
+                exists: !!jiraConfig,
+                loadingJiraConfig: loadingJiraConfig,
+                serverUrl: jiraConfig?.serverUrl ? '✓ configured' : '✗ missing',
+                projectKey: jiraConfig?.projectKey ? '✓ configured' : '✗ missing'
+            });
 
-            if (createJira && projectConfig?.jira_server_url) {
-                console.log('Widget: JIRA Debug - Opening JIRA modal');
-                // Show JIRA configuration step instead of closing
-                showJiraConfigurationStep({
-                    title: combinedTitle,
-                    description: description,
-                    screenshot: annotatedScreenshot,
-                    url: window.location.href,
-                    taskId: taskResult.taskId,
-                    projectId: taskResult.projectId
-                });
-            } else if (createJira && !projectConfig?.jira_server_url) {
-                console.log('Widget: JIRA Debug - JIRA checkbox checked but no server URL configured');
-                jiraStatusMessage.style.display = 'inline';
-                jiraStatusMessage.style.color = '#ffc107';
-                jiraStatusMessage.textContent = 'JIRA ist nicht konfiguriert.';
-                setTimeout(function() {
-                    jiraStatusMessage.style.display = 'none';
-                    closeAnnotationInterface();
-                }, 3000);
+            if (createJira) {
+                // Check if JIRA config is still loading
+                if (loadingJiraConfig) {
+                    console.log('Widget: JIRA Debug - JIRA config still loading, showing wait message');
+                    jiraStatusMessage.style.display = 'inline';
+                    jiraStatusMessage.style.color = '#007bff';
+                    jiraStatusMessage.textContent = 'JIRA-Konfiguration wird geladen...';
+
+                    // Try to wait for config and retry
+                    setTimeout(async () => {
+                        if (projectConfig?.id) {
+                            try {
+                                await loadJiraConfigWithRetry(projectConfig.id, 2); // Quick retry
+
+                                if (jiraConfig?.serverUrl && jiraConfig?.projectKey) {
+                                    jiraStatusMessage.style.display = 'none';
+                                    showJiraConfigurationStep({
+                                        title: combinedTitle,
+                                        description: description,
+                                        screenshot: annotatedScreenshot,
+                                        url: window.location.href,
+                                        taskId: taskResult.taskId,
+                                        projectId: taskResult.projectId
+                                    });
+                                } else {
+                                    jiraStatusMessage.style.color = '#ffc107';
+                                    jiraStatusMessage.textContent = 'JIRA ist nicht vollständig konfiguriert.';
+                                    setTimeout(() => {
+                                        jiraStatusMessage.style.display = 'none';
+                                        closeAnnotationInterface();
+                                    }, 3000);
+                                }
+                            } catch (error) {
+                                console.error('Widget: Failed to retry JIRA config:', error);
+                                jiraStatusMessage.style.color = '#dc3545';
+                                jiraStatusMessage.textContent = 'JIRA-Konfiguration konnte nicht geladen werden.';
+                                setTimeout(() => {
+                                    jiraStatusMessage.style.display = 'none';
+                                    closeAnnotationInterface();
+                                }, 3000);
+                            }
+                        }
+                    }, 1000);
+                    return;
+                }
+
+                // Check if JIRA is fully configured
+                const isFullyConfigured = jiraConfig?.serverUrl && jiraConfig?.username && jiraConfig?.apiToken && jiraConfig?.projectKey;
+
+                if (isFullyConfigured) {
+                    console.log('Widget: JIRA Debug - Opening JIRA modal');
+                    showJiraConfigurationStep({
+                        title: combinedTitle,
+                        description: description,
+                        screenshot: annotatedScreenshot,
+                        url: window.location.href,
+                        taskId: taskResult.taskId,
+                        projectId: taskResult.projectId
+                    });
+                } else {
+                    console.log('Widget: JIRA Debug - JIRA configuration incomplete:', {
+                        serverUrl: jiraConfig?.serverUrl ? '✓' : '✗',
+                        username: jiraConfig?.username ? '✓' : '✗',
+                        apiToken: jiraConfig?.apiToken ? '✓' : '✗',
+                        projectKey: jiraConfig?.projectKey ? '✓' : '✗'
+                    });
+                    jiraStatusMessage.style.display = 'inline';
+                    jiraStatusMessage.style.color = '#ffc107';
+                    jiraStatusMessage.textContent = 'JIRA ist nicht vollständig konfiguriert. Bitte prüfen Sie die Admin- und Projekt-Einstellungen.';
+                    setTimeout(function() {
+                        jiraStatusMessage.style.display = 'none';
+                        closeAnnotationInterface();
+                    }, 4000); // Longer timeout for longer message
+                }
             } else {
                 console.log('Widget: JIRA Debug - No JIRA requested, showing success');
                 // No JIRA - show success and close
@@ -1744,6 +1796,7 @@
             if (response.ok) {
                 projectConfig = await response.json();
                 console.log('Widget: Project loaded by name:', projectConfig?.name);
+                await loadJiraConfig();
                 return;
             }
 
@@ -1754,6 +1807,7 @@
                 if (response.ok) {
                     projectConfig = await response.json();
                     console.log('Widget: Project loaded by ID:', projectConfig?.name);
+                    await loadJiraConfig();
                     return;
                 }
             }
@@ -1766,6 +1820,93 @@
         } catch (error) {
             console.error('Widget: Error loading project config:', error);
         }
+    }
+
+    async function loadJiraConfig() {
+        try {
+            if (!projectConfig?.id) {
+                console.log('Widget: No project ID available for JIRA config');
+                return;
+            }
+
+            await loadJiraConfigWithRetry(projectConfig.id);
+        } catch (error) {
+            console.error('Widget: Error loading JIRA config:', error);
+        }
+    }
+
+    function updateJiraCheckboxVisibility() {
+        setTimeout(() => {
+            const jiraSection = document.querySelector('.jira-section');
+            if (jiraSection) {
+                if (loadingJiraConfig) {
+                    jiraSection.style.display = 'block';
+                    const checkbox = jiraSection.querySelector('input[type="checkbox"]');
+                    const label = jiraSection.querySelector('label');
+                    if (checkbox) checkbox.disabled = true;
+                    if (label) {
+                        const originalText = label.textContent;
+                        if (!originalText.includes('wird geladen')) {
+                            label.textContent = originalText + ' (wird geladen...)';
+                        }
+                    }
+                } else if (jiraConfig?.serverUrl && jiraConfig?.projectKey) {
+                    jiraSection.style.display = 'block';
+                    const checkbox = jiraSection.querySelector('input[type="checkbox"]');
+                    const label = jiraSection.querySelector('label');
+                    if (checkbox) checkbox.disabled = false;
+                    if (label && label.textContent.includes('wird geladen')) {
+                        label.textContent = label.textContent.replace(' (wird geladen...)', '');
+                    }
+                } else {
+                    jiraSection.style.display = 'none';
+                }
+            }
+        }, 0);
+    }
+
+    async function loadJiraConfigWithRetry(projectId, retries = 3) {
+        loadingJiraConfig = true;
+        updateJiraCheckboxVisibility();
+
+        for (let i = 0; i < retries; i++) {
+            try {
+                console.log(`Widget: Loading JIRA config for project ${projectId} (attempt ${i + 1}/${retries})`);
+
+                const response = await fetch(`${baseUrl}/api/jira/config/${projectId}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        jiraConfig = result.config;
+                        console.log('Widget: JIRA config loaded successfully:', {
+                            serverUrl: jiraConfig.serverUrl ? '✓ configured' : '✗ missing',
+                            username: jiraConfig.username ? '✓ configured' : '✗ missing',
+                            apiToken: jiraConfig.apiToken ? '✓ configured' : '✗ missing',
+                            projectKey: jiraConfig.projectKey ? '✓ configured' : '✗ missing',
+                            isConfigured: result.isConfigured
+                        });
+                        loadingJiraConfig = false;
+                        updateJiraCheckboxVisibility();
+                        return; // Success, exit retry loop
+                    } else {
+                        console.error('Widget: API returned error:', result.error);
+                    }
+                } else {
+                    console.error('Widget: HTTP error:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error(`Widget: Attempt ${i + 1} failed:`, error);
+            }
+
+            // Wait before retry (except on last attempt)
+            if (i < retries - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+            }
+        }
+
+        console.error('Widget: Failed to load JIRA config after all retries');
+        loadingJiraConfig = false;
+        updateJiraCheckboxVisibility();
     }
     
     async function submitFeedback(title, description, screenshot) {

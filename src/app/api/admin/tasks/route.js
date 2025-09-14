@@ -12,18 +12,24 @@ export async function GET() {
       );
     }
 
-    await initDatabase();
+    // Add timeout for database initialization
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database initialization timeout')), 5000)
+    );
+
+    await Promise.race([initDatabase(), timeoutPromise]);
     const db = getDb();
 
-    // Get all tasks for admin with project information
+    // Get recent tasks for admin with project information (limit to 100 most recent)
     const result = await db.execute(`
-      SELECT 
+      SELECT
         t.*,
         p.name as project_name,
         p.domain as project_domain
       FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id
       ORDER BY t.created_at DESC
+      LIMIT 100
     `);
 
     return Response.json({

@@ -2,7 +2,12 @@ import { getDb, initDatabase } from '../../../../../lib/db.js';
 
 export async function GET() {
   try {
-    await initDatabase();
+    // Add timeout for database initialization
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database initialization timeout')), 5000)
+    );
+
+    await Promise.race([initDatabase(), timeoutPromise]);
     const db = getDb();
 
     // Get projects count
@@ -54,9 +59,10 @@ export async function GET() {
       }
     });
 
-  } catch {
+  } catch (error) {
+    console.error('Error in admin stats:', error);
     return Response.json(
-      { success: false, error: 'Fehler beim Laden der Statistiken' },
+      { success: false, error: error.message || 'Fehler beim Laden der Statistiken' },
       { status: 500 }
     );
   }

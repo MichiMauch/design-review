@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSettings } from '../../admin/hooks/useSettings';
 import { 
   Copy, 
   CheckCircle, 
@@ -39,6 +40,7 @@ const TASK_STATUSES = [
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
+  const { getR2Url } = useSettings();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [copied, setCopied] = useState(false);
@@ -56,12 +58,11 @@ export default function ProjectPage() {
   const [showTaskDeleteConfirm, setShowTaskDeleteConfirm] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [jiraConfig, setJiraConfig] = useState({
-    serverUrl: '',
-    username: '',
-    apiToken: '',
     projectKey: '',
     issueType: 'Task'
   });
+  const [combinedJiraConfig, setCombinedJiraConfig] = useState(null);
+  const [loadingJiraConfig, setLoadingJiraConfig] = useState(false);
   const [jiraTaskData, setJiraTaskData] = useState({
     title: '',
     description: '',
@@ -101,10 +102,8 @@ export default function ProjectPage() {
   // Helper function to get screenshot URL
   const getScreenshotUrl = (screenshot) => {
     if (!screenshot) return null;
-    if (screenshot.startsWith('data:')) return screenshot;
-    if (screenshot.startsWith('http')) return screenshot;
-    // For filename-only screenshots, construct the correct R2 URL
-    return `https://pub-cac1d67ee1dc4cb6814dff593983d703.r2.dev/screenshots/${screenshot}`;
+    // Simple: just combine settings URL with filename
+    return `${getR2Url()}${screenshot}`;
   };
 
   // Load screenshot for a specific task
@@ -172,20 +171,20 @@ export default function ProjectPage() {
   // Load project and tasks when component mounts or params change
   useEffect(() => {
     if (params.id) {
-      loadProject();
+      loadProject(); // Now includes combined JIRA config loading
       loadTasks();
       checkWidgetStatus();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
-  // Load JIRA statuses when tasks or jiraConfig changes
+  // Load JIRA statuses when tasks or combinedJiraConfig changes
   useEffect(() => {
-    if (tasks.length > 0 && jiraConfig.serverUrl) {
+    if (tasks.length > 0 && combinedJiraConfig?.serverUrl) {
       loadJiraStatuses();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, jiraConfig]);
+  }, [tasks, combinedJiraConfig]);
 
   const loadProject = async () => {
     try {
@@ -195,6 +194,9 @@ export default function ProjectPage() {
       }
       const projectData = await response.json();
       setProject(projectData);
+
+      // Load combined JIRA config immediately after project is set
+      await loadCombinedJiraConfigWithRetry(projectData.id);
     } catch {
       router.push('/projects');
     } finally {
@@ -217,7 +219,7 @@ export default function ProjectPage() {
         
         // Lade JIRA-Statuses für neue Tasks
         setTimeout(() => {
-          if (tasksData.some(task => task.jira_key) && jiraConfig.serverUrl) {
+          if (tasksData.some(task => task.jira_key) && combinedJiraConfig?.serverUrl) {
             loadJiraStatuses();
           }
         }, 100);
@@ -259,12 +261,12 @@ export default function ProjectPage() {
   }, [params.id]);
 
   useEffect(() => {
-    // Load JIRA statuses when tasks or jiraConfig change
-    if (tasks.length > 0 && jiraConfig.serverUrl) {
+    // Load JIRA statuses when tasks or combinedJiraConfig change
+    if (tasks.length > 0 && combinedJiraConfig?.serverUrl) {
       loadJiraStatuses();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, jiraConfig]);
+  }, [tasks, combinedJiraConfig]);
 
   // Load comments when task modal is opened
   useEffect(() => {
@@ -307,28 +309,65 @@ export default function ProjectPage() {
       // First try to load from settings API
       const response = await fetch(`/api/settings?key=jira_config_project_${params.id}`);
       const data = await response.json();
-      
+
       if (data.success && data.setting) {
         setJiraConfig(data.setting.value);
       } else {
-        // If not found in settings, try to load from project configuration
+        // Load project-specific JIRA configuration
         const projectResponse = await fetch(`/api/projects/${params.id}`);
         if (projectResponse.ok) {
           const projectData = await projectResponse.json();
-          if (projectData.jira_server_url) {
-            const jiraConfigFromProject = {
-              serverUrl: projectData.jira_server_url,
-              username: projectData.jira_username,
-              apiToken: projectData.jira_api_token,
-              projectKey: projectData.jira_project_key,
-              issueType: 'Task'
-            };
-            setJiraConfig(jiraConfigFromProject);
-          }
+          const jiraConfigFromProject = {
+            projectKey: projectData.jira_project_key || '',
+            issueType: projectData.jira_issue_type || 'Task'
+          };
+          setJiraConfig(jiraConfigFromProject);
         }
       }
     } catch {
     }
+  };
+
+
+  const loadCombinedJiraConfigWithRetry = async (projectId, retries = 3) => {
+    setLoadingJiraConfig(true);
+
+    for (let i = 0; i < retries; i++) {
+      try {
+        console.log(`Loading combined JIRA config for project ${projectId} (attempt ${i + 1}/${retries})`);
+
+        const response = await fetch(`/api/jira/config/${projectId}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setCombinedJiraConfig(result.config);
+            console.log('Combined JIRA config loaded successfully:', {
+              serverUrl: result.config.serverUrl ? '✓ configured' : '✗ missing',
+              username: result.config.username ? '✓ configured' : '✗ missing',
+              apiToken: result.config.apiToken ? '✓ configured' : '✗ missing',
+              projectKey: result.config.projectKey ? '✓ configured' : '✗ missing',
+              isConfigured: result.isConfigured
+            });
+            setLoadingJiraConfig(false);
+            return; // Success, exit retry loop
+          } else {
+            console.error('API returned error:', result.error);
+          }
+        } else {
+          console.error('HTTP error:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error(`Attempt ${i + 1} failed:`, error);
+      }
+
+      // Wait before retry (except on last attempt)
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+      }
+    }
+
+    console.error('Failed to load combined JIRA config after all retries');
+    setLoadingJiraConfig(false);
   };
 
   const copySnippet = async () => {
@@ -656,17 +695,15 @@ export default function ProjectPage() {
 
   const saveJiraConfig = async () => {
     try {
-      // Save JIRA config to localStorage
+      // Save project-specific JIRA config to localStorage
       localStorage.setItem('jiraConfig', JSON.stringify(jiraConfig));
-      
+
       // Also save to database for widget access
       const projectUpdateData = {
         name: project.name,
         domain: project.domain,
-        jira_server_url: jiraConfig.serverUrl,
-        jira_username: jiraConfig.username,
-        jira_api_token: jiraConfig.apiToken,
         jira_project_key: jiraConfig.projectKey,
+        jira_issue_type: jiraConfig.issueType,
         jira_auto_create: false
       };
       
@@ -689,46 +726,16 @@ export default function ProjectPage() {
     }
   };
 
-  const testJiraConnection = async () => {
-    try {
-      showToast('Teste JIRA-Verbindung...', 'info');
-      
-      // Test the JIRA connection
-      const response = await fetch('/api/jira', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'testConnection',
-          serverUrl: jiraConfig.serverUrl,
-          username: jiraConfig.username,
-          apiToken: jiraConfig.apiToken,
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        showToast('JIRA-Verbindung erfolgreich!', 'success');
-      } else {
-        showToast(`JIRA-Verbindung fehlgeschlagen: ${result.error}`, 'error');
-      }
-    } catch {
-      showToast('Fehler beim Testen der JIRA-Verbindung', 'error');
-    }
-  };
 
   const loadJiraStatuses = async () => {
     const tasksWithJira = tasks.filter(task => task.jira_key);
-    if (tasksWithJira.length === 0 || !jiraConfig.serverUrl || !jiraConfig.username || !jiraConfig.apiToken) {
+    if (tasksWithJira.length === 0 || !combinedJiraConfig?.serverUrl || !combinedJiraConfig?.username || !combinedJiraConfig?.apiToken) {
       return;
     }
 
-
     const statusPromises = tasksWithJira.map(async (task) => {
       try {
-        const url = `/api/jira/status?issueKey=${encodeURIComponent(task.jira_key)}&serverUrl=${encodeURIComponent(jiraConfig.serverUrl)}&username=${encodeURIComponent(jiraConfig.username)}&apiToken=${encodeURIComponent(jiraConfig.apiToken)}`;
+        const url = `/api/jira/status?issueKey=${encodeURIComponent(task.jira_key)}&serverUrl=${encodeURIComponent(combinedJiraConfig.serverUrl)}&username=${encodeURIComponent(combinedJiraConfig.username)}&apiToken=${encodeURIComponent(combinedJiraConfig.apiToken)}`;
         const response = await fetch(url);
         const data = await response.json();
         
@@ -948,19 +955,55 @@ export default function ProjectPage() {
 
   const openJiraModal = async (task) => {
     try {
-      // Check if JIRA is configured in localStorage
-      if (!jiraConfig.serverUrl || !jiraConfig.username || !jiraConfig.apiToken || !jiraConfig.projectKey) {
-        showToast('Bitte konfigurieren Sie zuerst die JIRA-Einstellungen für dieses Projekt.', 'error');
+      console.log('Opening JIRA modal for task:', task.id);
+      console.log('Combined JIRA config state:', {
+        exists: !!combinedJiraConfig,
+        serverUrl: combinedJiraConfig?.serverUrl ? '✓ configured' : '✗ missing',
+        username: combinedJiraConfig?.username ? '✓ configured' : '✗ missing',
+        apiToken: combinedJiraConfig?.apiToken ? '✓ configured' : '✗ missing',
+        projectKey: combinedJiraConfig?.projectKey ? '✓ configured' : '✗ missing'
+      });
+
+      // Check if combined JIRA config is still loading
+      if (!combinedJiraConfig) {
+        console.log('Combined JIRA config not yet loaded, waiting...');
+        showToast('JIRA-Konfiguration wird geladen, bitte warten...', 'info');
+
+        // Try to load it again
+        if (project?.id) {
+          await loadCombinedJiraConfigWithRetry(project.id);
+        }
+
+        // Check again after retry
+        if (!combinedJiraConfig) {
+          showToast('JIRA-Konfiguration konnte nicht geladen werden. Bitte prüfen Sie die Einstellungen.', 'error');
+          setJiraConfigOpen(true);
+          return;
+        }
+      }
+
+      // Check if JIRA is fully configured
+      const isFullyConfigured =
+        combinedJiraConfig?.serverUrl &&
+        combinedJiraConfig?.username &&
+        combinedJiraConfig?.apiToken &&
+        combinedJiraConfig?.projectKey;
+
+      if (!isFullyConfigured) {
+        console.log('JIRA configuration incomplete');
+        showToast('JIRA ist nicht vollständig konfiguriert. Bitte prüfen Sie die Admin-Einstellungen und Projekt-Einstellungen.', 'error');
         setJiraConfigOpen(true);
         return;
       }
+
+      console.log('JIRA configuration validated successfully');
 
       // Always set the task immediately - no race conditions
       setSelectedTask(task);
       
       // Load screenshot if not already loaded
       let taskWithScreenshot = task;
-      const hasScreenshot = task.screenshot_display || task.screenshot_url || task.screenshot;
+      const hasScreenshot = task.screenshot_url || task.screenshot;
       
       console.log('Screenshot loading check for task:', {
         taskId: task.id,
@@ -1073,10 +1116,10 @@ export default function ProjectPage() {
     try {
       const params = new URLSearchParams({
         action: 'getUsers',
-        serverUrl: jiraConfig.serverUrl,
-        username: jiraConfig.username,
-        apiToken: jiraConfig.apiToken,
-        projectKey: jiraConfig.projectKey
+        serverUrl: combinedJiraConfig.serverUrl,
+        username: combinedJiraConfig.username,
+        apiToken: combinedJiraConfig.apiToken,
+        projectKey: combinedJiraConfig.projectKey
       });
 
       const response = await fetch(`/api/jira?${params}`, {
@@ -1095,10 +1138,10 @@ export default function ProjectPage() {
     try {
       const boardsParams = new URLSearchParams({
         action: 'getBoards',
-        serverUrl: jiraConfig.serverUrl,
-        username: jiraConfig.username,
-        apiToken: jiraConfig.apiToken,
-        projectKey: jiraConfig.projectKey
+        serverUrl: combinedJiraConfig.serverUrl,
+        username: combinedJiraConfig.username,
+        apiToken: combinedJiraConfig.apiToken,
+        projectKey: combinedJiraConfig.projectKey
       });
 
       const boardsResponse = await fetch(`/api/jira?${boardsParams}`, {
@@ -1123,9 +1166,9 @@ export default function ProjectPage() {
       // Get sprints for this board
       const sprintsParams = new URLSearchParams({
         action: 'getSprints',
-        serverUrl: jiraConfig.serverUrl,
-        username: jiraConfig.username,
-        apiToken: jiraConfig.apiToken,
+        serverUrl: combinedJiraConfig.serverUrl,
+        username: combinedJiraConfig.username,
+        apiToken: combinedJiraConfig.apiToken,
         boardId: boardId
       });
 
@@ -1147,9 +1190,9 @@ export default function ProjectPage() {
       
       const columnsParams = new URLSearchParams({
         action: 'getBoardColumns',
-        serverUrl: jiraConfig.serverUrl,
-        username: jiraConfig.username,
-        apiToken: jiraConfig.apiToken,
+        serverUrl: combinedJiraConfig.serverUrl,
+        username: combinedJiraConfig.username,
+        apiToken: combinedJiraConfig.apiToken,
         boardId: boardId
       });
 
@@ -1323,7 +1366,7 @@ export default function ProjectPage() {
           setShowJiraModal(false);
           
           // Load JIRA statuses for the new task
-          if (jiraConfig.serverUrl) {
+          if (combinedJiraConfig?.serverUrl) {
             setTimeout(() => {
               loadJiraStatuses();
             }, 500);
@@ -1753,18 +1796,18 @@ export default function ProjectPage() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  const imageUrl = getScreenshotUrl(task.screenshot) || task.screenshot_display;
+                                  const imageUrl = getScreenshotUrl(task.screenshot);
                                   if (imageUrl) {
                                     openScreenshotLightbox(imageUrl);
                                   }
                                 }}
                               >
-                                {task.screenshot_display || task.screenshot ? (
+                                {task.screenshot ? (
                                   <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img 
-                                      src={getScreenshotUrl(task.screenshot) || task.screenshot_display} 
-                                      alt="Task Screenshot" 
+                                    <img
+                                      src={getScreenshotUrl(task.screenshot)}
+                                      alt="Task Screenshot"
                                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
                                     />
                                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
@@ -1796,9 +1839,9 @@ export default function ProjectPage() {
                               {user?.role === 'admin' && (
                                 <button
                                   onClick={() => openJiraModal(task)}
-                                  disabled={creatingJira === task.id || loadingJiraModal === task.id}
+                                  disabled={creatingJira === task.id || loadingJiraModal === task.id || loadingJiraConfig}
                                   className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm ml-auto"
-                                  title="JIRA-Task erstellen"
+                                  title={loadingJiraConfig ? "JIRA-Konfiguration wird geladen..." : "JIRA-Task erstellen"}
                                 >
                                   {creatingJira === task.id ? (
                                     <>
@@ -1809,6 +1852,11 @@ export default function ProjectPage() {
                                     <>
                                       <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                       Lade...
+                                    </>
+                                  ) : loadingJiraConfig ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                      Konfiguration...
                                     </>
                                   ) : (
                                     <>
@@ -2067,7 +2115,7 @@ export default function ProjectPage() {
                                   <div className="flex items-center justify-between text-xs text-gray-500">
                                     <span>{formatTime(task.created_at)}</span>
                                     <div className="flex items-center gap-1">
-                                      {task.screenshot_display || task.screenshot ? (
+                                      {task.screenshot ? (
                                         <div className="w-4 h-4 bg-gray-200 rounded text-center text-xs">
                                           📷
                                         </div>
@@ -2172,7 +2220,7 @@ export default function ProjectPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">JIRA Integration</span>
-                    {jiraConfig.serverUrl && jiraConfig.username && jiraConfig.apiToken && jiraConfig.projectKey ? (
+                    {combinedJiraConfig?.serverUrl && combinedJiraConfig?.username && combinedJiraConfig?.apiToken && jiraConfig.projectKey ? (
                       <div className="flex items-center gap-1 text-green-600">
                         <CheckCircle className="h-4 w-4" />
                         <span className="text-sm font-medium">Konfiguriert</span>
@@ -2184,7 +2232,7 @@ export default function ProjectPage() {
                       </div>
                     )}
                   </div>
-                  {jiraConfig.serverUrl && (
+                  {combinedJiraConfig?.serverUrl && (
                     <div className="text-xs text-gray-500 pl-4">
                       {jiraConfig.projectKey ? `Projekt: ${jiraConfig.projectKey}` : 'Konfiguration unvollständig'}
                     </div>
@@ -2194,7 +2242,7 @@ export default function ProjectPage() {
                 {/* Overall Status */}
                 <div className="pt-3 border-t border-gray-200">
                   <div className="flex items-center gap-2">
-                    {project.widget_installed && jiraConfig.serverUrl && jiraConfig.projectKey ? (
+                    {project.widget_installed && combinedJiraConfig?.serverUrl && jiraConfig.projectKey ? (
                       <>
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span className="text-sm font-medium text-green-700">System bereit</span>
@@ -2211,45 +2259,10 @@ export default function ProjectPage() {
                 
               {jiraConfigOpen && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-gray-200">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Server URL
-                    </label>
-                    <input
-                      type="text"
-                      value={jiraConfig.serverUrl}
-                      onChange={(e) => setJiraConfig({ ...jiraConfig, serverUrl: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="https://company.atlassian.net"
-                    />
+                  <div className="text-sm text-gray-600 mb-3">
+                    <p>Die JIRA-Servereinstellungen werden in den Admin-Einstellungen verwaltet.</p>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Benutzername
-                    </label>
-                    <input
-                      type="text"
-                      value={jiraConfig.username}
-                      onChange={(e) => setJiraConfig({ ...jiraConfig, username: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="user@company.com"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      API Token
-                    </label>
-                    <input
-                      type="password"
-                      value={jiraConfig.apiToken}
-                      onChange={(e) => setJiraConfig({ ...jiraConfig, apiToken: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="API Token"
-                    />
-                  </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Projekt-Key
@@ -2262,7 +2275,7 @@ export default function ProjectPage() {
                       placeholder="PROJ"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Issue Type
@@ -2277,7 +2290,7 @@ export default function ProjectPage() {
                       <option value="Story">Story</option>
                     </select>
                   </div>
-                  
+
                   <div className="flex gap-2">
                     <button
                       onClick={saveJiraConfig}
@@ -2285,13 +2298,6 @@ export default function ProjectPage() {
                     >
                       <Save className="h-3 w-3" />
                       Speichern
-                    </button>
-                    <button
-                      onClick={testJiraConnection}
-                      className="flex items-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                    >
-                      <CheckCircle className="h-3 w-3" />
-                      Testen
                     </button>
                   </div>
                 </div>
@@ -2668,10 +2674,10 @@ export default function ProjectPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Screenshot</label>
                       <div className="border rounded-lg p-2 bg-gray-50">
                         <img
-                          src={getScreenshotUrl(selectedTaskForModal.screenshot) || selectedTaskForModal.screenshot_display}
+                          src={getScreenshotUrl(selectedTaskForModal.screenshot)}
                           alt="Task Screenshot"
                           className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openScreenshotLightbox(getScreenshotUrl(selectedTaskForModal.screenshot) || selectedTaskForModal.screenshot_display)}
+                          onClick={() => openScreenshotLightbox(getScreenshotUrl(selectedTaskForModal.screenshot))}
                           onError={(e) => {
                             e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y3ZjdmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5TY3JlZW5zaG90IG5pY2h0IGdlZnVuZGVuPC90ZXh0Pjwvc3ZnPg==';
                           }}
@@ -2829,13 +2835,23 @@ export default function ProjectPage() {
                     {user?.role === 'admin' && (
                       <button
                         onClick={() => openJiraModal(selectedTaskForModal)}
-                        disabled={creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id}
+                        disabled={creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id || loadingJiraConfig}
                         className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm"
                       >
-                        {creatingJira === selectedTaskForModal.id || loadingJiraModal === selectedTaskForModal.id ? (
+                        {creatingJira === selectedTaskForModal.id ? (
                           <>
                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                            {loadingJiraModal === selectedTaskForModal.id ? 'Lade...' : 'Erstelle...'}
+                            Erstelle...
+                          </>
+                        ) : loadingJiraModal === selectedTaskForModal.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                            Lade...
+                          </>
+                        ) : loadingJiraConfig ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                            Konfiguration...
                           </>
                         ) : (
                           <>
