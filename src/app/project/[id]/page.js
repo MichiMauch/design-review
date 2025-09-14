@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSettings } from '../../admin/hooks/useSettings';
+import { useToast } from '../../../hooks/useToast';
+import Toast from '../../../components/ui/Toast';
 import { 
   Copy, 
   CheckCircle, 
@@ -41,6 +43,7 @@ export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const { getR2Url } = useSettings();
+  const { toast, showToast, hideToast } = useToast();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [copied, setCopied] = useState(false);
@@ -77,7 +80,6 @@ export default function ProjectPage() {
   const [loadingJiraModal, setLoadingJiraModal] = useState(null); // stores task.id when loading modal data
   const [jiraStatuses, setJiraStatuses] = useState({});
   const [jiraTaskSprints, setJiraTaskSprints] = useState({});
-  const [toast, setToast] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
@@ -558,10 +560,6 @@ export default function ProjectPage() {
     }
   };
 
-  const showToast = (message, type = 'success', link = null) => {
-    setToast({ message, type, link });
-    setTimeout(() => setToast(null), 8000); // Longer for links
-  };
 
   // Manual refresh function
   const refreshData = async () => {
@@ -1375,41 +1373,7 @@ export default function ProjectPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 max-w-sm ${
-          toast.type === 'success' ? 'bg-green-500 text-white' :
-          toast.type === 'error' ? 'bg-red-500 text-white' :
-          toast.type === 'warning' ? 'bg-yellow-500 text-white' :
-          'bg-blue-500 text-white'
-        }`}>
-          <div className="flex items-start gap-2">
-            <div className="flex-shrink-0 mt-0.5">
-              {toast.type === 'success' && <CheckCircle className="h-4 w-4" />}
-              {toast.type === 'error' && <AlertCircle className="h-4 w-4" />}
-              {toast.type === 'warning' && <AlertCircle className="h-4 w-4" />}
-            </div>
-            <div className="flex-1">
-              <span className="text-sm font-medium block">{toast.message}</span>
-              {toast.link && (
-                <a
-                  href={toast.link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm underline hover:no-underline mt-1 block"
-                >
-                  {toast.link.text}
-                </a>
-              )}
-            </div>
-            <button
-              onClick={() => setToast(null)}
-              className="flex-shrink-0 ml-2 text-white hover:text-gray-200"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      <Toast toast={toast} onClose={hideToast} />
 
       
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -2179,59 +2143,6 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* System Status */}
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-              <div className="mb-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-gray-600" />
-                  System Status
-                </h3>
-              </div>
-              
-              <div className="space-y-4">
-                {/* Widget Status */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Widget</span>
-                    {project.widget_installed ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Aktiv</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-yellow-600">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Ausstehend</span>
-                      </div>
-                    )}
-                  </div>
-                  {project.widget_last_ping && (
-                    <div className="text-xs text-gray-500 pl-4">
-                      Letzter Ping: {formatTime(project.widget_last_ping)}
-                    </div>
-                  )}
-                </div>
-
-
-                {/* Overall Status */}
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="flex items-center gap-2">
-                    {project.widget_installed && combinedJiraConfig?.serverUrl && jiraConfig.projectKey ? (
-                      <>
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-sm font-medium text-green-700">System bereit</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                        <span className="text-sm font-medium text-yellow-700">Setup unvollständig</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-                
-            </div>
 
             {/* Project Actions */}
             <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
