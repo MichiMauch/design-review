@@ -58,6 +58,8 @@ export default function ProjectPage() {
   const [jiraBoardId, setJiraBoardId] = useState(null);
   const [jiraBoardColumns, setJiraBoardColumns] = useState([]);
   const [loadingJiraModal, setLoadingJiraModal] = useState(null); // stores task.id when loading modal data
+  const [jiraStatuses, setJiraStatuses] = useState({}); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [jiraTaskSprints, setJiraTaskSprints] = useState({}); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
