@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useSettings } from '../../admin/hooks/useSettings';
 import { 
   Copy, 
@@ -23,7 +24,6 @@ import {
   List,
   Columns
 } from 'lucide-react';
-import Link from 'next/link';
 import { downloadExcel } from '@/utils/excelExport';
 
 // Task status definitions
@@ -50,7 +50,6 @@ export default function ProjectPage() {
   const [creatingJira, setCreatingJira] = useState(null);
   const [showJiraModal, setShowJiraModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [jiraConfigOpen, setJiraConfigOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -693,38 +692,6 @@ export default function ProjectPage() {
     }
   };
 
-  const saveJiraConfig = async () => {
-    try {
-      // Save project-specific JIRA config to localStorage
-      localStorage.setItem('jiraConfig', JSON.stringify(jiraConfig));
-
-      // Also save to database for widget access
-      const projectUpdateData = {
-        name: project.name,
-        domain: project.domain,
-        jira_project_key: jiraConfig.projectKey,
-        jira_issue_type: jiraConfig.issueType,
-        jira_auto_create: false
-      };
-      
-      const response = await fetch(`/api/projects/${params.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(projectUpdateData)
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save JIRA config to database');
-      }
-      
-      showToast('JIRA-Konfiguration gespeichert!', 'success');
-      setJiraConfigOpen(false);
-    } catch {
-      showToast('Fehler beim Speichern der JIRA-Konfiguration', 'error');
-    }
-  };
 
 
   const loadJiraStatuses = async () => {
@@ -1459,25 +1426,61 @@ export default function ProjectPage() {
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-                  <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 text-sm font-medium ${
-                    project.widget_installed 
-                      ? 'bg-green-100 text-green-800 border border-green-200' 
-                      : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                  }`}>
-                    {project.widget_installed ? (
-                      <>
-                        <CheckCircle className="h-4 w-4" />
-                        Widget aktiv
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-4 w-4" />
-                        Widget ausstehend
-                      </>
-                    )}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+
+                    {/* Status Badges */}
+                    <div className="flex items-center gap-2">
+                      {/* Widget Status Badge */}
+                      <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 text-sm font-medium ${
+                        project.widget_installed
+                          ? 'bg-green-100 text-green-800 border border-green-200'
+                          : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                      }`}>
+                        {project.widget_installed ? (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            Widget aktiv
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="h-4 w-4" />
+                            Widget ausstehend
+                          </>
+                        )}
+                      </div>
+
+                      {/* JIRA Status Badge */}
+                      <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 text-sm font-medium ${
+                        combinedJiraConfig?.serverUrl && combinedJiraConfig?.username && combinedJiraConfig?.apiToken && jiraConfig.projectKey
+                          ? 'bg-green-100 text-green-800 border border-green-200'
+                          : 'bg-gray-100 text-gray-800 border border-gray-200'
+                      }`}>
+                        {combinedJiraConfig?.serverUrl && combinedJiraConfig?.username && combinedJiraConfig?.apiToken && jiraConfig.projectKey ? (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            JIRA aktiv
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="h-4 w-4" />
+                            JIRA nicht konfiguriert
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Settings Button */}
+                  <Link
+                    href={`/project/${project.id}/settings`}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 rounded-lg transition-colors border border-gray-300 hover:border-blue-400"
+                    title="Projekt-Einstellungen"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Einstellungen
+                  </Link>
                 </div>
                 
                 <div className="flex items-center gap-6 text-gray-600">
@@ -2178,18 +2181,11 @@ export default function ProjectPage() {
 
             {/* System Status */}
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4">
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Settings className="h-4 w-4 text-gray-600" />
                   System Status
                 </h3>
-                <button
-                  onClick={() => setJiraConfigOpen(!jiraConfigOpen)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                  title="JIRA-Einstellungen"
-                >
-                  <Settings className="h-4 w-4" />
-                </button>
               </div>
               
               <div className="space-y-4">
@@ -2216,28 +2212,6 @@ export default function ProjectPage() {
                   )}
                 </div>
 
-                {/* JIRA Status */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">JIRA Integration</span>
-                    {combinedJiraConfig?.serverUrl && combinedJiraConfig?.username && combinedJiraConfig?.apiToken && jiraConfig.projectKey ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Konfiguriert</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Nicht konfiguriert</span>
-                      </div>
-                    )}
-                  </div>
-                  {combinedJiraConfig?.serverUrl && (
-                    <div className="text-xs text-gray-500 pl-4">
-                      {jiraConfig.projectKey ? `Projekt: ${jiraConfig.projectKey}` : 'Konfiguration unvollständig'}
-                    </div>
-                  )}
-                </div>
 
                 {/* Overall Status */}
                 <div className="pt-3 border-t border-gray-200">
@@ -2257,51 +2231,6 @@ export default function ProjectPage() {
                 </div>
               </div>
                 
-              {jiraConfigOpen && (
-                <div className="space-y-4 mt-4 pt-4 border-t border-gray-200">
-                  <div className="text-sm text-gray-600 mb-3">
-                    <p>Die JIRA-Servereinstellungen werden in den Admin-Einstellungen verwaltet.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Projekt-Key
-                    </label>
-                    <input
-                      type="text"
-                      value={jiraConfig.projectKey}
-                      onChange={(e) => setJiraConfig({ ...jiraConfig, projectKey: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="PROJ"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Issue Type
-                    </label>
-                    <select
-                      value={jiraConfig.issueType}
-                      onChange={(e) => setJiraConfig({ ...jiraConfig, issueType: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="Task">Task</option>
-                      <option value="Bug">Bug</option>
-                      <option value="Story">Story</option>
-                    </select>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={saveJiraConfig}
-                      className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                    >
-                      <Save className="h-3 w-3" />
-                      Speichern
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Project Actions */}
