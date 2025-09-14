@@ -9,6 +9,9 @@ import Toast from '../../../components/ui/Toast';
 import ProjectHeader from '../../../components/project/ProjectHeader';
 import WidgetInstallation from '../../../components/project/WidgetInstallation';
 import ProjectSidebar from '../../../components/project/ProjectSidebar';
+import TaskControls from '../../../components/project/TaskControls';
+import DeleteTaskModal from '../../../components/modals/DeleteTaskModal';
+import JiraModal from '../../../components/modals/JiraModal';
 import { 
   Copy, 
   CheckCircle, 
@@ -1315,62 +1318,14 @@ export default function ProjectPage() {
 
             {/* Tasks */}
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
-                <div></div>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={refreshData}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors disabled:opacity-50"
-                    title="Tasks aktualisieren"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Lädt...' : 'Aktualisieren'}
-                  </button>
-                  
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center border border-gray-200 rounded-lg">
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors ${
-                        viewMode === 'list' 
-                          ? 'bg-blue-100 text-blue-700' 
-                          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                      }`}
-                    >
-                      <List className="h-4 w-4" />
-                      Liste
-                    </button>
-                    <button
-                      onClick={() => setViewMode('board')}
-                      className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors border-l border-gray-200 ${
-                        viewMode === 'board' 
-                          ? 'bg-blue-100 text-blue-700' 
-                          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Columns className="h-4 w-4" />
-                      Board
-                    </button>
-                  </div>
-                  
-                  {/* Status Filter - nur in Liste-Ansicht */}
-                  {viewMode === 'list' && (
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="all">Alle Status</option>
-                      {TASK_STATUSES.map(status => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </div>
+              <TaskControls
+                isRefreshing={isRefreshing}
+                onRefresh={refreshData}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+              />
               
               {tasks.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -1955,184 +1910,30 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Task Delete Confirmation Modal */}
-        {showTaskDeleteConfirm && taskToDelete && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[62] p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Task löschen</h3>
-              
-              <p className="text-gray-600 mb-6">
-                Sind Sie sicher, dass Sie die Task <strong>&quot;{taskToDelete.title}&quot;</strong> löschen möchten? 
-                Diese Aktion kann nicht rückgängig gemacht werden.
-              </p>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={deleteTask}
-                  disabled={deletingTask === taskToDelete.id}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
-                >
-                  {deletingTask === taskToDelete.id ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Lösche...
-                    </>
-                  ) : (
-                    <>
-                      <X className="h-4 w-4" />
-                      Task löschen
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowTaskDeleteConfirm(false);
-                    setTaskToDelete(null);
-                  }}
-                  disabled={deletingTask === taskToDelete.id}
-                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DeleteTaskModal
+          isOpen={showTaskDeleteConfirm}
+          task={taskToDelete}
+          isDeleting={deletingTask === taskToDelete?.id}
+          onConfirm={deleteTask}
+          onCancel={() => {
+            setShowTaskDeleteConfirm(false);
+            setTaskToDelete(null);
+          }}
+        />
 
-        {/* JIRA Modal */}
-        {user?.role === 'admin' && showJiraModal && selectedTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[65] p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                JIRA-Task erstellen
-                <span className="text-xs text-gray-500 ml-2">
-                  (Task ID: {selectedTask.id})
-                </span>
-              </h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Titel
-                  </label>
-                  <input
-                    type="text"
-                    value={jiraTaskData.title}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Task-Titel"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Beschreibung
-                  </label>
-                  <textarea
-                    value={jiraTaskData.description}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                    rows="4"
-                    placeholder="Beschreibung des Tasks"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Zugewiesen an
-                  </label>
-                  <select
-                    value={jiraTaskData.assignee}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, assignee: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Nicht zugewiesen</option>
-                    {jiraUsers.map(user => (
-                      <option key={user.accountId} value={user.accountId}>
-                        {user.displayName} ({user.emailAddress})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sprint
-                  </label>
-                  <select
-                    value={jiraTaskData.sprint}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, sprint: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Kein Sprint</option>
-                    {jiraSprintsOptions.map(sprint => (
-                      <option key={sprint.id} value={sprint.id}>
-                        {sprint.name} ({sprint.state})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Board-Spalte
-                  </label>
-                  <select
-                    value={jiraTaskData.column}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, column: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Standard (To Do)</option>
-                    {jiraBoardColumns.map(column => (
-                      <option key={column.id} value={column.statusId || column.id}>
-                        {column.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Labels (kommagetrennt)
-                  </label>
-                  <input
-                    type="text"
-                    value={jiraTaskData.labels}
-                    onChange={(e) => setJiraTaskData({ ...jiraTaskData, labels: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="label1, label2, label3"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={createJiraTask}
-                  disabled={!jiraTaskData.title || creatingJira === selectedTask?.id}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg"
-                >
-                  {creatingJira === selectedTask?.id ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Erstelle...
-                    </>
-                  ) : (
-                    <>
-                      <JiraIcon className="h-4 w-4" />
-                      Erstellen
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowJiraModal(false)}
-                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <JiraModal
+          isOpen={showJiraModal}
+          task={selectedTask}
+          taskData={jiraTaskData}
+          onTaskDataChange={setJiraTaskData}
+          jiraUsers={jiraUsers}
+          jiraSprints={jiraSprintsOptions}
+          jiraBoardColumns={jiraBoardColumns}
+          isCreating={creatingJira === selectedTask?.id}
+          onCreateTask={createJiraTask}
+          onClose={() => setShowJiraModal(false)}
+          userRole={user?.role}
+        />
 
         {/* Screenshot Lightbox Modal */}
         {lightboxImage && (
