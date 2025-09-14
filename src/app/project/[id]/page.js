@@ -14,25 +14,15 @@ import DeleteTaskModal from '../../../components/modals/DeleteTaskModal';
 import JiraModal from '../../../components/modals/JiraModal';
 import ScreenshotLightbox from '../../../components/modals/ScreenshotLightbox';
 import TaskDetailModal from '../../../components/modals/TaskDetailModal';
-import { 
-  Copy, 
-  CheckCircle, 
-  ExternalLink, 
-  Code, 
-  MessageSquare, 
-  ArrowLeft,
-  AlertCircle,
-  Globe,
-  Calendar,
+import {
+  ExternalLink,
+  MessageSquare,
   Edit3,
   Save,
   X,
   ExternalLink as JiraIcon,
-  Settings,
-  RefreshCw,
-  Download,
-  List,
-  Columns
+  AlertCircle,
+  Calendar
 } from 'lucide-react';
 import { downloadExcel } from '@/utils/excelExport';
 import { TASK_STATUSES } from '../../../constants/taskStatuses';
