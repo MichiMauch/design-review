@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft, Settings, AlertTriangle, Trash2 } from 'lucide-react';
 
 export default function ProjectSettings() {
   const params = useParams();
@@ -15,6 +15,9 @@ export default function ProjectSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingProject, setDeletingProject] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -50,6 +53,35 @@ export default function ProjectSettings() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const deleteProject = async () => {
+    if (deleteConfirmText.trim() !== `Ich will dieses Projekt: ${project.name} löschen`) {
+      return;
+    }
+
+    setDeletingProject(true);
+    try {
+      const response = await fetch(`/api/projects/${params.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        router.push('/projects');
+      } else {
+        throw new Error('Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      setMessage('Fehler beim Löschen des Projekts');
+      setTimeout(() => setMessage(''), 3000);
+      setDeletingProject(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteConfirm(false);
+    setDeleteConfirmText('');
   };
 
   const saveJiraConfig = async () => {
@@ -195,6 +227,105 @@ export default function ProjectSettings() {
             </div>
           </div>
         </div>
+
+        {/* Danger Zone */}
+        <div className="bg-white shadow rounded-lg mt-8 border-2 border-red-200">
+          <div className="px-6 py-4 border-b border-red-200 bg-red-50">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+              <h2 className="text-lg font-medium text-red-900">
+                Danger Zone
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-red-700">
+              Vorsicht! Diese Aktionen können nicht rückgängig gemacht werden.
+            </p>
+          </div>
+
+          <div className="px-6 py-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900">
+                  Projekt löschen
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Alle Tasks und Daten dieses Projekts werden dauerhaft gelöscht.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Projekt löschen
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Projekt löschen</h3>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-2">
+                  Sind Sie sicher, dass Sie das Projekt <strong>{project.name}</strong> löschen möchten?
+                </p>
+                <p className="text-sm text-red-600 mb-4">
+                  Diese Aktion kann nicht rückgängig gemacht werden. Alle Tasks und Daten werden dauerhaft gelöscht.
+                </p>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm font-medium text-red-800 mb-2">Sicherheitsabfrage:</p>
+                  <p className="text-sm text-red-700 mb-3">
+                    Geben Sie den folgenden Text exakt ein, um das Löschen zu bestätigen:
+                  </p>
+                  <p className="text-sm font-mono bg-red-100 p-2 rounded border border-red-300 text-red-900">
+                    Ich will dieses Projekt: {project.name} löschen
+                  </p>
+                </div>
+
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  placeholder="Text hier eingeben..."
+                  disabled={deletingProject}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={deleteProject}
+                  disabled={deletingProject || deleteConfirmText.trim() !== `Ich will dieses Projekt: ${project.name} löschen`}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  {deletingProject ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Lösche...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      Projekt löschen
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={closeDeleteModal}
+                  disabled={deletingProject}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
