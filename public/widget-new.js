@@ -1839,6 +1839,14 @@
         setTimeout(() => {
             const jiraSection = document.querySelector('.jira-section');
             if (jiraSection) {
+                console.log('Widget: updateJiraCheckboxVisibility called with:', {
+                    loadingJiraConfig,
+                    jiraConfig,
+                    projectConfig,
+                    jira_auto_create: projectConfig?.jira_auto_create,
+                    jira_auto_create_type: typeof projectConfig?.jira_auto_create
+                });
+
                 if (loadingJiraConfig) {
                     jiraSection.style.display = 'block';
                     const checkbox = jiraSection.querySelector('input[type="checkbox"]');
@@ -1850,7 +1858,11 @@
                             label.textContent = originalText + ' (wird geladen...)';
                         }
                     }
-                } else if (jiraConfig?.serverUrl && jiraConfig?.projectKey) {
+                } else if (
+                    jiraConfig?.serverUrl &&
+                    jiraConfig?.projectKey &&
+                    Boolean(projectConfig?.jira_auto_create)
+                ) {
                     jiraSection.style.display = 'block';
                     const checkbox = jiraSection.querySelector('input[type="checkbox"]');
                     const label = jiraSection.querySelector('label');
@@ -1867,6 +1879,18 @@
 
     async function loadJiraConfigWithRetry(projectId, retries = 3) {
         loadingJiraConfig = true;
+
+        // Reload project config to get latest jira_auto_create setting
+        try {
+            const response = await fetch(`${baseUrl}/api/projects/${projectId}`);
+            if (response.ok) {
+                projectConfig = await response.json();
+                console.log('Widget: Project config reloaded with jira_auto_create:', projectConfig?.jira_auto_create);
+            }
+        } catch (error) {
+            console.error('Widget: Error reloading project config:', error);
+        }
+
         updateJiraCheckboxVisibility();
 
         for (let i = 0; i < retries; i++) {

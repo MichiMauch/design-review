@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Settings, AlertTriangle, Trash2 } from 'lucide-react';
 
@@ -12,31 +12,61 @@ export default function ProjectSettings() {
     projectKey: '',
     issueType: 'Task'
   });
+  const [jiraAutoCreate, setJiraAutoCreate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingProject, setDeletingProject] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  useEffect(() => {
-    loadProject();
-    loadJiraConfig();
-  }, [params.id]);
+  const checkAuthentication = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setUser(data.user);
+          // Check if user has access to this project
+          const hasAccess = data.user.role === 'admin' || data.user.projectAccess.includes(parseInt(params.id));
+          if (!hasAccess) {
+            router.push('/projects');
+            return;
+          }
+        } else {
+          router.push('/login');
+          return;
+        }
+      } else {
+        router.push('/login');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      router.push('/login');
+      return;
+    } finally {
+      setAuthChecked(true);
+    }
+  }, [params.id, router]);
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${params.id}`);
       if (response.ok) {
         const projectData = await response.json();
         setProject(projectData);
+        // Load the jira_auto_create setting
+        setJiraAutoCreate(Boolean(projectData.jira_auto_create));
       }
     } catch (error) {
       console.error('Error loading project:', error);
     }
-  };
+  }, [params.id]);
 
-  const loadJiraConfig = async () => {
+  const loadJiraConfig = useCallback(async () => {
     try {
       const response = await fetch(`/api/jira/config/${params.id}`);
       if (response.ok) {
@@ -53,7 +83,13 @@ export default function ProjectSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
+
+  useEffect(() => {
+    loadProject();
+    loadJiraConfig();
+    checkAuthentication();
+  }, [loadProject, loadJiraConfig, checkAuthentication]);
 
   const deleteProject = async () => {
     if (deleteConfirmText.trim() !== `Ich will dieses Projekt: ${project.name} löschen`) {
@@ -90,18 +126,21 @@ export default function ProjectSettings() {
 
     try {
       const response = await fetch(`/api/projects/${params.id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          name: project.name,
+          domain: project.domain,
           jira_project_key: jiraConfig.projectKey,
-          jira_issue_type: jiraConfig.issueType
+          jira_issue_type: jiraConfig.issueType,
+          jira_auto_create: jiraAutoCreate
         })
       });
 
       if (response.ok) {
-        setMessage('JIRA-Einstellungen erfolgreich gespeichert');
+        setMessage('JIRA-Einstellungen erfolgreich gespeichert!');
         setTimeout(() => setMessage(''), 3000);
       } else {
         throw new Error('Failed to save settings');
@@ -115,12 +154,17 @@ export default function ProjectSettings() {
     }
   };
 
-  if (loading) {
+  if (loading || !authChecked) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-500">Lade Einstellungen...</div>
       </div>
     );
+  }
+
+  // Don't render anything if user doesn't exist (will redirect to login)
+  if (!user) {
+    return null;
   }
 
   return (
@@ -197,6 +241,37 @@ export default function ProjectSettings() {
                 <p className="mt-1 text-sm text-gray-500">
                   Der Standard-Issue-Type für neue JIRA-Tasks
                 </p>
+              </div>
+
+              <div className="border-t pt-6 mt-6">
+                <h3 className="text-base font-medium text-gray-900 mb-4">Widget-Integration</h3>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="jira-auto-create"
+                    checked={jiraAutoCreate}
+                    onChange={(e) => setJiraAutoCreate(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    disabled={saving}
+                  />
+                  <div>
+                    <label htmlFor="jira-auto-create" className="text-sm font-medium text-gray-700">
+                      JIRA Task-Erstellung im Widget aktivieren
+                    </label>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Benutzer können direkt im Feedback-Widget JIRA-Tasks erstellen
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Was passiert wenn aktiviert:</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Benutzer sehen eine &quot;Als JIRA-Task erstellen&quot; Checkbox im Widget</li>
+                    <li>• Feedback kann direkt als JIRA-Task erstellt werden</li>
+                    <li>• Funktioniert nur wenn JIRA korrekt konfiguriert ist</li>
+                  </ul>
+                </div>
               </div>
             </div>
 
