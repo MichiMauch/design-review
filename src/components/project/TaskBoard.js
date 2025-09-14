@@ -1,10 +1,11 @@
 'use client';
 
+import { memo } from 'react';
 import { Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
 import { TASK_STATUSES } from '../../constants/taskStatuses';
 import { formatTime } from '../../utils/projectUtils';
 
-export default function TaskBoard({
+function TaskBoard({
   tasks,
   editingTask,
   editForm,
@@ -136,7 +137,7 @@ export default function TaskBoard({
   );
 }
 
-function TaskBoardCard({
+const TaskBoardCard = memo(function TaskBoardCard({
   task,
   isEditing,
   editForm,
@@ -353,4 +354,6 @@ function TaskBoardCard({
       )}
     </div>
   );
-}
+});
+
+export default memo(TaskBoard);

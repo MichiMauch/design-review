@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSettings } from '../../admin/hooks/useSettings';
@@ -11,12 +11,13 @@ import WidgetInstallation from '../../../components/project/WidgetInstallation';
 import ProjectSidebar from '../../../components/project/ProjectSidebar';
 import TaskControls from '../../../components/project/TaskControls';
 import DeleteTaskModal from '../../../components/modals/DeleteTaskModal';
+import ProjectDeleteModal from '../../../components/modals/ProjectDeleteModal';
 import JiraModal from '../../../components/modals/JiraModal';
 import ScreenshotLightbox from '../../../components/modals/ScreenshotLightbox';
-import TaskDetailModal from '../../../components/modals/TaskDetailModal';
+import TaskModalContainer from '../../../components/containers/TaskModalContainer';
 import TaskList from '../../../components/project/TaskList';
 import TaskBoard from '../../../components/project/TaskBoard';
-import { MessageSquare, X } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { downloadExcel } from '@/utils/excelExport';
 // Removed unused imports
 
@@ -69,20 +70,16 @@ export default function ProjectPage() {
   const [selectedTaskForModal, setSelectedTaskForModal] = useState(null);
   const [draggedTask, setDraggedTask] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
-  const [taskComments, setTaskComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [addingComment, setAddingComment] = useState(false);
-  const [commentCounts, setCommentCounts] = useState({});
+  const [commentCounts, setCommentCounts] = useState({}); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [user, setUser] = useState(null);
 
 
   // Helper function to get screenshot URL
-  const getScreenshotUrl = (screenshot) => {
+  const getScreenshotUrl = useCallback((screenshot) => {
     if (!screenshot) return null;
     // Simple: just combine settings URL with filename
     return `${getR2Url()}${screenshot}`;
-  };
+  }, [getR2Url]);
 
   // Load screenshot for a specific task
   const loadTaskScreenshot = async (taskId) => {
@@ -246,24 +243,7 @@ export default function ProjectPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, combinedJiraConfig]);
 
-  // Load comments when task modal is opened
-  useEffect(() => {
-    if (selectedTaskForModal?.id && project?.id) {
-      loadTaskComments(selectedTaskForModal.id);
-    } else {
-      setTaskComments([]);
-      setNewComment('');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTaskForModal?.id, project?.id]);
 
-  // Load comment counts when tasks change
-  useEffect(() => {
-    if (tasks.length > 0 && project?.id) {
-      loadCommentCounts();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks.length, project?.id]);
 
   // Load current user on component mount
   useEffect(() => {
@@ -351,102 +331,19 @@ export default function ProjectPage() {
 
 
   // Filter tasks based on status
-  const getFilteredTasks = (tasksToFilter) => {
+  const getFilteredTasks = useCallback((tasksToFilter) => {
     if (statusFilter === 'all') {
       return tasksToFilter;
     }
     return tasksToFilter.filter(task => task.status === statusFilter);
-  };
+  }, [statusFilter]);
 
 
-  // Comment management functions
-  const loadTaskComments = async (taskId) => {
-    if (!taskId) return;
-    setLoadingComments(true);
-    try {
-      const response = await fetch(`/api/projects/${project.id}/tasks/${taskId}/comments`);
-      const result = await response.json();
-      if (result.success) {
-        setTaskComments(result.comments);
-      } else {
-        showToast('Fehler beim Laden der Kommentare', 'error');
-      }
-    } catch {
-      showToast('Fehler beim Laden der Kommentare', 'error');
-    } finally {
-      setLoadingComments(false);
-    }
-  };
 
-  const addTaskComment = async (taskId, commentText) => {
-    if (!commentText.trim()) return;
-    setAddingComment(true);
-    try {
-      const response = await fetch(`/api/projects/${project.id}/tasks/${taskId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment_text: commentText, author: 'Benutzer' })
-      });
-      const result = await response.json();
-      if (result.success) {
-        setTaskComments(prev => [...prev, result.comment]);
-        setCommentCounts(prev => ({
-          ...prev,
-          [taskId]: (prev[taskId] || 0) + 1
-        }));
-        setNewComment('');
-        showToast('Kommentar hinzugefügt', 'success');
-      } else {
-        showToast('Fehler beim Hinzufügen des Kommentars', 'error');
-      }
-    } catch {
-      showToast('Fehler beim Hinzufügen des Kommentars', 'error');
-    } finally {
-      setAddingComment(false);
-    }
-  };
 
-  const deleteTaskComment = async (taskId, commentId) => {
-    try {
-      const response = await fetch(`/api/projects/${project.id}/tasks/${taskId}/comments?commentId=${commentId}`, {
-        method: 'DELETE'
-      });
-      const result = await response.json();
-      if (result.success) {
-        setTaskComments(prev => prev.filter(comment => comment.id !== commentId));
-        setCommentCounts(prev => ({
-          ...prev,
-          [taskId]: Math.max(0, (prev[taskId] || 0) - 1)
-        }));
-        showToast('Kommentar gelöscht', 'success');
-      } else {
-        showToast('Fehler beim Löschen des Kommentars', 'error');
-      }
-    } catch {
-      showToast('Fehler beim Löschen des Kommentars', 'error');
-    }
-  };
-
-  const loadCommentCounts = async () => {
-    if (!project?.id || tasks.length === 0) return;
-    try {
-      const counts = {};
-      await Promise.all(tasks.map(async (task) => {
-        const response = await fetch(`/api/projects/${project.id}/tasks/${task.id}/comments`);
-        const result = await response.json();
-        if (result.success) {
-          counts[task.id] = result.comments.length;
-        }
-      }));
-      setCommentCounts(counts);
-    } catch {
-      // Silently fail - comment counts are not critical
-    }
-  };
-
-  const getCommentCount = (taskId) => {
+  const getCommentCount = useCallback((taskId) => {
     return commentCounts[taskId] || 0;
-  };
+  }, [commentCounts]);
 
 
 
@@ -1310,69 +1207,15 @@ export default function ProjectPage() {
           />
         </div>
 
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[62] p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Projekt löschen</h3>
-              
-              <div className="mb-6">
-                <p className="text-gray-700 mb-2">
-                  Sind Sie sicher, dass Sie das Projekt <strong>{project.name}</strong> löschen möchten?
-                </p>
-                <p className="text-sm text-red-600 mb-4">
-                  Diese Aktion kann nicht rückgängig gemacht werden. Alle Tasks und Daten werden dauerhaft gelöscht.
-                </p>
-                
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm font-medium text-red-800 mb-2">Sicherheitsabfrage:</p>
-                  <p className="text-sm text-red-700 mb-3">
-                    Geben Sie den folgenden Text exakt ein, um das Löschen zu bestätigen:
-                  </p>
-                  <p className="text-sm font-mono bg-red-100 p-2 rounded border border-red-300 text-red-900">
-                    Ich will dieses Projekt: {project.name} löschen
-                  </p>
-                </div>
-                
-                <input
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Text hier eingeben..."
-                  disabled={deletingProject}
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={deleteProject}
-                  disabled={deletingProject || deleteConfirmText.trim() !== `Ich will dieses Projekt: ${project.name} löschen`}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg"
-                >
-                  {deletingProject ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Lösche...
-                    </>
-                  ) : (
-                    <>
-                      <X className="h-4 w-4" />
-                      Projekt löschen
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={closeDeleteModal}
-                  disabled={deletingProject}
-                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ProjectDeleteModal
+          isOpen={showDeleteConfirm}
+          project={project}
+          deleteConfirmText={deleteConfirmText}
+          onDeleteConfirmTextChange={setDeleteConfirmText}
+          deletingProject={deletingProject}
+          onConfirm={deleteProject}
+          onClose={closeDeleteModal}
+        />
 
         <DeleteTaskModal
           isOpen={showTaskDeleteConfirm}
@@ -1404,28 +1247,23 @@ export default function ProjectPage() {
           onClose={closeLightbox}
         />
 
-        <TaskDetailModal
-          task={selectedTaskForModal}
-          comments={taskComments}
-          loadingComments={loadingComments}
-          newComment={newComment}
-          onNewCommentChange={setNewComment}
-          addingComment={addingComment}
-          onAddComment={addTaskComment}
-          onDeleteComment={deleteTaskComment}
+        <TaskModalContainer
+          selectedTask={selectedTaskForModal}
+          onClose={() => setSelectedTaskForModal(null)}
+          project={project}
           onUpdateStatus={(taskId, status) => {
             updateTaskStatus(taskId, status);
-            setSelectedTaskForModal({...selectedTaskForModal, status});
+            setSelectedTaskForModal(prev => prev ? {...prev, status} : null);
           }}
           onOpenJiraModal={openJiraModal}
           onOpenDeleteModal={openTaskDeleteModal}
           onOpenScreenshotLightbox={openScreenshotLightbox}
-          onClose={() => setSelectedTaskForModal(null)}
           getScreenshotUrl={getScreenshotUrl}
           user={user}
           creatingJira={creatingJira}
           loadingJiraModal={loadingJiraModal}
           loadingJiraConfig={loadingJiraConfig}
+          showToast={showToast}
         />
       </div>
     </div>
