@@ -7,6 +7,7 @@ import { useSettings } from '../../admin/hooks/useSettings';
 import { useToast } from '../../../hooks/useToast';
 import Toast from '../../../components/ui/Toast';
 import ProjectHeader from '../../../components/project/ProjectHeader';
+import WidgetInstallation from '../../../components/project/WidgetInstallation';
 import { 
   Copy, 
   CheckCircle, 
@@ -38,7 +39,6 @@ export default function ProjectPage() {
   const { toast, showToast, hideToast } = useToast();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', description: '' });
@@ -88,9 +88,6 @@ export default function ProjectPage() {
   const [commentCounts, setCommentCounts] = useState({});
   const [user, setUser] = useState(null);
 
-  const snippetCode = project ? 
-    `<script src="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/widget-new.js" data-project-id="${project.name}" defer></script>` :
-    '';
 
   // Helper function to get screenshot URL
   const getScreenshotUrl = (screenshot) => {
@@ -363,14 +360,6 @@ export default function ProjectPage() {
     setLoadingJiraConfig(false);
   };
 
-  const copySnippet = async () => {
-    try {
-      await navigator.clipboard.writeText(snippetCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-    }
-  };
 
 
   // Filter tasks based on status
@@ -1321,62 +1310,7 @@ export default function ProjectPage() {
         <div className={`grid gap-6 ${viewMode === 'board' ? 'grid-cols-1' : 'lg:grid-cols-4'}`}>
           {/* Main Content Area */}
           <div className={viewMode === 'board' ? '' : 'lg:col-span-3'}>
-            {/* Widget Installation - only show if not installed */}
-            {!project.widget_installed && (
-              <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Code className="h-5 w-5 text-blue-600" />
-                  Widget Installation
-                </h2>
-                
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <code className="text-sm text-gray-800 break-all flex-1 font-mono">
-                      {snippetCode}
-                    </code>
-                    <button
-                      onClick={copySnippet}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
-                    >
-                      {copied ? (
-                        <>
-                          <CheckCircle className="h-4 w-4" />
-                          Kopiert!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Kopieren
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-sm text-gray-600">
-                  <p>
-                    ✅ Fügen Sie diesen Code vor dem schließenden <code>&lt;/body&gt;</code> Tag ein
-                  </p>
-                  <p>
-                    ✅ Das Widget erscheint als Button am rechten Bildschirmrand (mittig)
-                  </p>
-                  <p>
-                    ✅ Nutzer können Elemente auswählen und Feedback hinterlassen
-                  </p>
-                  <p>
-                    ✅ Keine Browser-Berechtigungen erforderlich (DOM-basiert)
-                  </p>
-                </div>
-
-                {project.widget_last_ping && (
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-800">
-                      ✓ Letzter Widget-Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE')}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+            <WidgetInstallation project={project} />
 
             {/* Tasks */}
             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
