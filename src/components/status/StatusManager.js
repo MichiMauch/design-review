@@ -30,7 +30,6 @@ export default function StatusManager({ projectId }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStatusLabel, setNewStatusLabel] = useState('');
   const [newStatusColor, setNewStatusColor] = useState('bg-gray-100 text-gray-800 border-gray-200');
-  const [showNewColorPicker, setShowNewColorPicker] = useState(false);
   const [needsMigration, setNeedsMigration] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -135,7 +134,7 @@ export default function StatusManager({ projectId }) {
           <div className="flex-1">
             <h4 className="font-medium text-yellow-900">Migration erforderlich</h4>
             <p className="text-sm text-yellow-700 mt-1">
-              Dieses Projekt verwendet noch globale Status. Klicken Sie auf "Migrieren",
+              Dieses Projekt verwendet noch globale Status. Klicken Sie auf &quot;Migrieren&quot;,
               um projektspezifische Status zu aktivieren.
             </p>
             <button

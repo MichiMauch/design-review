@@ -7,7 +7,7 @@ import { Pipette } from 'lucide-react';
  * Color picker component for status cards
  * Uses native HTML5 color picker with Tailwind class generation
  */
-export default function StatusColorPicker({ value, onChange, isOpen, onToggle }) {
+export default function StatusColorPicker({ value, onChange }) {
   const [hexColor, setHexColor] = useState('#6B7280'); // Default gray
 
   // Convert Tailwind classes to hex color (approximation)
