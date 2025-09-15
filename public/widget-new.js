@@ -527,7 +527,10 @@
             }
             
             // JIRA-Checkbox Visibility mit neuer Logik
-            updateJiraCheckboxVisibility();
+            // Nur aufrufen wenn Projekt bereits geladen wurde
+            if (projectConfig) {
+                updateJiraCheckboxVisibility();
+            }
         }, 0);
         
         // Initialize annotation functionality after DOM elements are created
@@ -1836,15 +1839,23 @@
     }
 
     function updateJiraCheckboxVisibility() {
+        console.log('Widget: updateJiraCheckboxVisibility() function called');
         setTimeout(() => {
-            const jiraSection = document.querySelector('.jira-section');
+            const jiraSection = document.getElementById('jira-section');
+            console.log('Widget: jiraSection found:', !!jiraSection);
             if (jiraSection) {
                 console.log('Widget: updateJiraCheckboxVisibility called with:', {
                     loadingJiraConfig,
                     jiraConfig,
                     projectConfig,
                     jira_auto_create: projectConfig?.jira_auto_create,
-                    jira_auto_create_type: typeof projectConfig?.jira_auto_create
+                    jira_auto_create_type: typeof projectConfig?.jira_auto_create,
+                    condition_check: {
+                        hasServerUrl: !!jiraConfig?.serverUrl,
+                        hasProjectKey: !!jiraConfig?.projectKey,
+                        jira_auto_create_equals_1: projectConfig?.jira_auto_create === 1,
+                        all_conditions_met: !!(jiraConfig?.serverUrl && jiraConfig?.projectKey && projectConfig?.jira_auto_create === 1)
+                    }
                 });
 
                 if (loadingJiraConfig) {
@@ -1861,7 +1872,7 @@
                 } else if (
                     jiraConfig?.serverUrl &&
                     jiraConfig?.projectKey &&
-                    Boolean(projectConfig?.jira_auto_create)
+                    projectConfig?.jira_auto_create === 1
                 ) {
                     jiraSection.style.display = 'block';
                     const checkbox = jiraSection.querySelector('input[type="checkbox"]');
