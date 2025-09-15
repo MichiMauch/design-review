@@ -18,8 +18,8 @@ export default function JiraModal({
   if (!isOpen || !task || userRole !== 'admin') return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[65] p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[65] p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           JIRA-Task erstellen
           <span className="text-xs text-gray-500 ml-2">
