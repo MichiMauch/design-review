@@ -3,10 +3,11 @@
 import { memo } from 'react';
 import { AlertCircle, Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
 import { formatTime } from '../../utils/projectUtils';
+import { AIBadgeSet } from '../ai/AIBadges';
 
 function TaskList({
   tasks,
-  getFilteredTasks,
+  filteredTasks,
   editingTask,
   editForm,
   onEditFormChange,
@@ -23,11 +24,19 @@ function TaskList({
   creatingJira,
   loadingJiraModal,
   loadingJiraConfig,
-  viewMode
+  viewMode,
+  projectStatuses = []
 }) {
   if (viewMode !== 'list') return null;
 
-  const filteredTasks = getFilteredTasks(tasks);
+  // Status info function
+  const getStatusInfo = (status) => {
+    const statusConfig = projectStatuses.find(s => s.value === status) || {
+      label: status || 'Open',
+      color: 'bg-gray-100 text-gray-800 border-gray-300'
+    };
+    return statusConfig;
+  };
 
   if (filteredTasks.length === 0) {
     return (
@@ -68,6 +77,8 @@ function TaskList({
             creatingJira={creatingJira}
             loadingJiraModal={loadingJiraModal}
             loadingJiraConfig={loadingJiraConfig}
+            getStatusInfo={getStatusInfo}
+            projectStatuses={projectStatuses}
           />
         ))}
       </div>
@@ -92,7 +103,9 @@ const TaskCard = memo(function TaskCard({
   user,
   creatingJira,
   loadingJiraModal,
-  loadingJiraConfig
+  loadingJiraConfig,
+  getStatusInfo,
+  projectStatuses
 }) {
   const statusInfo = getStatusInfo(task.status);
 
@@ -155,6 +168,19 @@ const TaskCard = memo(function TaskCard({
                   {task.description}
                 </p>
               )}
+
+              {/* AI Analysis Badges */}
+              <div className="mb-2">
+                <AIBadgeSet
+                  sentiment={task.ai_sentiment}
+                  confidence={task.ai_confidence}
+                  category={task.ai_category}
+                  priority={task.ai_priority}
+                  analyzed={!!task.ai_analyzed_at}
+                  compact={false}
+                  className="flex-wrap gap-1"
+                />
+              </div>
             </>
           )}
         </div>

@@ -261,7 +261,7 @@ export default function ProjectPage() {
               ) : taskManager.viewMode === 'list' ? (
                 <TaskList
                   tasks={projectManager.tasks}
-                  getFilteredTasks={taskManager.getFilteredTasks}
+                  filteredTasks={taskManager.getFilteredTasks}
                   editingTask={taskManager.editingTask}
                   editForm={taskManager.editForm}
                   onEditFormChange={taskManager.setEditForm}
@@ -280,7 +280,6 @@ export default function ProjectPage() {
                   loadingJiraConfig={projectManager.loadingJiraConfig}
                   viewMode={taskManager.viewMode}
                   projectStatuses={projectStatuses.statuses}
-                  getStatusInfo={projectStatuses.getStatusInfo}
                 />
               ) : (
                 <TaskBoard
