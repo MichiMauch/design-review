@@ -21,13 +21,13 @@ export async function PUT(request, { params }) {
     
     const requestBody = await request.json();
     
-    const { title, description, jira_key, jira_url, status } = requestBody;
+    const { title, description, jira_key, jira_url, status, sort_order } = requestBody;
 
     await initDatabase();
     const db = getDb();
 
-    // If only jira_key/jira_url or status is being updated, handle separately
-    if ((!title && (jira_key !== undefined || jira_url !== undefined)) || (!title && status !== undefined && jira_key === undefined && jira_url === undefined)) {
+    // If only jira_key/jira_url, status, or sort_order is being updated, handle separately
+    if ((!title && (jira_key !== undefined || jira_url !== undefined)) || (!title && (status !== undefined || sort_order !== undefined) && jira_key === undefined && jira_url === undefined)) {
       
       const currentTask = await db.execute({
         sql: 'SELECT title, description FROM tasks WHERE id = ? AND project_id = ?',
@@ -41,10 +41,18 @@ export async function PUT(request, { params }) {
 
       // Update only the specified fields
       let updateSql, updateArgs;
-      if (status !== undefined && jira_key === undefined && jira_url === undefined) {
-        // Status-only update
-        updateSql = `UPDATE tasks SET status = ? WHERE id = ? AND project_id = ?`;
-        updateArgs = [status, resolvedParams.taskId, resolvedParams.id];
+      if ((status !== undefined || sort_order !== undefined) && jira_key === undefined && jira_url === undefined) {
+        // Status and/or sort_order update
+        if (status !== undefined && sort_order !== undefined) {
+          updateSql = `UPDATE tasks SET status = ?, sort_order = ? WHERE id = ? AND project_id = ?`;
+          updateArgs = [status, sort_order, resolvedParams.taskId, resolvedParams.id];
+        } else if (status !== undefined) {
+          updateSql = `UPDATE tasks SET status = ? WHERE id = ? AND project_id = ?`;
+          updateArgs = [status, resolvedParams.taskId, resolvedParams.id];
+        } else if (sort_order !== undefined) {
+          updateSql = `UPDATE tasks SET sort_order = ? WHERE id = ? AND project_id = ?`;
+          updateArgs = [sort_order, resolvedParams.taskId, resolvedParams.id];
+        }
       } else if (jira_key !== undefined || jira_url !== undefined) {
         // JIRA key/url update
         updateSql = `UPDATE tasks SET jira_key = ?, jira_url = ? WHERE id = ? AND project_id = ?`;
@@ -57,9 +65,20 @@ export async function PUT(request, { params }) {
       });
 
 
+      let message = 'Erfolgreich aktualisiert';
+      if (status !== undefined && sort_order !== undefined) {
+        message = 'Status und Position erfolgreich aktualisiert';
+      } else if (status !== undefined) {
+        message = 'Status erfolgreich aktualisiert';
+      } else if (sort_order !== undefined) {
+        message = 'Position erfolgreich aktualisiert';
+      } else if (jira_key !== undefined || jira_url !== undefined) {
+        message = 'JIRA Daten erfolgreich aktualisiert';
+      }
+
       return addCorsHeaders(Response.json({
         success: true,
-        message: status !== undefined ? 'Status erfolgreich aktualisiert' : 'JIRA Daten erfolgreich aktualisiert',
+        message: message,
         rowsAffected: result.rowsAffected
       }));
     }
@@ -72,8 +91,8 @@ export async function PUT(request, { params }) {
 
     const result = await db.execute({
       sql: `
-        UPDATE tasks 
-        SET title = ?, description = ?, jira_key = ?, jira_url = ?, status = ?
+        UPDATE tasks
+        SET title = ?, description = ?, jira_key = ?, jira_url = ?, status = ?, sort_order = ?
         WHERE id = ? AND project_id = ?
       `,
       args: [
@@ -82,6 +101,7 @@ export async function PUT(request, { params }) {
         jira_key || null,
         jira_url || null,
         status || 'open',
+        sort_order || null,
         resolvedParams.taskId,
         resolvedParams.id
       ]

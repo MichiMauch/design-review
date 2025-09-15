@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
-import { TASK_STATUSES } from '../../constants/taskStatuses';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { formatTime } from '../../utils/projectUtils';
 
 function TaskBoard({
@@ -13,7 +13,8 @@ function TaskBoard({
   onStartEditing,
   onSaveTask,
   onCancelEditing,
-  onUpdateStatus,
+  onUpdateStatusAndPosition,
+  onReorderTasks,
   onOpenTaskModal,
   onOpenDeleteModal,
   onOpenJiraModal,
@@ -24,34 +25,86 @@ function TaskBoard({
   loadingJiraModal,
   loadingJiraConfig,
   viewMode,
-  draggedTask,
-  setDraggedTask,
-  dragOverColumn,
-  setDragOverColumn
+  updatingTaskStatus,
+  projectStatuses = [],
+  onDragStart,
+  onDragEnd
 }) {
   if (viewMode !== 'board') return null;
 
-  const handleDragStart = (task) => {
-    setDraggedTask(task);
+  const handleDragStart = () => {
+    onDragStart?.();
   };
 
-  const handleDragEnd = () => {
-    setDraggedTask(null);
-    setDragOverColumn(null);
-  };
+  const handleDragEnd = (result) => {
+    onDragEnd?.();
 
-  const handleDragOver = (e, status) => {
-    e.preventDefault();
-    setDragOverColumn(status.value);
-  };
+    if (!result.destination) return;
 
-  const handleDrop = (e, status) => {
-    e.preventDefault();
-    if (draggedTask && draggedTask.status !== status.value) {
-      onUpdateStatus(draggedTask.id, status.value);
+    const { draggableId, destination, source } = result;
+    const taskId = parseInt(draggableId);
+
+    // Check if it's the same position (no change)
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
+      return;
     }
-    setDraggedTask(null);
-    setDragOverColumn(null);
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Case 1: Moving between different columns (status change + position)
+    if (destination.droppableId !== source.droppableId) {
+      const newStatus = destination.droppableId;
+
+      // Get tasks in the destination column to calculate correct position
+      const destinationTasks = tasks
+        .filter(t => (t.status || 'open') === newStatus)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+      // Calculate the sort_order for the new position with 10-step spacing
+      let newSortOrder = 10;
+      if (destination.index === 0) {
+        // Dropping at the beginning - ensure there's space
+        newSortOrder = destinationTasks.length > 0 ? Math.max(10, (destinationTasks[0].sort_order || 10) - 10) : 10;
+      } else if (destination.index >= destinationTasks.length) {
+        // Dropping at the end - add with 10-step spacing
+        newSortOrder = destinationTasks.length > 0 ? (destinationTasks[destinationTasks.length - 1].sort_order || (destinationTasks.length * 10)) + 10 : 10;
+      } else {
+        // Dropping between existing tasks - calculate midpoint with safety checks
+        const beforeTask = destinationTasks[destination.index - 1];
+        const afterTask = destinationTasks[destination.index];
+        const beforeOrder = beforeTask ? (beforeTask.sort_order || (destination.index * 10)) : 0;
+        const afterOrder = afterTask ? (afterTask.sort_order || ((destination.index + 1) * 10)) : (destination.index + 1) * 10;
+
+        // Ensure sufficient gap, otherwise use safe fallback
+        const midPoint = Math.floor((beforeOrder + afterOrder) / 2);
+        if (midPoint > beforeOrder && midPoint < afterOrder) {
+          newSortOrder = midPoint;
+        } else {
+          // Fallback: use afterOrder minus small offset to maintain order
+          newSortOrder = afterOrder - 1;
+        }
+      }
+
+      // Call combined status + position update
+      onUpdateStatusAndPosition?.(taskId, newStatus, newSortOrder, destination.index);
+    }
+
+    // Case 2: Reordering within same column (sort order change only)
+    else if (destination.index !== source.index) {
+      // Get tasks in the current column
+      const columnTasks = tasks
+        .filter(t => (t.status || 'open') === destination.droppableId)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+      // Reorder array
+      const reorderedTasks = Array.from(columnTasks);
+      const [movedTask] = reorderedTasks.splice(source.index, 1);
+      reorderedTasks.splice(destination.index, 0, movedTask);
+
+      // Call reorder function
+      onReorderTasks?.(destination.droppableId, reorderedTasks.map(t => t.id));
+    }
   };
 
   if (tasks.length === 0) {
@@ -66,76 +119,137 @@ function TaskBoard({
     );
   }
 
+  // Use project statuses or fallback to empty if loading
+  const statusesToShow = projectStatuses.length > 0 ? projectStatuses : [];
+
+  if (statusesToShow.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8 text-gray-500">
+        <p>Status werden geladen...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {TASK_STATUSES.map(status => {
-        // Robust filtering - handle undefined, null, empty string
-        const statusTasks = tasks.filter(t => {
-          const taskStatus = t.status || 'open'; // Default to 'open' for undefined/null
-          return taskStatus === status.value;
-        });
-
-        // Debug logging for board filter
-        if (status.value === 'open') {
-          console.log(`Board filter for "${status.value}":`, {
-            totalTasks: tasks.length,
-            statusTasks: statusTasks.length,
-            tasksWithUndefinedStatus: tasks.filter(t => !t.status).length,
-            tasksWithEmptyStatus: tasks.filter(t => t.status === '').length,
-            allTaskStatuses: tasks.map(t => ({
-              id: t.id,
-              title: t.title?.substring(0, 30),
-              status: t.status
-            }))
+    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {statusesToShow.map(status => {
+          // Robust filtering - handle undefined, null, empty string
+          const statusTasks = tasks.filter(t => {
+            const taskStatus = t.status || 'open'; // Default to 'open' for undefined/null
+            return taskStatus === status.value;
           });
-        }
 
-        return (
-          <div
-            key={status.value}
-            className={`flex-shrink-0 w-80 bg-gray-50 rounded-lg p-4 ${
-              dragOverColumn === status.value ? 'bg-blue-50 border-2 border-blue-300' : ''
-            }`}
-            onDragOver={(e) => handleDragOver(e, status)}
-            onDrop={(e) => handleDrop(e, status)}
-          >
-            <div className={`flex items-center gap-2 mb-4 p-2 rounded-lg ${status.color}`}>
-              <h3 className="font-semibold text-sm">{status.label}</h3>
-              <span className="text-xs">({statusTasks.length})</span>
-            </div>
+          return (
+            <div key={status.value} className="flex-shrink-0 w-80">
+              <div className="bg-gray-50 rounded-lg p-4 h-full flex flex-col">
+                {/* Header außerhalb des Droppable */}
+                <div className={`flex items-center gap-2 mb-4 p-2 rounded-lg ${status.color}`}>
+                  <h3 className="font-semibold text-sm">{status.label}</h3>
+                  <span className="text-xs">({statusTasks.length})</span>
+                </div>
 
-            <div className="space-y-3">
-              {statusTasks.map(task => (
-                <TaskBoardCard
-                  key={task.id}
-                  task={task}
-                  isEditing={editingTask === task.id}
-                  editForm={editForm}
-                  onEditFormChange={onEditFormChange}
-                  onStartEditing={onStartEditing}
-                  onSaveTask={onSaveTask}
-                  onCancelEditing={onCancelEditing}
-                  onOpenTaskModal={onOpenTaskModal}
-                  onOpenDeleteModal={onOpenDeleteModal}
-                  onOpenJiraModal={onOpenJiraModal}
-                  getScreenshotUrl={getScreenshotUrl}
-                  getCommentCount={getCommentCount}
-                  user={user}
-                  creatingJira={creatingJira}
-                  loadingJiraModal={loadingJiraModal}
-                  loadingJiraConfig={loadingJiraConfig}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  isDragged={draggedTask?.id === task.id}
-                />
-              ))}
+                {/* Droppable füllt verfügbare Höhe */}
+                <Droppable droppableId={status.value}>
+                  {(provided, snapshot) => {
+                    // Clean drag & drop without debug logging
+
+                    return (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className={`flex-1 space-y-3 p-3 rounded-lg transition-all duration-300 border-2 ${
+                          snapshot.draggingOverWith
+                            ? 'bg-blue-100 border-blue-500 border-dashed shadow-lg ring-4 ring-blue-300'
+                            : 'border-gray-200 border-solid'
+                        }`}
+                        style={{ minHeight: '200px' }}
+                      >
+                      {statusTasks
+                        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                        .map((task, index) => (
+                        <Draggable
+                          key={`task-${task.id}`}
+                          draggableId={String(task.id)}
+                          index={index}
+                          isDragDisabled={editingTask === task.id || updatingTaskStatus === task.id}
+                        >
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                            >
+                              <TaskBoardCard
+                                task={task}
+                                isEditing={editingTask === task.id}
+                                editForm={editForm}
+                                onEditFormChange={onEditFormChange}
+                                onStartEditing={onStartEditing}
+                                onSaveTask={onSaveTask}
+                                onCancelEditing={onCancelEditing}
+                                onOpenTaskModal={onOpenTaskModal}
+                                onOpenDeleteModal={onOpenDeleteModal}
+                                onOpenJiraModal={onOpenJiraModal}
+                                getScreenshotUrl={getScreenshotUrl}
+                                getCommentCount={getCommentCount}
+                                user={user}
+                                creatingJira={creatingJira}
+                                loadingJiraModal={loadingJiraModal}
+                                loadingJiraConfig={loadingJiraConfig}
+                                isDragging={snapshot.isDragging}
+                                isUpdatingStatus={updatingTaskStatus === task.id}
+                              />
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                      </div>
+                    );
+                  }}
+                </Droppable>
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </DragDropContext>
   );
 }
+
+// Optimized memo comparison for TaskBoardCard
+const areEqual = (prevProps, nextProps) => {
+  // Check if the task object changed
+  if (prevProps.task.id !== nextProps.task.id) return false;
+  if (prevProps.task.title !== nextProps.task.title) return false;
+  if (prevProps.task.description !== nextProps.task.description) return false;
+  if (prevProps.task.status !== nextProps.task.status) return false;
+  if (prevProps.task.screenshot !== nextProps.task.screenshot) return false;
+  if (prevProps.task.url !== nextProps.task.url) return false;
+  if (prevProps.task.jira_key !== nextProps.task.jira_key) return false;
+
+  // Check editing state
+  if (prevProps.isEditing !== nextProps.isEditing) return false;
+
+  // Check dragging state
+  if (prevProps.isDragging !== nextProps.isDragging) return false;
+
+  // Check updating state
+  if (prevProps.isUpdatingStatus !== nextProps.isUpdatingStatus) return false;
+
+  // Check loading states
+  if (prevProps.creatingJira !== nextProps.creatingJira) return false;
+  if (prevProps.loadingJiraModal !== nextProps.loadingJiraModal) return false;
+
+  // If editing, check edit form
+  if (prevProps.isEditing) {
+    if (prevProps.editForm.title !== nextProps.editForm.title) return false;
+    if (prevProps.editForm.description !== nextProps.editForm.description) return false;
+  }
+
+  return true;
+};
 
 const TaskBoardCard = memo(function TaskBoardCard({
   task,
@@ -154,18 +268,15 @@ const TaskBoardCard = memo(function TaskBoardCard({
   creatingJira,
   loadingJiraModal,
   loadingJiraConfig,
-  onDragStart,
-  onDragEnd,
-  isDragged
+  isDragging,
+  isUpdatingStatus
 }) {
   return (
     <div
-      className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move border ${
-        isDragged ? 'opacity-50 rotate-3 scale-105' : ''
-      }`}
-      draggable={!isEditing}
-      onDragStart={() => onDragStart(task)}
-      onDragEnd={onDragEnd}
+      className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-all border ${
+        isDragging ? 'opacity-50 shadow-lg transform rotate-2 scale-105' :
+        isUpdatingStatus ? 'opacity-75 border-blue-300 bg-blue-50' : 'cursor-move'
+      } ${isEditing ? 'cursor-default' : 'cursor-move'}`}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
@@ -354,6 +465,21 @@ const TaskBoardCard = memo(function TaskBoardCard({
       )}
     </div>
   );
-});
+}, areEqual);
 
-export default memo(TaskBoard);
+// Memo comparison function for TaskBoard
+const areTaskBoardEqual = (prevProps, nextProps) => {
+  // Always allow re-renders for task changes to support optimistic updates
+  if (prevProps.tasks !== nextProps.tasks) return false;
+
+  // Compare other essential props
+  if (prevProps.viewMode !== nextProps.viewMode) return false;
+  if (prevProps.editingTask !== nextProps.editingTask) return false;
+  if (prevProps.updatingTaskStatus !== nextProps.updatingTaskStatus) return false;
+  if (prevProps.projectStatuses?.length !== nextProps.projectStatuses?.length) return false;
+  if (prevProps.isDragging !== nextProps.isDragging) return false;
+
+  return true;
+};
+
+export default memo(TaskBoard, areTaskBoardEqual);

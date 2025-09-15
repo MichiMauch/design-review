@@ -2,8 +2,7 @@
 
 import { memo } from 'react';
 import { AlertCircle, Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
-import { TASK_STATUSES } from '../../constants/taskStatuses';
-import { formatTime, getStatusInfo } from '../../utils/projectUtils';
+import { formatTime } from '../../utils/projectUtils';
 
 function TaskList({
   tasks,
@@ -189,7 +188,7 @@ const TaskCard = memo(function TaskCard({
               onChange={(e) => onUpdateStatus(task.id, e.target.value)}
               className={`w-full px-3 py-1 text-xs rounded-full border font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusInfo.color}`}
             >
-              {TASK_STATUSES.map(status => (
+              {projectStatuses.map(status => (
                 <option key={status.value} value={status.value}>
                   {status.label}
                 </option>

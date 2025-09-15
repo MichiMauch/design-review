@@ -37,15 +37,11 @@ export function useProjectManager({ projectId, showToast, router }) {
 
   const loadTasks = useCallback(async () => {
     try {
-      console.log('Loading tasks from API...');
+      // Loading tasks from API
       const response = await fetch(`/api/projects/${projectId}/tasks`);
       if (response.ok) {
         const tasksData = await response.json();
-        console.log('Tasks loaded from API:', {
-          totalTasks: tasksData.length,
-          tasksWithJira: tasksData.filter(t => t.jira_key).length,
-          taskStatuses: tasksData.map(t => ({ id: t.id, status: t.status, jira_key: t.jira_key }))
-        });
+        // Tasks loaded successfully
         setTasks(tasksData);
         return tasksData;
       }

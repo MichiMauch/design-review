@@ -19,14 +19,14 @@ export async function GET(request, { params }) {
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, created_at FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
+      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, sort_order, created_at FROM tasks WHERE project_id = ? ORDER BY COALESCE(sort_order, 999), created_at DESC',
       args: [resolvedParams.id]
     });
 
     // Process screenshots to ensure proper URLs
     const processedRows = result.rows.map(row => {
       let screenshotDisplay = null;
-      
+
       if (row.screenshot_url) {
         // Use the R2 URL
         screenshotDisplay = row.screenshot_url;
@@ -35,7 +35,7 @@ export async function GET(request, { params }) {
         const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
         screenshotDisplay = `https://pub-${accountId}.r2.dev/screenshots/${row.screenshot}`;
       }
-      
+
       return {
         ...row,
         screenshot_display: screenshotDisplay
@@ -65,12 +65,12 @@ export async function POST(request, { params }) {
 
     // Handle both numeric IDs and project names
     let projectId = resolvedParams.id;
-    
+
     // If the ID is not numeric, treat it as a project name and find the actual ID
     if (isNaN(Number(projectId))) {
       // Decode URL-encoded project name
       const projectName = decodeURIComponent(projectId);
-      
+
       const projectResult = await db.execute({
         sql: 'SELECT id FROM projects WHERE name = ?',
         args: [projectName]
@@ -88,7 +88,7 @@ export async function POST(request, { params }) {
     // R2 Upload only - no Data URL storage
     let screenshotUrl = null;
     let screenshotFilename = null;
-    
+
     if (screenshot && screenshot.startsWith('data:')) {
       console.log('=== R2 UPLOAD PROCESS START ===');
       console.log('Environment check:', {
@@ -97,36 +97,36 @@ export async function POST(request, { params }) {
         hasAccessKey: !!process.env.CLOUDFLARE_ACCESS_KEY_ID,
         hasSecretKey: !!process.env.CLOUDFLARE_SECRET_ACCESS_KEY
       });
-      
+
       // Extract content type and base64 data
       const matches = screenshot.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) {
         console.error('Invalid data URL format');
         return addCorsHeaders(new Response('Invalid screenshot format', { status: 400 }));
       }
-      
+
       const contentType = matches[1];
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, 'base64');
-      
+
       // Generate filename
       const ext = contentType.split('/')[1] || 'png';
       const timestamp = Date.now();
       const filename = `task-${timestamp}.${ext}`;
       const key = `screenshots/${filename}`;
-      
+
       console.log('Upload details:', {
         contentType,
         bufferSize: buffer.length,
         filename,
         key
       });
-      
+
       // Setup S3 client
       const AWS = await import('aws-sdk');
       const https = await import('https');
       const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 'cac1d67ee1dc4cb6814dff593983d703';
-      
+
       const s3 = new AWS.default.S3({
         endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
         accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
@@ -140,7 +140,7 @@ export async function POST(request, { params }) {
           timeout: 120000,
         }
       });
-      
+
       try {
         console.log('Starting S3 putObject...');
         await s3.putObject({
@@ -149,14 +149,14 @@ export async function POST(request, { params }) {
           Body: buffer,
           ContentType: contentType,
         }).promise();
-        
+
         screenshotFilename = filename;
         screenshotUrl = `https://pub-${accountId}.r2.dev/${key}`;
-        
+
         console.log('=== R2 UPLOAD SUCCESS ===');
         console.log('Filename:', screenshotFilename);
         console.log('URL:', screenshotUrl);
-        
+
       } catch (error) {
         console.error('=== R2 UPLOAD FAILED ===');
         console.error('Error:', error.message);

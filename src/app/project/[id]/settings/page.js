@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Settings, AlertTriangle, Trash2 } from 'lucide-react';
+import StatusManager from '../../../../components/status/StatusManager';
 
 export default function ProjectSettings() {
   const params = useParams();
@@ -300,6 +301,23 @@ export default function ProjectSettings() {
                 {saving ? 'Speichere...' : 'Einstellungen speichern'}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Status Management Section */}
+        <div className="bg-white shadow rounded-lg overflow-hidden mb-6 mt-6">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">
+              Status / Swimlanes
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Verwalten Sie die Status für Tasks in diesem Projekt.
+              Status können hinzugefügt, bearbeitet, gelöscht und neu sortiert werden.
+            </p>
+          </div>
+
+          <div className="px-6 py-6">
+            <StatusManager projectId={parseInt(params.id)} />
           </div>
         </div>
 

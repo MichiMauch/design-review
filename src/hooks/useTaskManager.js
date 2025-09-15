@@ -17,9 +17,9 @@ export function useTaskManager({
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState('board');
-  const [draggedTask, setDraggedTask] = useState(null);
-  const [dragOverColumn, setDragOverColumn] = useState(null);
+  const [updatingTaskStatus, setUpdatingTaskStatus] = useState(null);
   const [commentCounts, setCommentCounts] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
 
   // Helper function to get screenshot URL
   const getScreenshotUrl = useCallback((screenshot) => {
@@ -124,7 +124,35 @@ export function useTaskManager({
     }
   }, [projectId, editForm, setTasks, showToast]);
 
-  const updateTaskStatus = useCallback(async (taskId, newStatus) => {
+  const updateTaskStatus = useCallback(async (taskId, newStatus, optimistic = false) => {
+    // Prevent multiple simultaneous updates
+    if (updatingTaskStatus === taskId) {
+      return;
+    }
+
+    // Store original status for potential revert
+    let originalStatus = null;
+
+    // Always do optimistic update immediately for smooth UX
+    setTasks(currentTasks => {
+      const task = currentTasks.find(t => t.id === taskId);
+      if (task) {
+        originalStatus = task.status;
+        // Optimistic update - immediately update UI
+        return currentTasks.map(t =>
+          t.id === taskId ? { ...t, status: newStatus } : t
+        );
+      }
+      return currentTasks;
+    });
+
+    // If this is just an optimistic update, don't make the API call
+    if (optimistic) {
+      return;
+    }
+
+    setUpdatingTaskStatus(taskId);
+
     try {
       const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
         method: 'PATCH',
@@ -135,21 +163,156 @@ export function useTaskManager({
       });
 
       if (response.ok) {
-        // Update local state
-        setTasks(tasks =>
-          tasks.map(task =>
-            task.id === taskId ? { ...task, status: newStatus } : task
-          )
-        );
         showToast('Status erfolgreich aktualisiert', 'success');
       } else {
+        // Revert on error
+        if (originalStatus !== null) {
+          setTasks(tasks =>
+            tasks.map(task =>
+              task.id === taskId ? { ...task, status: originalStatus } : task
+            )
+          );
+        }
         showToast('Fehler beim Aktualisieren des Status', 'error');
       }
     } catch (error) {
       console.error('Error updating task status:', error);
+      // Revert on error
+      if (originalStatus !== null) {
+        setTasks(tasks =>
+          tasks.map(task =>
+            task.id === taskId ? { ...task, status: originalStatus } : task
+          )
+        );
+      }
       showToast('Fehler beim Aktualisieren des Status', 'error');
+    } finally {
+      setUpdatingTaskStatus(null);
     }
-  }, [projectId, setTasks, showToast]);
+  }, [projectId, setTasks, showToast, updatingTaskStatus]);
+
+  const updateStatusAndPosition = useCallback(async (taskId, newStatus, newSortOrder, targetIndex) => {
+    // Prevent multiple simultaneous updates
+    if (updatingTaskStatus === taskId) {
+      return;
+    }
+
+    // Store original tasks for potential revert
+    let originalTasks = null;
+
+    // Optimistic update - complete reordering of both source and destination columns
+    setTasks(currentTasks => {
+      originalTasks = currentTasks; // Store complete state for revert
+
+      const taskIndex = currentTasks.findIndex(t => t.id === taskId);
+      if (taskIndex === -1) return currentTasks;
+
+      const movedTask = currentTasks[taskIndex];
+      const oldStatus = movedTask.status || 'open';
+
+      // Create updated task with new status and position
+      const updatedTask = {
+        ...movedTask,
+        status: newStatus,
+        sort_order: newSortOrder
+      };
+
+      // Remove task from original position
+      let newTasks = currentTasks.filter(t => t.id !== taskId);
+
+      // If moving between different statuses, update both columns
+      if (oldStatus !== newStatus) {
+        // Get destination column tasks (excluding the moved task)
+        const destinationTasks = newTasks
+          .filter(t => (t.status || 'open') === newStatus)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+        // Insert task at correct position in destination column
+        destinationTasks.splice(targetIndex, 0, updatedTask);
+
+        // Re-sort destination column with clean spacing
+        const reorderedDestination = destinationTasks.map((task, index) => ({
+          ...task,
+          sort_order: (index + 1) * 10
+        }));
+
+        // Merge back with other tasks
+        const otherTasks = newTasks.filter(t => (t.status || 'open') !== newStatus);
+        newTasks = [...otherTasks, ...reorderedDestination];
+      } else {
+        // Same column reordering - just add the updated task back
+        newTasks.push(updatedTask);
+      }
+
+      return newTasks;
+    });
+
+    setUpdatingTaskStatus(taskId);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          sort_order: newSortOrder
+        })
+      });
+
+      if (!response.ok) {
+        // Revert on error - restore complete original state
+        if (originalTasks) {
+          setTasks(originalTasks);
+        }
+        console.error('Failed to update task status and position');
+      }
+    } catch (error) {
+      console.error('Error updating task status and position:', error);
+      // Revert on error - restore complete original state
+      if (originalTasks) {
+        setTasks(originalTasks);
+      }
+    } finally {
+      setUpdatingTaskStatus(null);
+    }
+  }, [projectId, setTasks, updatingTaskStatus]);
+
+  const reorderTasks = useCallback(async (status, taskOrder) => {
+    try {
+      // Store original state for potential revert
+      let originalTasks = null;
+
+      // Optimistic update - reorder tasks immediately in UI
+      setTasks(prevTasks => {
+        originalTasks = prevTasks; // Store for potential revert
+        const otherTasks = prevTasks.filter(t => (t.status || 'open') !== status);
+        const reorderedTasks = taskOrder.map((taskId, index) => {
+          const task = prevTasks.find(t => t.id === taskId);
+          return { ...task, sort_order: (index + 1) * 10 };
+        });
+        return [...otherTasks, ...reorderedTasks];
+      });
+
+      // Send to backend
+      const response = await fetch(`/api/projects/${projectId}/tasks/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, taskOrder })
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        if (originalTasks) {
+          setTasks(originalTasks);
+        }
+        console.error('Failed to reorder tasks');
+      }
+    } catch (error) {
+      console.error('Error reordering tasks:', error);
+    }
+  }, [projectId, setTasks]);
 
   // Task deletion functions
   const openTaskDeleteModal = useCallback((task) => {
@@ -192,6 +355,15 @@ export function useTaskManager({
     setTaskToDelete(null);
   }, []);
 
+  // Drag & drop state management
+  const onDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const onDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   // Handle ESC key to close lightbox
   useEffect(() => {
     const handleEscape = (e) => {
@@ -231,15 +403,17 @@ export function useTaskManager({
     viewMode,
     setViewMode,
 
-    // Drag & Drop state
-    draggedTask,
-    setDraggedTask,
-    dragOverColumn,
-    setDragOverColumn,
+    // Update state
+    updatingTaskStatus,
 
     // Comment state
     commentCounts,
     setCommentCounts,
+
+    // Drag state
+    isDragging,
+    onDragStart,
+    onDragEnd,
 
     // Computed values
     getFilteredTasks,
@@ -254,6 +428,8 @@ export function useTaskManager({
     cancelEditing,
     saveTask,
     updateTaskStatus,
+    updateStatusAndPosition,
+    reorderTasks,
     openTaskDeleteModal,
     deleteTask,
     closeTaskDeleteModal

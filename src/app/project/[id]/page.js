@@ -8,6 +8,7 @@ import { useToast } from '../../../hooks/useToast';
 import { useJiraManager } from '../../../hooks/useJiraManager';
 import { useProjectManager } from '../../../hooks/useProjectManager';
 import { useTaskManager } from '../../../hooks/useTaskManager';
+import { useProjectStatuses } from '../../../hooks/useProjectStatuses';
 import Toast from '../../../components/ui/Toast';
 import ProjectHeader from '../../../components/project/ProjectHeader';
 import WidgetInstallation from '../../../components/project/WidgetInstallation';
@@ -63,6 +64,9 @@ export default function ProjectPage() {
     jiraConfig: projectManager.jiraConfig,
     showToast
   });
+
+  // Load project-specific statuses
+  const projectStatuses = useProjectStatuses(params.id);
 
   // Enhanced JIRA modal opening with screenshot loading
   const openJiraModal = useCallback(async (task) => {
@@ -240,6 +244,7 @@ export default function ProjectPage() {
                 onViewModeChange={taskManager.setViewMode}
                 statusFilter={taskManager.statusFilter}
                 onStatusFilterChange={taskManager.setStatusFilter}
+                projectStatuses={projectStatuses.statuses}
               />
 
               {projectManager.tasks.length === 0 ? (
@@ -274,6 +279,8 @@ export default function ProjectPage() {
                   loadingJiraModal={jiraManager.loadingJiraModal}
                   loadingJiraConfig={projectManager.loadingJiraConfig}
                   viewMode={taskManager.viewMode}
+                  projectStatuses={projectStatuses.statuses}
+                  getStatusInfo={projectStatuses.getStatusInfo}
                 />
               ) : (
                 <TaskBoard
@@ -285,6 +292,8 @@ export default function ProjectPage() {
                   onSaveTask={taskManager.saveTask}
                   onCancelEditing={taskManager.cancelEditing}
                   onUpdateStatus={taskManager.updateTaskStatus}
+                  onUpdateStatusAndPosition={taskManager.updateStatusAndPosition}
+                  onReorderTasks={taskManager.reorderTasks}
                   onOpenTaskModal={taskManager.setSelectedTaskForModal}
                   onOpenDeleteModal={taskManager.openTaskDeleteModal}
                   onOpenJiraModal={openJiraModal}
@@ -293,12 +302,14 @@ export default function ProjectPage() {
                   user={projectManager.user}
                   creatingJira={jiraManager.creatingJira}
                   loadingJiraModal={jiraManager.loadingJiraModal}
+                  projectStatuses={projectStatuses.statuses}
+                  getStatusInfo={projectStatuses.getStatusInfo}
                   loadingJiraConfig={projectManager.loadingJiraConfig}
                   viewMode={taskManager.viewMode}
-                  draggedTask={taskManager.draggedTask}
-                  setDraggedTask={taskManager.setDraggedTask}
-                  dragOverColumn={taskManager.dragOverColumn}
-                  setDragOverColumn={taskManager.setDragOverColumn}
+                  updatingTaskStatus={taskManager.updatingTaskStatus}
+                  isDragging={taskManager.isDragging}
+                  onDragStart={taskManager.onDragStart}
+                  onDragEnd={taskManager.onDragEnd}
                 />
               )}
             </div>

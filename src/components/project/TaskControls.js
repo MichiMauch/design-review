@@ -1,7 +1,6 @@
 'use client';
 
 import { RefreshCw, List, Columns } from 'lucide-react';
-import { TASK_STATUSES } from '../../constants/taskStatuses';
 
 export default function TaskControls({
   isRefreshing,
@@ -9,7 +8,8 @@ export default function TaskControls({
   viewMode,
   onViewModeChange,
   statusFilter,
-  onStatusFilterChange
+  onStatusFilterChange,
+  projectStatuses = []
 }) {
   return (
     <div className="flex items-center justify-between mb-6">
@@ -60,7 +60,7 @@ export default function TaskControls({
             className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">Alle Status</option>
-            {TASK_STATUSES.map(status => (
+            {projectStatuses.map(status => (
               <option key={status.value} value={status.value}>
                 {status.label}
               </option>

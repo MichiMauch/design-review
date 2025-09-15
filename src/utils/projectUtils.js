@@ -33,14 +33,7 @@ export const formatTime = (dateString) => {
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  // Debug logging
-  console.log('Time debug:', {
-    original: dateString,
-    parsed: date.toLocaleString('de-DE'),
-    now: now.toLocaleString('de-DE'),
-    diffMins,
-    diffHours
-  });
+  // Debug logging removed for cleaner console
 
   if (diffMs < 60000) { // Less than 1 minute
     return 'Gerade eben';

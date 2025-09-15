@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Test - Projekt 3</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0066cc;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Widget Test - Projekt 3 (doityourself.rocks)</h1>
+
+        <div class="info">
+            <strong>Test-Informationen:</strong><br>
+            • Projekt ID: 3<br>
+            • Projekt Name: doityourself.rocks<br>
+            • jira_auto_create: 0 (FALSE)<br>
+            • Erwartetes Verhalten: JIRA-Checkbox soll NICHT angezeigt werden
+        </div>
+
+        <div class="debug-info">
+            <strong>Debug-Anweisungen:</strong><br>
+            1. Browser-Console öffnen (F12)<br>
+            2. Nach Widget-Debug-Logs suchen<br>
+            3. Besonders achten auf:<br>
+            &nbsp;&nbsp;- "Widget: updateJiraCheckboxVisibility called with:"<br>
+            &nbsp;&nbsp;- "Widget: Project config reloaded with jira_auto_create:"<br>
+            &nbsp;&nbsp;- jira_auto_create Wert und Typ
+        </div>
+
+        <p>Test-Content für Feedback-Widget:</p>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+
+        <button onclick="console.log('Test button clicked')">Test Button</button>
+    </div>
+
+    <!-- Load the new widget with project ID 3 -->
+    <script src="/widget-new.js" data-project-id="3"></script>
+</body>
+</html>
