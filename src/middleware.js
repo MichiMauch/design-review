@@ -25,7 +25,6 @@ const publicRoutes = [
   '/api/projects/.*/widget-status',
   '/api/simple-screenshot',
   '/api/jira', // JIRA API for widget usage
-  '/api/jira-modal', // JIRA modal for widget usage
   '/auth',
   '/login'
 ];
