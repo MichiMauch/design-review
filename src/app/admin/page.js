@@ -17,7 +17,6 @@ const SettingsTab = lazy(() => import('./components/settings/SettingsTab'));
 // Hooks
 import { useAdminData } from './hooks/useAdminData';
 import { useUserManagement } from './hooks/useUserManagement';
-import { useProjectAccess } from './hooks/useProjectAccess';
 import { useSettings } from './hooks/useSettings';
 
 export default function AdminDashboard() {
@@ -40,26 +39,19 @@ export default function AdminDashboard() {
     users,
     loading: usersLoading,
     isCreatingUser,
-    editingUser,
-    editUserForm,
-    setEditUserForm,
+    selectedUser,
+    userProjects,
+    loadingUserProjects,
+    updating,
+    deleting,
     loadUsers,
     createUser,
-    startEditUser,
-    cancelEdit,
+    openUserDetail,
+    closeUserDetail,
     updateUser,
+    toggleProjectAccess,
     deleteUser
   } = useUserManagement();
-
-  // Project access management
-  const {
-    managingProjectsUser,
-    userProjectAccess,
-    loadingProjectAccess,
-    toggleProjectAccess,
-    openProjectManager,
-    closeProjectManager
-  } = useProjectAccess();
 
   // Settings management
   const {
@@ -119,20 +111,17 @@ export default function AdminDashboard() {
             <UsersTab
               users={users}
               isCreatingUser={isCreatingUser}
-              editingUser={editingUser}
-              editUserForm={editUserForm}
-              onEditFormChange={setEditUserForm}
               onCreateUser={createUser}
-              onStartEdit={startEditUser}
-              onUpdate={updateUser}
-              onCancelEdit={cancelEdit}
-              onDelete={deleteUser}
-              managingProjectsUser={managingProjectsUser}
-              userProjectAccess={userProjectAccess}
-              loadingProjectAccess={loadingProjectAccess}
+              selectedUser={selectedUser}
+              userProjects={userProjects}
+              loadingUserProjects={loadingUserProjects}
+              onUserClick={openUserDetail}
+              onCloseUserDetail={closeUserDetail}
+              onUpdateUser={updateUser}
               onToggleProjectAccess={toggleProjectAccess}
-              onOpenProjectManager={openProjectManager}
-              onCloseProjectManager={closeProjectManager}
+              onDeleteUser={deleteUser}
+              updating={updating}
+              deleting={deleting}
             />
           )}
 

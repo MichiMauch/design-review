@@ -1,24 +1,21 @@
 import CreateUserForm from './CreateUserForm';
 import UsersTable from './UsersTable';
-import ProjectAccessModal from './ProjectAccessModal';
+import UserDetailModal from './UserDetailModal';
 
 export default function UsersTab({
   users,
   isCreatingUser,
-  editingUser,
-  editUserForm,
-  onEditFormChange,
   onCreateUser,
-  onStartEdit,
-  onUpdate,
-  onCancelEdit,
-  onDelete,
-  managingProjectsUser,
-  userProjectAccess,
-  loadingProjectAccess,
+  selectedUser,
+  userProjects,
+  loadingUserProjects,
+  onUserClick,
+  onCloseUserDetail,
+  onUpdateUser,
   onToggleProjectAccess,
-  onOpenProjectManager,
-  onCloseProjectManager
+  onDeleteUser,
+  updating,
+  deleting
 }) {
   return (
     <div>
@@ -29,22 +26,19 @@ export default function UsersTab({
 
       <UsersTable
         users={users}
-        editingUser={editingUser}
-        editUserForm={editUserForm}
-        onEditFormChange={onEditFormChange}
-        onStartEdit={onStartEdit}
-        onUpdate={onUpdate}
-        onCancelEdit={onCancelEdit}
-        onDelete={onDelete}
-        onOpenProjectManager={onOpenProjectManager}
+        onUserClick={onUserClick}
       />
 
-      <ProjectAccessModal
-        user={managingProjectsUser}
-        projects={userProjectAccess}
-        loading={loadingProjectAccess}
-        onToggleAccess={onToggleProjectAccess}
-        onClose={onCloseProjectManager}
+      <UserDetailModal
+        user={selectedUser}
+        projects={userProjects}
+        loadingProjects={loadingUserProjects}
+        onUpdateUser={onUpdateUser}
+        onToggleProjectAccess={onToggleProjectAccess}
+        onDeleteUser={onDeleteUser}
+        onClose={onCloseUserDetail}
+        updating={updating}
+        deleting={deleting}
       />
     </div>
   );

@@ -58,6 +58,27 @@ export const usersApi = {
       method: 'DELETE'
     });
     return handleResponse(response);
+  },
+
+  async getUserProjects(userId) {
+    const response = await fetch(`/api/admin/users/${userId}/project-access`);
+    return handleResponse(response);
+  },
+
+  async toggleProjectAccess(userId, projectId, hasAccess) {
+    if (hasAccess) {
+      const response = await fetch(`/api/admin/users/${userId}/project-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId })
+      });
+      return handleResponse(response);
+    } else {
+      const response = await fetch(`/api/admin/users/${userId}/project-access?projectId=${projectId}`, {
+        method: 'DELETE'
+      });
+      return handleResponse(response);
+    }
   }
 };
 

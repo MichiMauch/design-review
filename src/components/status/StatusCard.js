@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { GripVertical, Edit2, Trash2, Check, X } from 'lucide-react';
 import StatusColorPicker from './StatusColorPicker';
+import ConfirmationModal from '../shared/ConfirmationModal';
 
 /**
  * Individual status card component
@@ -20,6 +21,8 @@ export default function StatusCard({
   const [editLabel, setEditLabel] = useState(status.label);
   const [editColor, setEditColor] = useState(status.color);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSave = async () => {
     if (!editLabel.trim()) return;
@@ -42,9 +45,15 @@ export default function StatusCard({
     setIsEditing(false);
   };
 
-  const handleDelete = async () => {
-    if (window.confirm(`Möchten Sie den Status "${status.label}" wirklich löschen?`)) {
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
       await onDelete(status.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Delete error:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -125,7 +134,7 @@ export default function StatusCard({
             </button>
             {canDelete && (
               <button
-                onClick={handleDelete}
+                onClick={() => setShowDeleteConfirm(true)}
                 className="p-1 text-red-600 hover:bg-red-50 rounded"
                 title="Löschen"
               >
@@ -135,6 +144,19 @@ export default function StatusCard({
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Status löschen"
+        message={`Möchten Sie den Status "${status.label}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+        confirmText="Löschen"
+        cancelText="Abbrechen"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

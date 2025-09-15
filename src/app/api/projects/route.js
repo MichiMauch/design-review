@@ -115,13 +115,42 @@ export async function GET() {
       tasksByProject[task.project_id].push(task);
     });
 
-    // Add tasks to projects
-    const projectsWithTasks = projectsResult.rows.map(project => ({
+    // Get users for each project
+    const usersResult = await db.execute(`
+      SELECT
+        au.id,
+        au.name,
+        au.email,
+        au.role,
+        upa.project_id
+      FROM authorized_users au
+      INNER JOIN user_project_access upa ON au.email = upa.user_email
+      ORDER BY au.name ASC
+    `);
+
+    // Group users by project_id
+    const usersByProject = {};
+    usersResult.rows.forEach(user => {
+      if (!usersByProject[user.project_id]) {
+        usersByProject[user.project_id] = [];
+      }
+      usersByProject[user.project_id].push({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        initials: user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+      });
+    });
+
+    // Add tasks and users to projects
+    const projectsWithTasksAndUsers = projectsResult.rows.map(project => ({
       ...project,
-      tasks: tasksByProject[project.id] || []
+      tasks: tasksByProject[project.id] || [],
+      users: usersByProject[project.id] || []
     }));
 
-    return Response.json(projectsWithTasks);
+    return Response.json(projectsWithTasksAndUsers);
 
   } catch {
     return new Response('Fehler beim Laden der Projekte', { status: 500 });

@@ -2,18 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Folder, 
-  Plus, 
-  ExternalLink, 
-  Settings, 
-  User, 
+import {
+  Folder,
+  Plus,
+  ExternalLink,
+  Settings,
+  User,
   LogOut,
   AlertCircle,
   CheckCircle,
   Loader
 } from 'lucide-react';
 import Link from 'next/link';
+import UserAvatarList from '../../components/shared/users/UserAvatarList';
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -222,7 +223,20 @@ export default function ProjectsPage() {
                       </p>
                     </div>
                   </div>
-                  
+
+                  {/* User Access Display */}
+                  {project.users && project.users.length > 0 && (
+                    <div className="mb-4">
+                      <UserAvatarList
+                        users={project.users}
+                        maxVisible={3}
+                        size="sm"
+                        showCount={false}
+                        className="justify-start"
+                      />
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(project)}`}>
                       {project.widget_installed ? (

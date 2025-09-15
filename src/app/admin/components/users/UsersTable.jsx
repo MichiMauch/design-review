@@ -2,14 +2,7 @@ import UserTableRow from './UserTableRow';
 
 export default function UsersTable({
   users,
-  editingUser,
-  editUserForm,
-  onEditFormChange,
-  onStartEdit,
-  onUpdate,
-  onCancelEdit,
-  onDelete,
-  onOpenProjectManager
+  onUserClick
 }) {
   return (
     <div className="bg-white rounded-lg shadow">
@@ -30,9 +23,6 @@ export default function UsersTable({
                 Rolle
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Projekte
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Erstellt
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -45,14 +35,7 @@ export default function UsersTable({
               <UserTableRow
                 key={user.id}
                 user={user}
-                isEditing={editingUser === user.id}
-                editUserForm={editUserForm}
-                onEditFormChange={onEditFormChange}
-                onStartEdit={onStartEdit}
-                onUpdate={onUpdate}
-                onCancelEdit={onCancelEdit}
-                onDelete={onDelete}
-                onOpenProjectManager={onOpenProjectManager}
+                onUserClick={onUserClick}
               />
             ))}
           </tbody>

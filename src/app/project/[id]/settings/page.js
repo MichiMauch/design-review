@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Settings, AlertTriangle, Trash2 } from 'lucide-react';
 import StatusManager from '../../../../components/status/StatusManager';
+import ProjectUserManager from '../../../../components/shared/users/ProjectUserManager';
+import { useProjectUsers } from '../../../../hooks/useProjectUsers';
 
 export default function ProjectSettings() {
   const params = useParams();
@@ -22,6 +24,9 @@ export default function ProjectSettings() {
   const [deletingProject, setDeletingProject] = useState(false);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+
+  // Project users management
+  const { users: projectUsers, loading: loadingUsers, refreshUsers } = useProjectUsers(params.id);
 
   const checkAuthentication = useCallback(async () => {
     try {
@@ -318,6 +323,29 @@ export default function ProjectSettings() {
 
           <div className="px-6 py-6">
             <StatusManager projectId={parseInt(params.id)} />
+          </div>
+        </div>
+
+        {/* User Access Management Section */}
+        <div className="bg-white shadow rounded-lg overflow-hidden mb-6 mt-6">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">
+              Benutzerzugriffe
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Verwalten Sie welche Benutzer Zugriff auf dieses Projekt haben.
+              Nur Admins können Benutzer hinzufügen oder entfernen.
+            </p>
+          </div>
+
+          <div className="px-6 py-6">
+            <ProjectUserManager
+              projectId={parseInt(params.id)}
+              users={projectUsers}
+              loading={loadingUsers}
+              currentUser={user}
+              refreshUsers={refreshUsers}
+            />
           </div>
         </div>
 
