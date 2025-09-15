@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { formatTime } from '../../utils/projectUtils';
+import { AIBadgeSet } from '../ai/AIBadges';
 
 function TaskBoard({
   tasks,
@@ -229,6 +230,13 @@ const areEqual = (prevProps, nextProps) => {
   if (prevProps.task.url !== nextProps.task.url) return false;
   if (prevProps.task.jira_key !== nextProps.task.jira_key) return false;
 
+  // Check AI analysis fields
+  if (prevProps.task.ai_sentiment !== nextProps.task.ai_sentiment) return false;
+  if (prevProps.task.ai_confidence !== nextProps.task.ai_confidence) return false;
+  if (prevProps.task.ai_category !== nextProps.task.ai_category) return false;
+  if (prevProps.task.ai_priority !== nextProps.task.ai_priority) return false;
+  if (prevProps.task.ai_analyzed_at !== nextProps.task.ai_analyzed_at) return false;
+
   // Check editing state
   if (prevProps.isEditing !== nextProps.isEditing) return false;
 
@@ -323,6 +331,19 @@ const TaskBoardCard = memo(function TaskBoardCard({
                   {task.description}
                 </p>
               )}
+
+              {/* AI Analysis Badges */}
+              <div className="mb-2">
+                <AIBadgeSet
+                  sentiment={task.ai_sentiment}
+                  confidence={task.ai_confidence}
+                  category={task.ai_category}
+                  priority={task.ai_priority}
+                  analyzed={!!task.ai_analyzed_at}
+                  compact={true}
+                  className="flex-wrap gap-1"
+                />
+              </div>
             </>
           )}
         </div>

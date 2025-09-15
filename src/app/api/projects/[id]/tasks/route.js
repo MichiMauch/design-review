@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
     const db = getDb();
 
     const result = await db.execute({
-      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, sort_order, created_at FROM tasks WHERE project_id = ? ORDER BY COALESCE(sort_order, 999), created_at DESC',
+      sql: 'SELECT id, project_id, title, description, url, status, selected_area, jira_key, title_en, description_en, screenshot, screenshot_url, sort_order, ai_sentiment, ai_confidence, ai_category, ai_priority, ai_summary, ai_keywords, ai_analyzed_at, created_at FROM tasks WHERE project_id = ? ORDER BY COALESCE(sort_order, 999), created_at DESC',
       args: [resolvedParams.id]
     });
 
@@ -188,6 +188,51 @@ export async function POST(request, { params }) {
     });
 
     const taskId = Number(result.lastInsertRowid);
+
+    // Trigger AI analysis in background (non-blocking)
+    if (process.env.OPENAI_API_KEY && (title || description)) {
+      try {
+        // Import and analyze in background
+        const { analyzeFeedback } = await import('../../../../../lib/ai-service.js');
+        const analysisText = [title, description].filter(Boolean).join('. ');
+
+        // Run analysis without blocking the response
+        analyzeFeedback(analysisText).then(async (aiResult) => {
+          if (aiResult.success) {
+            const analysis = aiResult.analysis;
+            // Update task with AI analysis
+            await db.execute({
+              sql: `
+                UPDATE tasks
+                SET
+                  ai_sentiment = ?,
+                  ai_confidence = ?,
+                  ai_category = ?,
+                  ai_priority = ?,
+                  ai_summary = ?,
+                  ai_keywords = ?,
+                  ai_analyzed_at = datetime('now', 'localtime')
+                WHERE id = ?
+              `,
+              args: [
+                analysis.sentiment,
+                analysis.confidence,
+                analysis.category,
+                analysis.priority,
+                analysis.summary,
+                JSON.stringify(analysis.keywords),
+                taskId
+              ]
+            });
+            console.log(`AI analysis completed for task ${taskId}`);
+          }
+        }).catch(error => {
+          console.warn(`AI analysis failed for task ${taskId}:`, error.message);
+        });
+      } catch (error) {
+        console.warn('AI analysis initialization failed:', error.message);
+      }
+    }
 
     return addCorsHeaders(Response.json({
       id: taskId,

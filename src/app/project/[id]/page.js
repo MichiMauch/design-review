@@ -320,6 +320,8 @@ export default function ProjectPage() {
             onExcelExport={() => projectManager.handleExcelExport(taskManager.loadTaskScreenshot)}
             exportingExcel={projectManager.exportingExcel}
             viewMode={taskManager.viewMode}
+            projectId={params.id}
+            onTasksUpdate={taskManager.loadTasks}
           />
         </div>
 

@@ -1,12 +1,15 @@
 'use client';
 
 import { Download } from 'lucide-react';
+import AIProjectDashboard from '../ai/AIProjectDashboard';
 
 export default function ProjectSidebar({
   tasks,
   onExcelExport,
   exportingExcel,
-  viewMode
+  viewMode,
+  projectId,
+  onTasksUpdate
 }) {
   if (viewMode !== 'list') return null;
 
@@ -62,6 +65,15 @@ export default function ProjectSidebar({
           )}
         </button>
       </div>
+
+      {/* AI Analysis Dashboard */}
+      {projectId && (
+        <AIProjectDashboard
+          projectId={projectId}
+          tasks={tasks}
+          onTasksUpdate={onTasksUpdate}
+        />
+      )}
     </div>
   );
 }
