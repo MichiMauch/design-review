@@ -1,9 +1,135 @@
 // Modern Feedback Widget with Screenshot Annotation using html-to-image
 (function() {
     'use strict';
-    
-    
-    // Configuration
+
+    // ============================================================================
+    // TOAST NOTIFICATION SYSTEM
+    // ============================================================================
+    const ToastManager = (function() {
+        let toastContainer = null;
+
+        function createToastContainer() {
+            if (toastContainer) return toastContainer;
+
+            toastContainer = document.createElement('div');
+            toastContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 20000;
+                pointer-events: none;
+            `;
+            document.body.appendChild(toastContainer);
+            return toastContainer;
+        }
+
+        function showToast(message, type = 'error', duration = 4000) {
+            const container = createToastContainer();
+
+            // Toast styling based on type
+            const styles = {
+                error: {
+                    background: '#dc3545',
+                    color: 'white',
+                    icon: '⚠️'
+                },
+                success: {
+                    background: '#28a745',
+                    color: 'white',
+                    icon: '✅'
+                },
+                warning: {
+                    background: '#ffc107',
+                    color: '#212529',
+                    icon: '⚠️'
+                },
+                info: {
+                    background: '#17a2b8',
+                    color: 'white',
+                    icon: 'ℹ️'
+                }
+            };
+
+            const style = styles[type] || styles.error;
+
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                background: ${style.background};
+                color: ${style.color};
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                max-width: 350px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                font-family: Arial, sans-serif;
+                font-size: 14px;
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                pointer-events: auto;
+                cursor: pointer;
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                animation: slideIn 0.3s ease-out forwards;
+            `;
+
+            toast.innerHTML = `
+                <span style="font-size: 16px;">${style.icon}</span>
+                <span style="flex: 1;">${message}</span>
+                <span style="opacity: 0.7; font-size: 18px; line-height: 1;">×</span>
+            `;
+
+            // Add slide-in animation
+            const styleSheet = document.createElement('style');
+            styleSheet.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); }
+                    to { transform: translateX(0); }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); }
+                    to { transform: translateX(100%); }
+                }
+            `;
+            if (!document.head.querySelector('style[data-toast-styles]')) {
+                styleSheet.setAttribute('data-toast-styles', 'true');
+                document.head.appendChild(styleSheet);
+            }
+
+            container.appendChild(toast);
+
+            // Auto-dismiss
+            const dismiss = () => {
+                toast.style.animation = 'slideOut 0.3s ease-in forwards';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            };
+
+            // Click to dismiss
+            toast.addEventListener('click', dismiss);
+
+            // Auto-dismiss after duration
+            setTimeout(dismiss, duration);
+
+            return toast;
+        }
+
+        return {
+            show: showToast,
+            error: (message) => showToast(message, 'error'),
+            success: (message) => showToast(message, 'success'),
+            warning: (message) => showToast(message, 'warning'),
+            info: (message) => showToast(message, 'info')
+        };
+    })();
+
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
     const script = document.currentScript || document.querySelector('script[data-project-id]');
     const projectId = script?.getAttribute('data-project-id') || 'default-project';
     
@@ -31,56 +157,10 @@
     let loadingJiraConfig = false;
     let currentFeedbackData = null;
     let jiraModalWindow = null;
-    
-    // Show toast notification
+
+    // Legacy toast function - redirect to ToastManager
     function showToast(message, type = 'success', duration = 3000) {
-        const toast = document.createElement('div');
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 8px;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            z-index: 9999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            max-width: 300px;
-            word-wrap: break-word;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-        `;
-        
-        // Set background color based on type
-        if (type === 'success') {
-            toast.style.backgroundColor = '#28a745';
-        } else if (type === 'error') {
-            toast.style.backgroundColor = '#dc3545';
-        } else if (type === 'warning') {
-            toast.style.backgroundColor = '#ffc107';
-            toast.style.color = '#212529';
-        } else {
-            toast.style.backgroundColor = '#007bff';
-        }
-        
-        toast.innerHTML = message;
-        document.body.appendChild(toast);
-        
-        // Animate in
-        setTimeout(() => {
-            toast.style.transform = 'translateX(0)';
-        }, 100);
-        
-        // Auto remove
-        setTimeout(() => {
-            toast.style.transform = 'translateX(100%)';
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 300);
-        }, duration);
+        return ToastManager.show(message, type, duration);
     }
     
     // Create feedback button
@@ -399,6 +479,9 @@
         annotationModal.id = 'feedback-annotation-modal';
         annotationModal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10001; display: flex;">
+                <!-- Mobile Sidebar Backdrop -->
+                <div id="sidebar-backdrop"></div>
+
                 <!-- Sidebar -->
                 <div class="sidebar" style="width: 320px; background: white; display: flex; flex-direction: column; box-shadow: 2px 0 8px rgba(0,0,0,0.2);">
                     <!-- Sidebar Header -->
@@ -414,6 +497,7 @@
                                 <button id="tool-rectangle" class="annotation-tool active" data-tool="rectangle" style="padding: 8px 12px; border: 2px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">📱 Rechteck</button>
                                 <button id="tool-circle" class="annotation-tool" data-tool="circle" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">⭕ Kreis</button>
                                 <button id="tool-line" class="annotation-tool" data-tool="line" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">📏 Linie</button>
+                                <button id="tool-arrow" class="annotation-tool" data-tool="arrow" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">➡️ Pfeil</button>
                                 <button id="tool-freehand" class="annotation-tool" data-tool="freehand" style="padding: 8px 12px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 4px; cursor: pointer; font-family: Arial, sans-serif; font-size: 12px; transition: all 0.2s;">✏️ Stift</button>
                                 <button id="tool-clear" title="Alles löschen" style="width: 38px; height: 38px; border: 2px solid #dc3545; background: white; color: #dc3545; border-radius: 4px; cursor: pointer; font-size: 16px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; padding: 0;">🗑️</button>
                             </div>
@@ -476,24 +560,74 @@
             </div>
             
             <!-- Mobile Toggle Button -->
-            <button id="sidebar-toggle" style="display: none; position: absolute; top: 16px; left: 16px; z-index: 10003; background: white; border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-family: Arial, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">☰ Tools</button>
-            
+            <button id="sidebar-toggle" style="display: none; position: fixed; top: 20px; left: 20px; z-index: 10005; background: #007bff; color: white; border: none; border-radius: 8px; padding: 12px 16px; cursor: pointer; font-family: Arial, sans-serif; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(0,123,255,0.3); transition: all 0.2s ease;">
+                <span id="toggle-icon">☰</span> <span id="toggle-text">Tools</span>
+            </button>
+
             <style>
-                @media (max-width: 768px) {
-                    #feedback-annotation-modal .sidebar { 
-                        position: absolute !important; 
-                        z-index: 10004 !important; 
-                        transform: translateX(-100%) !important; 
-                        transition: transform 0.3s ease !important;
+                /* Responsive Design - Verbesserte Breakpoints */
+                @media (max-width: 1024px) {
+                    #feedback-annotation-modal .sidebar {
+                        position: fixed !important;
+                        z-index: 10004 !important;
+                        transform: translateX(-100%) !important;
+                        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                        height: 100vh !important;
+                        overflow-y: auto !important;
+                        box-shadow: 4px 0 16px rgba(0,0,0,0.3) !important;
                     }
-                    #feedback-annotation-modal .sidebar.open { 
-                        transform: translateX(0) !important; 
+                    #feedback-annotation-modal .sidebar.open {
+                        transform: translateX(0) !important;
                     }
-                    #sidebar-toggle { 
-                        display: block !important; 
+                    #sidebar-toggle {
+                        display: block !important;
                     }
-                    #screenshot-image { 
-                        max-width: calc(100vw - 40px) !important; 
+                    #sidebar-toggle:hover {
+                        background: #0056b3 !important;
+                        transform: translateY(-1px) !important;
+                        box-shadow: 0 6px 16px rgba(0,123,255,0.4) !important;
+                    }
+                    #screenshot-image {
+                        max-width: calc(100vw - 40px) !important;
+                        max-height: calc(100vh - 60px) !important;
+                    }
+                }
+
+                /* Sehr kleine Bildschirme */
+                @media (max-width: 480px) {
+                    #feedback-annotation-modal .sidebar {
+                        width: 90vw !important;
+                        max-width: 320px !important;
+                    }
+                    #sidebar-toggle {
+                        top: 16px !important;
+                        left: 16px !important;
+                        padding: 10px 14px !important;
+                        font-size: 13px !important;
+                    }
+                    #screenshot-image {
+                        max-width: calc(100vw - 32px) !important;
+                        max-height: calc(100vh - 80px) !important;
+                    }
+                }
+
+                /* Backdrop für mobile Sidebar */
+                @media (max-width: 1024px) {
+                    #sidebar-backdrop {
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        background: rgba(0,0,0,0.5) !important;
+                        z-index: 10003 !important;
+                        opacity: 0 !important;
+                        visibility: hidden !important;
+                        transition: all 0.3s ease !important;
+                    }
+                    #sidebar-backdrop.active {
+                        opacity: 1 !important;
+                        visibility: visible !important;
                     }
                 }
                 
@@ -516,15 +650,59 @@
             if (cancelBtn) cancelBtn.onclick = closeAnnotationInterface;
             if (submitBtn) submitBtn.onclick = submitAnnotatedFeedback;
             
-            // Mobile Sidebar Toggle
+            // Enhanced Mobile Sidebar Toggle
             const sidebarToggle = document.getElementById('sidebar-toggle');
             const sidebar = document.querySelector('.sidebar');
-            if (sidebarToggle && sidebar) {
-                sidebarToggle.onclick = () => {
-                    sidebar.classList.toggle('open');
-                    sidebarToggle.textContent = sidebar.classList.contains('open') ? '✕ Schließen' : '☰ Tools';
-                };
+            const backdrop = document.getElementById('sidebar-backdrop');
+            const toggleIcon = document.getElementById('toggle-icon');
+            const toggleText = document.getElementById('toggle-text');
+
+            function openSidebar() {
+                if (sidebar) sidebar.classList.add('open');
+                if (backdrop) backdrop.classList.add('active');
+                if (toggleIcon) toggleIcon.textContent = '✕';
+                if (toggleText) toggleText.textContent = 'Schließen';
             }
+
+            function closeSidebar() {
+                if (sidebar) sidebar.classList.remove('open');
+                if (backdrop) backdrop.classList.remove('active');
+                if (toggleIcon) toggleIcon.textContent = '☰';
+                if (toggleText) toggleText.textContent = 'Tools';
+            }
+
+            function toggleSidebar() {
+                if (sidebar && sidebar.classList.contains('open')) {
+                    closeSidebar();
+                } else {
+                    openSidebar();
+                }
+            }
+
+            // Toggle button click
+            if (sidebarToggle) {
+                sidebarToggle.onclick = toggleSidebar;
+            }
+
+            // Backdrop click to close
+            if (backdrop) {
+                backdrop.onclick = closeSidebar;
+            }
+
+            // ESC key to close sidebar
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
+                    closeSidebar();
+                }
+            });
+
+            // Auto-close on window resize to desktop size
+            function handleResize() {
+                if (window.innerWidth > 1024 && sidebar && sidebar.classList.contains('open')) {
+                    closeSidebar();
+                }
+            }
+            window.addEventListener('resize', handleResize);
             
             // JIRA-Checkbox Visibility mit neuer Logik
             // Nur aufrufen wenn Projekt bereits geladen wurde
@@ -1532,6 +1710,30 @@
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y2);
                     break;
+                case 'arrow':
+                    // Hauptlinie zeichnen
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+
+                    // Pfeilspitze berechnen
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    const arrowLength = 15;
+                    const arrowAngle = Math.PI / 6; // 30 Grad
+
+                    // Erste Linie der Pfeilspitze
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(
+                        x2 - arrowLength * Math.cos(angle - arrowAngle),
+                        y2 - arrowLength * Math.sin(angle - arrowAngle)
+                    );
+
+                    // Zweite Linie der Pfeilspitze
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(
+                        x2 - arrowLength * Math.cos(angle + arrowAngle),
+                        y2 - arrowLength * Math.sin(angle + arrowAngle)
+                    );
+                    break;
             }
             ctx.stroke();
         }
@@ -1616,11 +1818,11 @@
         const jiraStatusMessage = document.getElementById('jira-status-message');
 
         if (!title) {
-            alert('Bitte geben Sie einen Titel ein.');
+            ToastManager.error('Bitte geben Sie einen Titel ein.');
             return;
         }
         if (!description) {
-            alert('Bitte geben Sie eine Beschreibung ein.');
+            ToastManager.error('Bitte geben Sie eine Beschreibung ein.');
             return;
         }
 

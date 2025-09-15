@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget-New Test Seite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            margin: 20px 0;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h3 {
+            font-size: 1.5em;
+            margin: 0 0 15px 0;
+        }
+
+        .card p {
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        .toolbar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 0.9em;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 0;
+            opacity: 0.7;
+        }
+
+        /* Responsive Design Test */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .toolbar {
+                position: static;
+                margin: 20px 0;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.5em;
+            }
+
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Widget-New Test Seite</h1>
+            <p>Diese Seite testet das neue mobile-responsive Feedback Widget</p>
+            <p><strong>Anleitung:</strong> Verkleinere den Browser oder nutze die mobile Ansicht (F12 → Toggle Device Toolbar)</p>
+        </div>
+
+        <div class="toolbar">
+            <strong>📱 Mobile Test:</strong><br>
+            1. Browser verkleinern (&lt; 1024px)<br>
+            2. Feedback-Button klicken<br>
+            3. "☰ Tools" Button suchen<br>
+            4. Zeichenwerkzeuge testen
+        </div>
+
+        <div class="content">
+            <div class="card">
+                <h3>✨ Neue Features</h3>
+                <p>Das Widget wurde für mobile Geräte optimiert. Die Sidebar mit den Zeichenwerkzeugen ist jetzt auf allen Bildschirmgrößen zugänglich.</p>
+                <p>Bei kleinen Bildschirmen erscheint ein blauer "☰ Tools" Button, um die Werkzeuge ein- und auszublenden.</p>
+            </div>
+
+            <div class="card">
+                <h3>🎯 Test-Bereiche</h3>
+                <p>Teste verschiedene Bildschirmgrößen:</p>
+                <ul>
+                    <li><strong>Desktop:</strong> > 1024px (Sidebar immer sichtbar)</li>
+                    <li><strong>Tablet:</strong> 768px - 1024px (Toggle-Button)</li>
+                    <li><strong>Mobile:</strong> < 768px (Optimierte Sidebar)</li>
+                    <li><strong>Klein:</strong> < 480px (Kompakte Ansicht)</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>🔧 Interaktionen</h3>
+                <p>Verschiedene Wege die Sidebar zu schließen:</p>
+                <ul>
+                    <li>Klick auf "✕ Schließen" Button</li>
+                    <li>Klick außerhalb der Sidebar (dunkler Bereich)</li>
+                    <li>ESC-Taste drücken</li>
+                    <li>Browser auf Desktop-Größe vergrößern</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>🎨 Zeichenwerkzeuge</h3>
+                <p>Teste alle verfügbaren Werkzeuge:</p>
+                <ul>
+                    <li>Verschiedene Stiftgrößen (1px - 5px)</li>
+                    <li>Farbauswahl (Schwarz, Rot, Grün, Blau, Gelb)</li>
+                    <li>Markierungen auf dem Screenshot</li>
+                    <li>"Alles löschen" Funktion</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>📝 Feedback-Formular</h3>
+                <p>Das Formular wurde ebenfalls optimiert:</p>
+                <ul>
+                    <li>Touch-freundliche Eingabefelder</li>
+                    <li>Bessere Scrollbar-Integration</li>
+                    <li>Optimierte Button-Größen</li>
+                    <li>JIRA-Integration (falls konfiguriert)</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>🚀 Performance</h3>
+                <p>Verbesserte Animationen und Übergänge:</p>
+                <ul>
+                    <li>Smooth cubic-bezier Transitions</li>
+                    <li>Backdrop-Blur Effekte</li>
+                    <li>Hardware-beschleunigte Animationen</li>
+                    <li>Optimierte z-index Hierarchie</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>💡 Tipp: Nutze die Browser-Entwicklertools (F12) um verschiedene Gerätegrößen zu simulieren</p>
+            <p>Widget-New Version • Responsive Design Test</p>
+        </div>
+    </div>
+
+    <!-- Load Widget-New Script -->
+    <script src="/widget-new.js" data-project-id="widget-new-test" defer></script>
+
+    <script>
+        // Add some debug info
+        console.log('🎯 Widget-New Test Seite geladen');
+        console.log('📱 Aktuelle Bildschirmbreite:', window.innerWidth);
+
+        // Log resize events for debugging
+        window.addEventListener('resize', () => {
+            console.log('📏 Neue Bildschirmbreite:', window.innerWidth);
+        });
+
+        // Show current screen size in page
+        function updateScreenInfo() {
+            const width = window.innerWidth;
+            let size = '';
+            if (width > 1024) size = 'Desktop (> 1024px)';
+            else if (width > 768) size = 'Tablet (768px - 1024px)';
+            else if (width > 480) size = 'Mobile (480px - 768px)';
+            else size = 'Klein (< 480px)';
+
+            document.title = `Widget Test - ${size}`;
+        }
+
+        updateScreenInfo();
+        window.addEventListener('resize', updateScreenInfo);
+    </script>
+</body>
+</html>
