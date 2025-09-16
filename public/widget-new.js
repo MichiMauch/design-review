@@ -163,6 +163,31 @@
         return ToastManager.show(message, type, duration);
     }
     
+    // --------------------------------------------------------------------------
+    // WIDGET PING: Inform server that widget is alive (every 60 minutes)
+    // --------------------------------------------------------------------------
+    async function widgetPing() {
+        try {
+            await fetch(`${baseUrl}/api/projects/${encodeURIComponent(projectId)}/widget-ping`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source: 'widget' })
+            });
+        } catch (e) {
+            // Silently ignore network/CORS issues
+        }
+    }
+
+    // Schedule periodic pings (initial + every 60 minutes)
+    try {
+        // Fire one initial ping shortly after load
+        setTimeout(widgetPing, 2000);
+        // Then every 60 minutes
+        setInterval(widgetPing, 60 * 60 * 1000);
+    } catch (e) {
+        // no-op
+    }
+    
     // Create feedback button
     function createFeedbackButton() {
         const button = document.createElement('button');

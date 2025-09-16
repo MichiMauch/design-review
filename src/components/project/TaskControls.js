@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw, List, Columns, Brain, Heart } from 'lucide-react';
+import { RefreshCw, List, Columns, Brain, Heart, LayoutDashboard } from 'lucide-react';
 
 export default function TaskControls({
   isRefreshing,
@@ -29,8 +29,19 @@ export default function TaskControls({
         {/* View Mode Toggle */}
         <div className="flex items-center border border-gray-200 rounded-lg">
           <button
-            onClick={() => onViewModeChange('list')}
+            onClick={() => onViewModeChange('dashboard')}
             className={`flex items-center gap-1 px-2 py-1 text-sm transition-colors rounded-l-lg ${
+              viewMode === 'dashboard'
+                ? 'bg-blue-100 text-blue-700'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => onViewModeChange('list')}
+            className={`flex items-center gap-1 px-2 py-1 text-sm transition-colors border-l border-gray-200 ${
               viewMode === 'list'
                 ? 'bg-blue-100 text-blue-700'
                 : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'

@@ -15,6 +15,21 @@ export function useProjectManager({ projectId, showToast, router }) {
   });
   const [loadingJiraConfig, setLoadingJiraConfig] = useState(false);
   const [lastAnalyzedTasks, setLastAnalyzedTasks] = useState(new Set());
+  const [authorizedUsers, setAuthorizedUsers] = useState([]);
+
+  const loadAuthorizedUsers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/authorized-users');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.users) {
+          setAuthorizedUsers(data.users);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading authorized users:', error);
+    }
+  }, []);
 
   const loadProject = useCallback(async () => {
     try {
@@ -24,6 +39,9 @@ export function useProjectManager({ projectId, showToast, router }) {
       }
       const projectData = await response.json();
       setProject(projectData);
+
+      // Load authorized users
+      loadAuthorizedUsers();
 
       // Load combined JIRA config immediately after project is set (non-blocking)
       try {
@@ -39,7 +57,7 @@ export function useProjectManager({ projectId, showToast, router }) {
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, router]);
+  }, [projectId, router, loadAuthorizedUsers]);
 
   const loadTasks = useCallback(async (silent = false) => {
     try {
@@ -272,14 +290,14 @@ export function useProjectManager({ projectId, showToast, router }) {
   useEffect(() => {
     if (!projectId) return;
 
-    // Check widget installation status every 10 seconds, refresh tasks every 3 seconds
+    // Check widget installation status every 30 seconds, refresh tasks every 30 seconds
     const widgetInterval = setInterval(() => {
       checkWidgetStatus();
-    }, 10000);
+    }, 30000);
 
     const tasksInterval = setInterval(async () => {
-      await loadTasks(); // Refresh tasks more frequently to catch AI analysis updates
-    }, 3000);
+      await loadTasks(); // Refresh tasks periodically to catch AI analysis updates
+    }, 30000);
 
     return () => {
       clearInterval(widgetInterval);
@@ -309,6 +327,7 @@ export function useProjectManager({ projectId, showToast, router }) {
     isRefreshing,
     user,
     exportingExcel,
+    authorizedUsers,
     combinedJiraConfig,
     setCombinedJiraConfig,
     jiraConfig,

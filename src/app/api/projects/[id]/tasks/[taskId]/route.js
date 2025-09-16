@@ -1,4 +1,5 @@
 import { getDb, initDatabase } from '../../../../../../../lib/db.js';
+import { requireAuth, hasProjectAccess } from '../../../../../../../lib/auth.js';
 
 function addCorsHeaders(response) {
   response.headers.set('Access-Control-Allow-Origin', '*');
@@ -17,17 +18,23 @@ export async function PATCH(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
+    const user = await requireAuth();
     const resolvedParams = await params;
+
+    // Check project access
+    if (!hasProjectAccess(user, resolvedParams.id)) {
+      return addCorsHeaders(new Response('Access denied', { status: 403 }));
+    }
     
     const requestBody = await request.json();
     
-    const { title, description, jira_key, jira_url, status, sort_order } = requestBody;
+    const { title, description, jira_key, jira_url, status, sort_order, ai_category, sentiment_category } = requestBody;
 
     await initDatabase();
     const db = getDb();
 
-    // If only jira_key/jira_url, status, or sort_order is being updated, handle separately
-    if ((!title && (jira_key !== undefined || jira_url !== undefined)) || (!title && (status !== undefined || sort_order !== undefined) && jira_key === undefined && jira_url === undefined)) {
+    // If only jira_key/jira_url, status, sort_order, ai_category, or sentiment_category is being updated, handle separately
+    if ((!title && (jira_key !== undefined || jira_url !== undefined)) || (!title && (status !== undefined || sort_order !== undefined || ai_category !== undefined || sentiment_category !== undefined) && jira_key === undefined && jira_url === undefined)) {
       
       const currentTask = await db.execute({
         sql: 'SELECT title, description FROM tasks WHERE id = ? AND project_id = ?',
@@ -41,18 +48,30 @@ export async function PUT(request, { params }) {
 
       // Update only the specified fields
       let updateSql, updateArgs;
-      if ((status !== undefined || sort_order !== undefined) && jira_key === undefined && jira_url === undefined) {
-        // Status and/or sort_order update
-        if (status !== undefined && sort_order !== undefined) {
-          updateSql = `UPDATE tasks SET status = ?, sort_order = ? WHERE id = ? AND project_id = ?`;
-          updateArgs = [status, sort_order, resolvedParams.taskId, resolvedParams.id];
-        } else if (status !== undefined) {
-          updateSql = `UPDATE tasks SET status = ? WHERE id = ? AND project_id = ?`;
-          updateArgs = [status, resolvedParams.taskId, resolvedParams.id];
-        } else if (sort_order !== undefined) {
-          updateSql = `UPDATE tasks SET sort_order = ? WHERE id = ? AND project_id = ?`;
-          updateArgs = [sort_order, resolvedParams.taskId, resolvedParams.id];
+      if ((status !== undefined || sort_order !== undefined || ai_category !== undefined || sentiment_category !== undefined) && jira_key === undefined && jira_url === undefined) {
+        // Partial update (status, sort_order, ai_category, sentiment_category)
+        const fieldsToUpdate = [];
+        const valuesToUpdate = [];
+
+        if (status !== undefined) {
+          fieldsToUpdate.push('status = ?');
+          valuesToUpdate.push(status);
         }
+        if (sort_order !== undefined) {
+          fieldsToUpdate.push('sort_order = ?');
+          valuesToUpdate.push(sort_order);
+        }
+        if (ai_category !== undefined) {
+          fieldsToUpdate.push('ai_category = ?');
+          valuesToUpdate.push(ai_category);
+        }
+        if (sentiment_category !== undefined) {
+          fieldsToUpdate.push('sentiment_category = ?');
+          valuesToUpdate.push(sentiment_category);
+        }
+
+        updateSql = `UPDATE tasks SET ${fieldsToUpdate.join(', ')} WHERE id = ? AND project_id = ?`;
+        updateArgs = [...valuesToUpdate, resolvedParams.taskId, resolvedParams.id];
       } else if (jira_key !== undefined || jira_url !== undefined) {
         // JIRA key/url update
         updateSql = `UPDATE tasks SET jira_key = ?, jira_url = ? WHERE id = ? AND project_id = ?`;
@@ -92,7 +111,7 @@ export async function PUT(request, { params }) {
     const result = await db.execute({
       sql: `
         UPDATE tasks
-        SET title = ?, description = ?, jira_key = ?, jira_url = ?, status = ?, sort_order = ?
+        SET title = ?, description = ?, jira_key = ?, jira_url = ?, status = ?, sort_order = ?, ai_category = ?, sentiment_category = ?
         WHERE id = ? AND project_id = ?
       `,
       args: [
@@ -102,6 +121,8 @@ export async function PUT(request, { params }) {
         jira_url || null,
         status || 'open',
         sort_order || null,
+        ai_category || null,
+        sentiment_category || null,
         resolvedParams.taskId,
         resolvedParams.id
       ]
@@ -118,17 +139,24 @@ export async function PUT(request, { params }) {
     }));
 
   } catch (error) {
-    return addCorsHeaders(Response.json({ 
-      success: false, 
+    console.error('Error updating task:', error);
+    return addCorsHeaders(Response.json({
+      success: false,
       error: 'Fehler beim Aktualisieren der Task',
-      details: error.message 
+      details: error.message
     }, { status: 500 }));
   }
 }
 
 export async function DELETE(request, { params }) {
   try {
+    const user = await requireAuth();
     const resolvedParams = await params;
+
+    // Check project access
+    if (!hasProjectAccess(user, resolvedParams.id)) {
+      return addCorsHeaders(new Response('Access denied', { status: 403 }));
+    }
 
     await initDatabase();
     const db = getDb();
@@ -149,10 +177,11 @@ export async function DELETE(request, { params }) {
     }));
 
   } catch (error) {
-    return addCorsHeaders(Response.json({ 
-      success: false, 
+    console.error('Error deleting task:', error);
+    return addCorsHeaders(Response.json({
+      success: false,
       error: 'Fehler beim Löschen der Task',
-      details: error.message 
+      details: error.message
     }, { status: 500 }));
   }
 }

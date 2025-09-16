@@ -11,15 +11,13 @@ export const formatTime = (dateString) => {
   // Handle different date formats from database
   let date;
   if (dateString.includes('T')) {
-    // ISO format with timezone (e.g., "2025-08-29T12:53:20+02:00")
+    // ISO format with timezone or Z (UTC)
     date = new Date(dateString);
   } else {
-    // SQLite datetime format (e.g., "2025-08-29 10:43:38") - treat as local time
-    // JavaScript interprets "YYYY-MM-DD HH:mm:ss" as UTC, but we need local time
-    // Solution: Add timezone offset to compensate
-    const tempDate = new Date(dateString.replace(' ', 'T'));
-    const timezoneOffset = tempDate.getTimezoneOffset() * 60000; // in milliseconds
-    date = new Date(tempDate.getTime() - timezoneOffset);
+    // SQLite format without timezone: interpret as UTC to unify storage
+    // Convert to ISO by adding 'T' and 'Z'
+    const iso = dateString.replace(' ', 'T') + 'Z';
+    date = new Date(iso);
   }
 
   // Verify date is valid
@@ -44,11 +42,12 @@ export const formatTime = (dateString) => {
   } else if (diffDays < 7) {
     return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
   } else {
-    // For older dates, show in local timezone
-    return date.toLocaleDateString('de-DE', {
+    // For older dates, show in Europe/Zurich regardless of browser TZ
+    return date.toLocaleDateString('de-CH', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'Europe/Zurich'
     });
   }
 };

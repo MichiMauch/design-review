@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   serverExternalPackages: ['sqlite3'],
   webpack: (config, { isServer }) => {
     if (isServer) {

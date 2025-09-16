@@ -1,8 +1,7 @@
 'use client';
 
-import { memo } from 'react';
-import { AlertCircle, Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
-import { formatTime } from '../../utils/projectUtils';
+import { memo, useState, useCallback } from 'react';
+import { AlertCircle, Edit3, X, MessageSquare, Calendar, Eye, ChevronUp, ChevronDown } from 'lucide-react';
 
 function TaskList({
   filteredTasks,
@@ -27,6 +26,52 @@ function TaskList({
 }) {
   if (viewMode !== 'list') return null;
 
+  // Sorting state
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  // Sorting functions
+  const handleSort = useCallback((column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  }, [sortBy, sortOrder]);
+
+  const getSortIcon = useCallback((column) => {
+    if (sortBy !== column) return null;
+    return sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
+  }, [sortBy, sortOrder]);
+
+  const getSortedTasks = useCallback((tasks) => {
+    return [...tasks].sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortBy) {
+        case 'status':
+          aVal = a.status || 'open';
+          bVal = b.status || 'open';
+          break;
+        case 'created_at':
+          aVal = new Date(a.created_at || 0);
+          bVal = new Date(b.created_at || 0);
+          break;
+        case 'comments':
+          aVal = getCommentCount ? getCommentCount(a.id) : 0;
+          bVal = getCommentCount ? getCommentCount(b.id) : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [sortBy, sortOrder, getCommentCount]);
+
   // Status info function
   const getStatusInfo = (status) => {
     const statusConfig = projectStatuses.find(s => s.value === status) || {
@@ -48,266 +93,162 @@ function TaskList({
     );
   }
 
+  const sortedTasks = getSortedTasks(filteredTasks);
+
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
         <AlertCircle className="h-5 w-5 text-red-500" />
-        Tasks ({filteredTasks.length})
+        Tasks - Sortierbare Tabelle ({sortedTasks.length})
       </h3>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-        {filteredTasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            isEditing={editingTask === task.id}
-            editForm={editForm}
-            onEditFormChange={onEditFormChange}
-            onStartEditing={onStartEditing}
-            onSaveTask={onSaveTask}
-            onCancelEditing={onCancelEditing}
-            onUpdateStatus={onUpdateStatus}
-            onOpenTaskModal={onOpenTaskModal}
-            onOpenDeleteModal={onOpenDeleteModal}
-            onOpenJiraModal={onOpenJiraModal}
-            getScreenshotUrl={getScreenshotUrl}
-            getCommentCount={getCommentCount}
-            user={user}
-            creatingJira={creatingJira}
-            loadingJiraModal={loadingJiraModal}
-            loadingJiraConfig={loadingJiraConfig}
-            getStatusInfo={getStatusInfo}
-            projectStatuses={projectStatuses}
-          />
-        ))}
+
+      <div className="bg-white rounded-lg shadow overflow-hidden max-w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed min-w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '100px'}}>
+                  Screenshot
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '40%'}}>
+                  Titel
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  style={{width: '120px'}}
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center gap-1">
+                    Status
+                    {getSortIcon('status')}
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  style={{width: '100px'}}
+                  onClick={() => handleSort('created_at')}
+                >
+                  <div className="flex items-center gap-1">
+                    Datum
+                    {getSortIcon('created_at')}
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  style={{width: '80px'}}
+                  onClick={() => handleSort('comments')}
+                >
+                  <div className="flex items-center gap-1">
+                    Kommentare
+                    {getSortIcon('comments')}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '120px'}}>
+                  Aktionen
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedTasks.map((task, index) => {
+                const isEvenRow = index % 2 === 0;
+                const statusInfo = getStatusInfo(task.status);
+
+                return (
+                  <tr
+                    key={task.id}
+                    className={`${isEvenRow ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 cursor-pointer`}
+                    onClick={() => onOpenTaskModal(task)}
+                  >
+                    {/* Screenshot */}
+                    <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                      {(task.screenshot_display || task.screenshot) ? (
+                        <img
+                          src={getScreenshotUrl ? getScreenshotUrl(task.screenshot) : '#'}
+                          alt="Preview"
+                          className="w-20 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => onOpenTaskModal && onOpenTaskModal(task)}
+                        />
+                      ) : (
+                        <div className="w-20 h-16 bg-gray-100 rounded flex items-center justify-center">
+                          <span className="text-gray-400 text-sm">📷</span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Titel */}
+                    <td className="px-4 py-4">
+                      <div className="truncate">
+                        <h4 className="font-medium text-gray-900 text-sm truncate" title={task.title || 'Ohne Titel'}>
+                          {task.title || 'Ohne Titel'}
+                        </h4>
+                      </div>
+                    </td>
+
+                    {/* Status - Display only, not editable */}
+                    <td className="px-4 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full border font-medium ${statusInfo.color}`}>
+                        {statusInfo.label}
+                      </span>
+                    </td>
+
+                    {/* Datum */}
+                    <td className="px-4 py-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span className="hidden sm:inline">
+                          {task.created_at ? new Date(task.created_at).toLocaleDateString('de-DE') : 'Unbekannt'}
+                        </span>
+                        <span className="sm:hidden">
+                          {task.created_at ? new Date(task.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '?'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Kommentare */}
+                    <td className="px-4 py-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        <span>{getCommentCount ? getCommentCount(task.id) : '0'}</span>
+                      </div>
+                    </td>
+
+                    {/* Aktionen */}
+                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => onOpenTaskModal && onOpenTaskModal(task)}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Details anzeigen"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+
+                        <button
+                          onClick={() => onStartEditing && onStartEditing(task)}
+                          className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                          title="Task bearbeiten"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+
+                        <button
+                          onClick={() => onOpenDeleteModal && onOpenDeleteModal(task)}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Task löschen"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
-
-const TaskCard = memo(function TaskCard({
-  task,
-  isEditing,
-  editForm,
-  onEditFormChange,
-  onStartEditing,
-  onSaveTask,
-  onCancelEditing,
-  onUpdateStatus,
-  onOpenTaskModal,
-  onOpenDeleteModal,
-  onOpenJiraModal,
-  getScreenshotUrl,
-  getCommentCount,
-  user,
-  creatingJira,
-  loadingJiraModal,
-  loadingJiraConfig,
-  getStatusInfo,
-  projectStatuses
-}) {
-  const statusInfo = getStatusInfo(task.status);
-
-  return (
-    <div className="bg-white border border-red-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1">
-          {isEditing ? (
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={editForm.title}
-                onChange={(e) => onEditFormChange({ ...editForm, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Task-Titel"
-              />
-              <textarea
-                value={editForm.description}
-                onChange={(e) => onEditFormChange({ ...editForm, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                rows="2"
-                placeholder="Beschreibung (optional)"
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onSaveTask(task.id)}
-                  className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                >
-                  <Save className="h-3 w-3" />
-                  Speichern
-                </button>
-                <button
-                  onClick={onCancelEditing}
-                  className="flex items-center gap-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
-                >
-                  <X className="h-3 w-3" />
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-start gap-2 mb-1">
-                <h4 className="font-medium text-gray-900 flex-1" style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
-                  {task.title}
-                </h4>
-              </div>
-              {task.description && (
-                <p className="text-sm text-gray-600 mb-2" style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
-                  {task.description}
-                </p>
-              )}
-
-              {/* AI Analysis Badges - not shown in list view */}
-            </>
-          )}
-        </div>
-
-        {!isEditing && (
-          <div className="flex items-center gap-1 ml-2">
-            <button
-              onClick={() => onStartEditing(task)}
-              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-              title="Task bearbeiten"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => onOpenDeleteModal(task)}
-              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-              title="Task löschen"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {!isEditing && (
-        <>
-          {/* Status */}
-          <div className="mb-3">
-            <select
-              value={task.status || 'open'}
-              onChange={(e) => onUpdateStatus(task.id, e.target.value)}
-              className={`w-full px-3 py-1 text-xs rounded-full border font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusInfo.color}`}
-            >
-              {projectStatuses.map(status => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Screenshot */}
-          {(task.screenshot_display || task.screenshot) && (
-            <div className="mb-3">
-              <img
-                src={getScreenshotUrl(task.screenshot)}
-                alt="Task Screenshot"
-                className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => onOpenTaskModal(task)}
-                onError={(e) => {
-                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y3ZjdmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5TY3JlZW5zaG90IG5pY2h0IGdlZnVuZGVuPC90ZXh0Pjwvc3ZnPg==';
-                }}
-              />
-            </div>
-          )}
-
-          {/* URL */}
-          {task.url && (
-            <div className="mb-3">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500 truncate flex-1">{task.url}</span>
-                <a
-                  href={task.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 text-blue-600 hover:text-blue-800"
-                  title="URL öffnen"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-3 text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatTime(task.created_at)}
-              </div>
-              <div className="flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" />
-                {getCommentCount(task.id)}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {task.jira_key && task.jira_url && (
-                <a
-                  href={task.jira_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs hover:bg-blue-200 transition-colors"
-                  title="JIRA Ticket öffnen"
-                >
-                  <JiraIcon className="h-3 w-3" />
-                  {task.jira_key}
-                </a>
-              )}
-
-              {user?.role === 'admin' && (
-                <button
-                  onClick={() => onOpenJiraModal(task)}
-                  disabled={creatingJira === task.id || loadingJiraModal === task.id || loadingJiraConfig}
-                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs transition-colors"
-                  title="JIRA Task erstellen"
-                >
-                  {creatingJira === task.id ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                      Erstelle...
-                    </>
-                  ) : loadingJiraModal === task.id ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                      Lade...
-                    </>
-                  ) : (
-                    <>
-                      <JiraIcon className="h-3 w-3" />
-                      JIRA
-                    </>
-                  )}
-                </button>
-              )}
-
-              <button
-                onClick={() => onOpenTaskModal(task)}
-                className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs transition-colors"
-                title="Task Details anzeigen"
-              >
-                Details
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-});
 
 export default memo(TaskList);

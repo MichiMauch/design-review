@@ -16,10 +16,12 @@ export function useTaskManager({
   const [lightboxImage, setLightboxImage] = useState(null);
   const [loadingScreenshots, setLoadingScreenshots] = useState({});
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('board');
+  const [viewMode, setViewMode] = useState('dashboard');
   const [updatingTaskStatus, setUpdatingTaskStatus] = useState(null);
   const [updatingTaskCategory, setUpdatingTaskCategory] = useState(null);
   const [commentCounts, setCommentCounts] = useState({});
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   // Helper function to get screenshot URL
@@ -36,6 +38,15 @@ export function useTaskManager({
     }
     return tasks.filter(task => task.status === statusFilter);
   }, [tasks, statusFilter]);
+
+  // Update comment counts when comments change
+  useEffect(() => {
+    const counts = {};
+    comments.forEach(comment => {
+      counts[comment.task_id] = (counts[comment.task_id] || 0) + 1;
+    });
+    setCommentCounts(counts);
+  }, [comments]);
 
   const getCommentCount = useCallback((taskId) => {
     return commentCounts[taskId] || 0;
@@ -141,10 +152,10 @@ export function useTaskManager({
     );
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}/ai-category`, {
-        method: 'PUT',
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category })
+        body: JSON.stringify({ ai_category: category })
       });
 
       if (!response.ok) {
@@ -166,6 +177,52 @@ export function useTaskManager({
         setTasks(updatedTasks);
       }
       showToast('Fehler beim Aktualisieren der Kategorie', 'error');
+    } finally {
+      setUpdatingTaskCategory(null);
+    }
+  }, [projectId, setTasks, showToast, updatingTaskCategory]);
+
+  // Update Sentiment Category when dragged between categories
+  const updateTaskSentimentCategory = useCallback(async (taskId, sentiment) => {
+    if (updatingTaskCategory === taskId) {
+      return;
+    }
+
+    setUpdatingTaskCategory(taskId);
+
+    // Optimistic update
+    setTasks(currentTasks =>
+      currentTasks.map(task =>
+        task.id === taskId ? { ...task, sentiment_category: sentiment } : task
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sentiment_category: sentiment })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update sentiment category');
+      }
+
+      const { success } = await response.json();
+      if (!success) {
+        throw new Error('Sentiment update failed');
+      }
+
+      showToast('Task-Sentiment aktualisiert', 'success');
+    } catch (error) {
+      console.error('Error updating task sentiment:', error);
+      // Revert on error - fetch fresh data
+      const response = await fetch(`/api/projects/${projectId}/tasks`);
+      if (response.ok) {
+        const updatedTasks = await response.json();
+        setTasks(updatedTasks);
+      }
+      showToast('Fehler beim Aktualisieren des Sentiments', 'error');
     } finally {
       setUpdatingTaskCategory(null);
     }
@@ -411,6 +468,24 @@ export function useTaskManager({
     setIsDragging(false);
   }, []);
 
+  // Load all comments for project tasks
+  const loadProjectComments = useCallback(async () => {
+    setLoadingComments(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/comments`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.comments) {
+          setComments(data.comments);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading project comments:', error);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [projectId]);
+
   // Handle ESC key to close lightbox
   useEffect(() => {
     const handleEscape = (e) => {
@@ -457,6 +532,9 @@ export function useTaskManager({
     // Comment state
     commentCounts,
     setCommentCounts,
+    comments,
+    setComments,
+    loadingComments,
 
     // Drag state
     isDragging,
@@ -470,6 +548,7 @@ export function useTaskManager({
     getScreenshotUrl,
     getCommentCount,
     loadTaskScreenshot,
+    loadProjectComments,
     openScreenshotLightbox,
     closeLightbox,
     startEditing,
@@ -477,6 +556,7 @@ export function useTaskManager({
     saveTask,
     updateTaskStatus,
     updateTaskAICategory,
+    updateTaskSentimentCategory,
     updateStatusAndPosition,
     reorderTasks,
     openTaskDeleteModal,

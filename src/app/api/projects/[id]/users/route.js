@@ -43,7 +43,7 @@ export async function GET(request, { params }) {
         role: user.role,
         created_at: user.created_at,
         access_granted_at: user.access_granted_at,
-        initials: user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        initials: (user.name || user.email).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
       }))
     });
 

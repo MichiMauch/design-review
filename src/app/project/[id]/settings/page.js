@@ -26,7 +26,7 @@ export default function ProjectSettings() {
   const [authChecked, setAuthChecked] = useState(false);
 
   // Project users management
-  const { users: projectUsers, loading: loadingUsers, refreshUsers } = useProjectUsers(params.id);
+  const { users, loading: loadingUsers, refreshUsers } = useProjectUsers(parseInt(params.id));
 
   const checkAuthentication = useCallback(async () => {
     try {
@@ -341,7 +341,7 @@ export default function ProjectSettings() {
           <div className="px-6 py-6">
             <ProjectUserManager
               projectId={parseInt(params.id)}
-              users={projectUsers}
+              users={users}
               loading={loadingUsers}
               currentUser={user}
               refreshUsers={refreshUsers}

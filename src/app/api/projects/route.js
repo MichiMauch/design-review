@@ -36,7 +36,7 @@ export async function POST(request) {
     const result = await db.execute({
       sql: `
         INSERT INTO projects (name, domain, widget_installed, created_at)
-        VALUES (?, ?, FALSE, datetime('now', 'localtime'))
+        VALUES (?, ?, FALSE, datetime('now'))
       `,
       args: [name, domain]
     });

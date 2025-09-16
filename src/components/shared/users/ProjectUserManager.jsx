@@ -25,7 +25,7 @@ const UserRow = ({ user, onRemoveAccess, isRemoving, currentUser }) => {
         {/* User Info */}
         <div className="flex-1">
           <div className="flex items-center space-x-2">
-            <h4 className="font-medium text-gray-900">{user.name}</h4>
+            <h4 className="font-medium text-gray-900">{user.name || user.email}</h4>
             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeClass(user.role)}`}>
               {user.role}
             </span>
@@ -110,7 +110,7 @@ export default function ProjectUserManager({
 
   // Filter users based on search term
   const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -318,13 +318,13 @@ export default function ProjectUserManager({
                           w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow-sm
                           ${user.role === 'admin' ? 'bg-red-500' : 'bg-blue-500'}
                         `}>
-                          {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                          {(user.name || user.email).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                         </div>
 
                         {/* User Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-1">
-                            <h4 className="font-medium text-gray-900 truncate">{user.name}</h4>
+                            <h4 className="font-medium text-gray-900 truncate">{user.name || user.email}</h4>
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeClass(user.role)}`}>
                               {user.role}
                             </span>
