@@ -32,10 +32,21 @@ const PRIORITY_MAPPING = {
  * @param {string} feedbackText - The feedback text to analyze
  * @returns {Promise<Object>} Analysis results
  */
-export async function analyzeFeedback(feedbackText) {
+export async function analyzeFeedback(feedbackText, options = {}) {
+  const startTime = Date.now();
+  const { debug = false, retries = 2 } = options;
+
   try {
     if (!feedbackText || feedbackText.trim().length === 0) {
       throw new Error('Feedback text is required');
+    }
+
+    if (debug) {
+      console.log('🤖 AI Analysis Starting:', {
+        text: feedbackText.substring(0, 100) + (feedbackText.length > 100 ? '...' : ''),
+        length: feedbackText.length,
+        timestamp: new Date().toISOString()
+      });
     }
 
     const prompt = `
@@ -59,62 +70,153 @@ Respond in JSON format:
 }
 `;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert UX researcher and product manager analyzing user feedback. Always respond with valid JSON.'
-        },
-        {
-          role: 'user',
-          content: prompt
+    let response;
+    let attempt = 0;
+
+    while (attempt <= retries) {
+      try {
+        if (debug && attempt > 0) {
+          console.log(`🔄 Retry attempt ${attempt}/${retries}`);
         }
-      ],
-      temperature: 0.3,
-      max_tokens: 300
-    });
+
+        response = await openai.chat.completions.create({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert UX researcher and product manager analyzing user feedback. Always respond with valid JSON.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 300
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
+          throw new Error('No response content from OpenAI');
+        }
+
+        if (debug) {
+          console.log('✅ OpenAI Response:', {
+            model: response.model,
+            usage: response.usage,
+            contentLength: content.length,
+            duration: Date.now() - startTime + 'ms'
+          });
+        }
+
+        break; // Success, exit retry loop
+      } catch (apiError) {
+        attempt++;
+
+        if (debug) {
+          console.error(`❌ OpenAI API Error (attempt ${attempt}):`, {
+            error: apiError.message,
+            code: apiError.code,
+            type: apiError.type,
+            status: apiError.status
+          });
+        }
+
+        if (attempt > retries) {
+          throw new Error(`OpenAI API failed after ${retries + 1} attempts: ${apiError.message}`);
+        }
+
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
 
     const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from OpenAI');
-    }
 
     // Parse the JSON response
     let analysis;
     try {
       analysis = JSON.parse(content);
-    } catch (error) {
-      // Fallback if JSON parsing fails
-      console.error('Failed to parse OpenAI response:', content, error);
-      analysis = createFallbackAnalysis(feedbackText);
+
+      if (debug) {
+        console.log('📋 Parsed Analysis:', {
+          sentiment: analysis.sentiment,
+          confidence: analysis.confidence,
+          category: analysis.category,
+          priority: analysis.priority,
+          hasKeywords: Array.isArray(analysis.keywords),
+          keywordCount: Array.isArray(analysis.keywords) ? analysis.keywords.length : 0
+        });
+      }
+    } catch (parseError) {
+      if (debug) {
+        console.error('❌ JSON Parse Error:', {
+          error: parseError.message,
+          rawContent: content,
+          contentLength: content?.length
+        });
+      }
+
+      // Try to extract data from malformed JSON
+      const extractedData = tryExtractDataFromText(content);
+      if (extractedData) {
+        analysis = extractedData;
+        console.warn('⚠️ Used extracted data from malformed JSON');
+      } else {
+        console.error('Failed to parse OpenAI response, using fallback analysis');
+        analysis = createFallbackAnalysis(feedbackText);
+      }
     }
 
     // Validate and normalize the response
     analysis = validateAndNormalizeAnalysis(analysis, feedbackText);
 
+    const finalAnalysis = {
+      sentiment: analysis.sentiment,
+      confidence: Math.max(0, Math.min(100, analysis.confidence || 70)),
+      category: analysis.category,
+      categoryLabel: FEEDBACK_CATEGORIES[analysis.category] || 'Other',
+      priority: analysis.priority,
+      summary: analysis.summary || feedbackText.substring(0, 50) + '...',
+      keywords: Array.isArray(analysis.keywords) ? analysis.keywords.slice(0, 5) : [],
+      analyzedAt: new Date().toISOString(),
+      processingTime: Date.now() - startTime
+    };
+
+    if (debug) {
+      console.log('✅ AI Analysis Complete:', {
+        ...finalAnalysis,
+        inputLength: feedbackText.length,
+        totalDuration: Date.now() - startTime + 'ms'
+      });
+    }
+
     return {
       success: true,
-      analysis: {
-        sentiment: analysis.sentiment,
-        confidence: Math.max(0, Math.min(100, analysis.confidence || 70)),
-        category: analysis.category,
-        categoryLabel: FEEDBACK_CATEGORIES[analysis.category] || 'Other',
-        priority: analysis.priority,
-        summary: analysis.summary || feedbackText.substring(0, 50) + '...',
-        keywords: Array.isArray(analysis.keywords) ? analysis.keywords.slice(0, 5) : [],
-        analyzedAt: new Date().toISOString()
-      }
+      analysis: finalAnalysis
     };
 
   } catch (error) {
-    console.error('AI Analysis Error:', error);
+    const duration = Date.now() - startTime;
+
+    console.error('AI Analysis Error:', {
+      error: error.message,
+      stack: error.stack,
+      inputText: feedbackText.substring(0, 100) + '...',
+      duration: duration + 'ms',
+      timestamp: new Date().toISOString()
+    });
 
     // Return fallback analysis if OpenAI fails
+    const fallbackAnalysis = createFallbackAnalysis(feedbackText);
     return {
       success: false,
       error: error.message,
-      analysis: createFallbackAnalysis(feedbackText)
+      analysis: {
+        ...fallbackAnalysis,
+        processingTime: duration,
+        fallbackUsed: true
+      }
     };
   }
 }
@@ -317,4 +419,51 @@ export function getAnalysisStatistics(analyzedFeedback) {
   stats.averageConfidence = Math.round(totalConfidence / analyzedFeedback.length);
 
   return stats;
+}
+
+/**
+ * Try to extract analysis data from malformed text response
+ * @param {string} text - The malformed response text
+ * @returns {Object|null} Extracted data or null if extraction fails
+ */
+function tryExtractDataFromText(text) {
+  try {
+    // Common patterns to extract data
+    const patterns = {
+      sentiment: /sentiment[\"']?\s*:\s*[\"']?(positive|negative|neutral)[\"']?/i,
+      confidence: /confidence[\"']?\s*:\s*[\"']?(\d+)[\"']?/i,
+      category: /category[\"']?\s*:\s*[\"']?([\w-]+)[\"']?/i,
+      priority: /priority[\"']?\s*:\s*[\"']?(low|medium|high)[\"']?/i,
+      summary: /summary[\"']?\s*:\s*[\"']([^\"']+)[\"']?/i
+    };
+
+    const extracted = {};
+    let hasData = false;
+
+    // Extract each field using regex
+    for (const [key, regex] of Object.entries(patterns)) {
+      const match = text.match(regex);
+      if (match && match[1]) {
+        extracted[key] = key === 'confidence' ? parseInt(match[1]) : match[1].trim();
+        hasData = true;
+      }
+    }
+
+    // Try to extract keywords
+    const keywordsMatch = text.match(/keywords[\"']?\s*:\s*\[([^\]]+)\]/i);
+    if (keywordsMatch) {
+      try {
+        const keywordStr = keywordsMatch[1].replace(/[\"']/g, '');
+        extracted.keywords = keywordStr.split(',').map(k => k.trim()).filter(k => k);
+        hasData = true;
+      } catch {
+        // Ignore keyword extraction errors
+      }
+    }
+
+    return hasData ? extracted : null;
+  } catch (error) {
+    console.error('Text extraction failed:', error);
+    return null;
+  }
 }

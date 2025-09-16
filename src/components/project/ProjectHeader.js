@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -7,7 +8,9 @@ import {
   AlertCircle,
   Settings,
   Globe,
-  Calendar
+  Calendar,
+  Brain,
+  RefreshCw
 } from 'lucide-react';
 import { formatTime } from '../../utils/projectUtils';
 
@@ -16,6 +19,36 @@ export default function ProjectHeader({
   combinedJiraConfig,
   jiraConfig
 }) {
+  const [aiStatus, setAiStatus] = useState({
+    configured: false,
+    available: false,
+    loading: true
+  });
+
+  const checkAIConfiguration = async () => {
+    setAiStatus(prev => ({ ...prev, loading: true }));
+    try {
+      const response = await fetch('/api/ai/status');
+      const result = await response.json();
+
+      setAiStatus({
+        configured: result.configured,
+        available: result.available,
+        loading: false
+      });
+    } catch {
+      setAiStatus({
+        configured: false,
+        available: false,
+        loading: false
+      });
+    }
+  };
+
+  useEffect(() => {
+    checkAIConfiguration();
+  }, []);
+
   if (!project) return null;
 
   return (
@@ -54,6 +87,39 @@ export default function ProjectHeader({
                         Widget ausstehend
                       </>
                     )}
+                  </div>
+
+                  {/* AI Badge */}
+                  <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 text-sm font-medium ${
+                    aiStatus.available
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : aiStatus.configured
+                      ? 'bg-red-100 text-red-800 border border-red-200'
+                      : 'bg-gray-100 text-gray-800 border border-gray-200'
+                  }`}>
+                    {aiStatus.available ? (
+                      <>
+                        <Brain className="h-4 w-4" />
+                        AI Online
+                      </>
+                    ) : aiStatus.configured ? (
+                      <>
+                        <AlertCircle className="h-4 w-4" />
+                        AI Offline
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4" />
+                        AI nicht konfiguriert
+                      </>
+                    )}
+                    <button
+                      onClick={checkAIConfiguration}
+                      className="p-0.5 text-current hover:opacity-70"
+                      title="AI-Status aktualisieren"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${aiStatus.loading ? 'animate-spin' : ''}`} />
+                    </button>
                   </div>
 
                   {/* JIRA Status Badge */}

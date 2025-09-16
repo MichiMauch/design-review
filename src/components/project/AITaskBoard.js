@@ -1,11 +1,100 @@
 'use client';
 
 import { memo } from 'react';
-import { Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import {
+  Bug,
+  Sparkles,
+  Palette,
+  Zap,
+  FileText,
+  Accessibility,
+  HelpCircle,
+  MessageSquare,
+  Calendar,
+  ExternalLink,
+  Edit3,
+  Save,
+  X
+} from 'lucide-react';
+import { AIBadgeSet } from '../ai/AIBadges';
 import { formatTime } from '../../utils/projectUtils';
 
-function TaskBoard({
+// AI Category definitions with colors and icons
+const AI_CATEGORIES = [
+  {
+    value: 'bug',
+    label: 'Bug',
+    icon: Bug,
+    color: 'red',
+    bgClass: 'bg-red-50',
+    borderClass: 'border-red-200',
+    headerClass: 'bg-gradient-to-r from-red-100 to-red-50 border-b-2 border-red-200',
+    iconClass: 'text-red-600'
+  },
+  {
+    value: 'feature',
+    label: 'Feature Request',
+    icon: Sparkles,
+    color: 'purple',
+    bgClass: 'bg-purple-50',
+    borderClass: 'border-purple-200',
+    headerClass: 'bg-gradient-to-r from-purple-100 to-purple-50 border-b-2 border-purple-200',
+    iconClass: 'text-purple-600'
+  },
+  {
+    value: 'ui/ux',
+    label: 'UI/UX',
+    icon: Palette,
+    color: 'blue',
+    bgClass: 'bg-blue-50',
+    borderClass: 'border-blue-200',
+    headerClass: 'bg-gradient-to-r from-blue-100 to-blue-50 border-b-2 border-blue-200',
+    iconClass: 'text-blue-600'
+  },
+  {
+    value: 'performance',
+    label: 'Performance',
+    icon: Zap,
+    color: 'yellow',
+    bgClass: 'bg-yellow-50',
+    borderClass: 'border-yellow-200',
+    headerClass: 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-b-2 border-yellow-200',
+    iconClass: 'text-yellow-600'
+  },
+  {
+    value: 'content',
+    label: 'Content',
+    icon: FileText,
+    color: 'green',
+    bgClass: 'bg-green-50',
+    borderClass: 'border-green-200',
+    headerClass: 'bg-gradient-to-r from-green-100 to-green-50 border-b-2 border-green-200',
+    iconClass: 'text-green-600'
+  },
+  {
+    value: 'accessibility',
+    label: 'Accessibility',
+    icon: Accessibility,
+    color: 'indigo',
+    bgClass: 'bg-indigo-50',
+    borderClass: 'border-indigo-200',
+    headerClass: 'bg-gradient-to-r from-indigo-100 to-indigo-50 border-b-2 border-indigo-200',
+    iconClass: 'text-indigo-600'
+  },
+  {
+    value: 'uncategorized',
+    label: 'Nicht kategorisiert',
+    icon: HelpCircle,
+    color: 'gray',
+    bgClass: 'bg-gray-50',
+    borderClass: 'border-gray-200',
+    headerClass: 'bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-gray-200',
+    iconClass: 'text-gray-600'
+  }
+];
+
+function AITaskBoard({
   tasks,
   editingTask,
   editForm,
@@ -13,8 +102,7 @@ function TaskBoard({
   onStartEditing,
   onSaveTask,
   onCancelEditing,
-  onUpdateStatusAndPosition,
-  onReorderTasks,
+  onUpdateAICategory,
   onOpenTaskModal,
   onOpenDeleteModal,
   onOpenJiraModal,
@@ -25,12 +113,11 @@ function TaskBoard({
   loadingJiraModal,
   loadingJiraConfig,
   viewMode,
-  updatingTaskStatus,
-  projectStatuses = [],
+  updatingTaskCategory,
   onDragStart,
   onDragEnd
 }) {
-  if (viewMode !== 'board') return null;
+  if (viewMode !== 'ai-board') return null;
 
   const handleDragStart = () => {
     onDragStart?.();
@@ -52,127 +139,109 @@ function TaskBoard({
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Case 1: Moving between different columns (status change + position)
+    // Moving between different categories
     if (destination.droppableId !== source.droppableId) {
-      const newStatus = destination.droppableId;
-
-      // Get tasks in the destination column to calculate correct position
-      const destinationTasks = tasks
-        .filter(t => (t.status || 'open') === newStatus)
-        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-      // Calculate the sort_order for the new position with 10-step spacing
-      let newSortOrder = 10;
-      if (destination.index === 0) {
-        // Dropping at the beginning - ensure there's space
-        newSortOrder = destinationTasks.length > 0 ? Math.max(10, (destinationTasks[0].sort_order || 10) - 10) : 10;
-      } else if (destination.index >= destinationTasks.length) {
-        // Dropping at the end - add with 10-step spacing
-        newSortOrder = destinationTasks.length > 0 ? (destinationTasks[destinationTasks.length - 1].sort_order || (destinationTasks.length * 10)) + 10 : 10;
-      } else {
-        // Dropping between existing tasks - calculate midpoint with safety checks
-        const beforeTask = destinationTasks[destination.index - 1];
-        const afterTask = destinationTasks[destination.index];
-        const beforeOrder = beforeTask ? (beforeTask.sort_order || (destination.index * 10)) : 0;
-        const afterOrder = afterTask ? (afterTask.sort_order || ((destination.index + 1) * 10)) : (destination.index + 1) * 10;
-
-        // Ensure sufficient gap, otherwise use safe fallback
-        const midPoint = Math.floor((beforeOrder + afterOrder) / 2);
-        if (midPoint > beforeOrder && midPoint < afterOrder) {
-          newSortOrder = midPoint;
-        } else {
-          // Fallback: use afterOrder minus small offset to maintain order
-          newSortOrder = afterOrder - 1;
-        }
-      }
-
-      // Call combined status + position update
-      onUpdateStatusAndPosition?.(taskId, newStatus, newSortOrder, destination.index);
-    }
-
-    // Case 2: Reordering within same column (sort order change only)
-    else if (destination.index !== source.index) {
-      // Get tasks in the current column
-      const columnTasks = tasks
-        .filter(t => (t.status || 'open') === destination.droppableId)
-        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-      // Reorder array
-      const reorderedTasks = Array.from(columnTasks);
-      const [movedTask] = reorderedTasks.splice(source.index, 1);
-      reorderedTasks.splice(destination.index, 0, movedTask);
-
-      // Call reorder function
-      onReorderTasks?.(destination.droppableId, reorderedTasks.map(t => t.id));
+      const newCategory = destination.droppableId === 'uncategorized' ? null : destination.droppableId;
+      onUpdateAICategory?.(taskId, newCategory);
     }
   };
 
-  if (tasks.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-        <p>Noch keine Tasks vorhanden</p>
-        <p className="text-sm mt-2">
-          Tasks werden automatisch erstellt, wenn das Widget installiert und verwendet wird.
-        </p>
-      </div>
-    );
-  }
+  // Group tasks by AI category
+  const getTasksByCategory = (category) => {
+    if (category === 'uncategorized') {
+      return tasks.filter(task => !task.ai_category || task.ai_category === '');
+    }
 
-  // Use project statuses or fallback to empty if loading
-  const statusesToShow = projectStatuses.length > 0 ? projectStatuses : [];
+    // Flexible category matching to handle different formats
+    return tasks.filter(task => {
+      if (!task.ai_category) return false;
 
-  if (statusesToShow.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-8 text-gray-500">
-        <p>Status werden geladen...</p>
-      </div>
-    );
-  }
+      const taskCategory = task.ai_category.toLowerCase().trim();
+      const searchCategory = category.toLowerCase().trim();
+
+      // Direct match
+      if (taskCategory === searchCategory) return true;
+
+      // Handle UI/UX variations
+      if (searchCategory === 'ui/ux') {
+        return ['ui/ux', 'ui-ux', 'uiux', 'ui ux', 'ui & ux'].includes(taskCategory);
+      }
+
+      // Handle other potential variations
+      const normalizedTask = taskCategory.replace(/[-_\s&]/g, '');
+      const normalizedSearch = searchCategory.replace(/[-_\s&]/g, '');
+
+      return normalizedTask === normalizedSearch;
+    });
+  };
 
   return (
     <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {statusesToShow.map(status => {
-          // Robust filtering - handle undefined, null, empty string
-          const statusTasks = tasks.filter(t => {
-            const taskStatus = t.status || 'open'; // Default to 'open' for undefined/null
-            return taskStatus === status.value;
-          });
+        {AI_CATEGORIES.map((category) => {
+          const categoryTasks = getTasksByCategory(category.value);
+          const Icon = category.icon;
+
+          // Debug log to see what categories we have
+          if (category.value === 'ui/ux') {
+            console.log('UI/UX Debug:', {
+              categoryValue: category.value,
+              allTasks: tasks.length,
+              taskCategories: tasks.map(t => t.ai_category).filter(Boolean),
+              filteredTasks: categoryTasks.length,
+              matchingTasks: categoryTasks.map(t => ({ id: t.id, category: t.ai_category, title: t.title }))
+            });
+          }
 
           return (
-            <div key={status.value} className="flex-shrink-0 w-80">
-              <div className="bg-gray-50 rounded-lg p-4 h-full flex flex-col">
-                {/* Header außerhalb des Droppable */}
-                <div className={`flex items-center gap-2 mb-4 p-2 rounded-lg ${status.color}`}>
-                  <h3 className="font-semibold text-sm">{status.label}</h3>
-                  <span className="text-xs">({statusTasks.length})</span>
+            <div key={category.value} className="flex-shrink-0 w-80">
+              <div
+                className={`bg-white rounded-xl shadow-sm border-2 ${category.borderClass} overflow-hidden h-full flex flex-col`}
+                style={{ minHeight: '400px' }}
+              >
+              {/* Category Header */}
+              <div className={`${category.headerClass} p-3 sticky top-0 z-10`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-5 h-5 ${category.iconClass}`} />
+                    <h3 className="font-semibold text-sm text-gray-800">
+                      {category.label}
+                    </h3>
+                  </div>
+                  <span className="px-2 py-0.5 bg-white/70 rounded-full text-xs font-medium text-gray-700">
+                    {categoryTasks.length}
+                  </span>
                 </div>
+              </div>
 
-                {/* Droppable füllt verfügbare Höhe */}
-                <Droppable droppableId={status.value}>
-                  {(provided, snapshot) => {
-                    // Clean drag & drop without debug logging
-
-                    return (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        className={`flex-1 space-y-3 p-3 rounded-lg transition-all duration-300 border-2 ${
-                          snapshot.draggingOverWith
-                            ? 'bg-blue-100 border-blue-500 border-dashed shadow-lg ring-4 ring-blue-300'
-                            : 'border-gray-200 border-solid'
-                        }`}
-                        style={{ minHeight: '200px' }}
-                      >
-                      {statusTasks
-                        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-                        .map((task, index) => (
+              {/* Droppable Area */}
+              <Droppable droppableId={category.value}>
+                {(provided, snapshot) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className={`flex-1 p-3 space-y-2 transition-all duration-300 ${
+                      snapshot.draggingOverWith
+                        ? `${category.bgClass} ring-2 ring-${category.color}-400`
+                        : ''
+                    }`}
+                    style={{ minHeight: '200px' }}
+                  >
+                    {categoryTasks
+                      .sort((a, b) => {
+                        // Sort by priority first, then by created date
+                        const priorityOrder = { high: 0, medium: 1, low: 2, null: 3 };
+                        const aPriority = priorityOrder[a.ai_priority] ?? 3;
+                        const bPriority = priorityOrder[b.ai_priority] ?? 3;
+                        if (aPriority !== bPriority) return aPriority - bPriority;
+                        return new Date(b.created_at) - new Date(a.created_at);
+                      })
+                      .map((task, index) => (
                         <Draggable
-                          key={`task-${task.id}`}
+                          key={`ai-task-${task.id}`}
                           draggableId={String(task.id)}
                           index={index}
-                          isDragDisabled={editingTask === task.id || updatingTaskStatus === task.id}
+                          isDragDisabled={editingTask === task.id || updatingTaskCategory === task.id}
                         >
                           {(provided, snapshot) => (
                             <div
@@ -180,7 +249,7 @@ function TaskBoard({
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                             >
-                              <TaskBoardCard
+                              <AITaskCard
                                 task={task}
                                 isEditing={editingTask === task.id}
                                 editForm={editForm}
@@ -198,17 +267,25 @@ function TaskBoard({
                                 loadingJiraModal={loadingJiraModal}
                                 loadingJiraConfig={loadingJiraConfig}
                                 isDragging={snapshot.isDragging}
-                                isUpdatingStatus={updatingTaskStatus === task.id}
+                                isUpdatingCategory={updatingTaskCategory === task.id}
+                                categoryColor={category.color}
                               />
                             </div>
                           )}
                         </Draggable>
                       ))}
-                      {provided.placeholder}
+                    {provided.placeholder}
+
+                    {/* Empty State */}
+                    {categoryTasks.length === 0 && !snapshot.draggingOverWith && (
+                      <div className="text-center py-8 text-gray-400">
+                        <Icon className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-xs">Keine Tasks</p>
                       </div>
-                    );
-                  }}
-                </Droppable>
+                    )}
+                  </div>
+                )}
+              </Droppable>
               </div>
             </div>
           );
@@ -218,47 +295,8 @@ function TaskBoard({
   );
 }
 
-// Optimized memo comparison for TaskBoardCard
-const areEqual = (prevProps, nextProps) => {
-  // Check if the task object changed
-  if (prevProps.task.id !== nextProps.task.id) return false;
-  if (prevProps.task.title !== nextProps.task.title) return false;
-  if (prevProps.task.description !== nextProps.task.description) return false;
-  if (prevProps.task.status !== nextProps.task.status) return false;
-  if (prevProps.task.screenshot !== nextProps.task.screenshot) return false;
-  if (prevProps.task.url !== nextProps.task.url) return false;
-  if (prevProps.task.jira_key !== nextProps.task.jira_key) return false;
-
-  // Check AI analysis fields
-  if (prevProps.task.ai_sentiment !== nextProps.task.ai_sentiment) return false;
-  if (prevProps.task.ai_confidence !== nextProps.task.ai_confidence) return false;
-  if (prevProps.task.ai_category !== nextProps.task.ai_category) return false;
-  if (prevProps.task.ai_priority !== nextProps.task.ai_priority) return false;
-  if (prevProps.task.ai_analyzed_at !== nextProps.task.ai_analyzed_at) return false;
-
-  // Check editing state
-  if (prevProps.isEditing !== nextProps.isEditing) return false;
-
-  // Check dragging state
-  if (prevProps.isDragging !== nextProps.isDragging) return false;
-
-  // Check updating state
-  if (prevProps.isUpdatingStatus !== nextProps.isUpdatingStatus) return false;
-
-  // Check loading states
-  if (prevProps.creatingJira !== nextProps.creatingJira) return false;
-  if (prevProps.loadingJiraModal !== nextProps.loadingJiraModal) return false;
-
-  // If editing, check edit form
-  if (prevProps.isEditing) {
-    if (prevProps.editForm.title !== nextProps.editForm.title) return false;
-    if (prevProps.editForm.description !== nextProps.editForm.description) return false;
-  }
-
-  return true;
-};
-
-const TaskBoardCard = memo(function TaskBoardCard({
+// Task Card Component for AI Board - using same design as TaskBoardCard
+const AITaskCard = memo(function AITaskCard({
   task,
   isEditing,
   editForm,
@@ -276,13 +314,20 @@ const TaskBoardCard = memo(function TaskBoardCard({
   loadingJiraModal,
   loadingJiraConfig,
   isDragging,
-  isUpdatingStatus
+  isUpdatingCategory
 }) {
+  // JIRA Icon component (same as in TaskBoard)
+  const JiraIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35V2.7a.7.7 0 0 0-.7-.7h-9.78zm0 9.53c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-9.7a.7.7 0 0 0-.7-.7H11.53zm-9.53 0c0 2.4 1.97 4.35 4.35 4.35H8.13v1.7c0 2.4 1.96 4.35 4.35 4.35v-9.7a.7.7 0 0 0-.7-.7H2z"/>
+    </svg>
+  );
+
   return (
     <div
       className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-all border ${
         isDragging ? 'opacity-50 shadow-lg transform rotate-2 scale-105' :
-        isUpdatingStatus ? 'opacity-75 border-blue-300 bg-blue-50' : 'cursor-move'
+        isUpdatingCategory ? 'opacity-75 border-blue-300 bg-blue-50' : 'cursor-move'
       } ${isEditing ? 'cursor-default' : 'cursor-move'}`}
     >
       <div className="flex items-start justify-between mb-2">
@@ -331,7 +376,18 @@ const TaskBoardCard = memo(function TaskBoardCard({
                 </p>
               )}
 
-              {/* AI Analysis Badges - not shown in normal board */}
+              {/* AI Analysis Badges */}
+              <div className="mb-2">
+                <AIBadgeSet
+                  sentiment={task.ai_sentiment}
+                  confidence={task.ai_confidence}
+                  category={task.ai_category}
+                  priority={task.ai_priority}
+                  analyzed={!!task.ai_analyzed_at}
+                  compact={true}
+                  className="flex-wrap gap-1"
+                />
+              </div>
             </>
           )}
         </div>
@@ -474,21 +530,6 @@ const TaskBoardCard = memo(function TaskBoardCard({
       )}
     </div>
   );
-}, areEqual);
+});
 
-// Memo comparison function for TaskBoard
-const areTaskBoardEqual = (prevProps, nextProps) => {
-  // Always allow re-renders for task changes to support optimistic updates
-  if (prevProps.tasks !== nextProps.tasks) return false;
-
-  // Compare other essential props
-  if (prevProps.viewMode !== nextProps.viewMode) return false;
-  if (prevProps.editingTask !== nextProps.editingTask) return false;
-  if (prevProps.updatingTaskStatus !== nextProps.updatingTaskStatus) return false;
-  if (prevProps.projectStatuses?.length !== nextProps.projectStatuses?.length) return false;
-  if (prevProps.isDragging !== nextProps.isDragging) return false;
-
-  return true;
-};
-
-export default memo(TaskBoard, areTaskBoardEqual);
+export default memo(AITaskBoard);

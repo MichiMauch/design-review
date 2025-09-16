@@ -18,6 +18,7 @@ export function useTaskManager({
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState('board');
   const [updatingTaskStatus, setUpdatingTaskStatus] = useState(null);
+  const [updatingTaskCategory, setUpdatingTaskCategory] = useState(null);
   const [commentCounts, setCommentCounts] = useState({});
   const [isDragging, setIsDragging] = useState(false);
 
@@ -123,6 +124,52 @@ export function useTaskManager({
       showToast('Fehler beim Speichern der Task', 'error');
     }
   }, [projectId, editForm, setTasks, showToast]);
+
+  // Update AI Category when dragged between categories
+  const updateTaskAICategory = useCallback(async (taskId, category) => {
+    if (updatingTaskCategory === taskId) {
+      return;
+    }
+
+    setUpdatingTaskCategory(taskId);
+
+    // Optimistic update
+    setTasks(currentTasks =>
+      currentTasks.map(task =>
+        task.id === taskId ? { ...task, ai_category: category } : task
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}/ai-category`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update category');
+      }
+
+      const { success } = await response.json();
+      if (!success) {
+        throw new Error('Update failed');
+      }
+
+      showToast('Task-Kategorie aktualisiert', 'success');
+    } catch (error) {
+      console.error('Error updating task category:', error);
+      // Revert on error - fetch fresh data
+      const response = await fetch(`/api/projects/${projectId}/tasks`);
+      if (response.ok) {
+        const updatedTasks = await response.json();
+        setTasks(updatedTasks);
+      }
+      showToast('Fehler beim Aktualisieren der Kategorie', 'error');
+    } finally {
+      setUpdatingTaskCategory(null);
+    }
+  }, [projectId, setTasks, showToast, updatingTaskCategory]);
 
   const updateTaskStatus = useCallback(async (taskId, newStatus, optimistic = false) => {
     // Prevent multiple simultaneous updates
@@ -405,6 +452,7 @@ export function useTaskManager({
 
     // Update state
     updatingTaskStatus,
+    updatingTaskCategory,
 
     // Comment state
     commentCounts,
@@ -428,6 +476,7 @@ export function useTaskManager({
     cancelEditing,
     saveTask,
     updateTaskStatus,
+    updateTaskAICategory,
     updateStatusAndPosition,
     reorderTasks,
     openTaskDeleteModal,

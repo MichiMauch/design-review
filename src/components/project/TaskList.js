@@ -3,10 +3,8 @@
 import { memo } from 'react';
 import { AlertCircle, Edit3, Save, X, ExternalLink, MessageSquare, Calendar, ExternalLink as JiraIcon } from 'lucide-react';
 import { formatTime } from '../../utils/projectUtils';
-import { AIBadgeSet } from '../ai/AIBadges';
 
 function TaskList({
-  tasks,
   filteredTasks,
   editingTask,
   editForm,
@@ -169,18 +167,7 @@ const TaskCard = memo(function TaskCard({
                 </p>
               )}
 
-              {/* AI Analysis Badges */}
-              <div className="mb-2">
-                <AIBadgeSet
-                  sentiment={task.ai_sentiment}
-                  confidence={task.ai_confidence}
-                  category={task.ai_category}
-                  priority={task.ai_priority}
-                  analyzed={!!task.ai_analyzed_at}
-                  compact={false}
-                  className="flex-wrap gap-1"
-                />
-              </div>
+              {/* AI Analysis Badges - not shown in list view */}
             </>
           )}
         </div>

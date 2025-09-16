@@ -10,7 +10,8 @@ export async function GET(request, { params }) {
   try {
     // Authentication
     const user = await requireAuth();
-    const projectId = parseInt(params.id);
+    const resolvedParams = await params;
+    const projectId = parseInt(resolvedParams.id);
 
     // Check project access
     if (!hasProjectAccess(user, projectId)) {
@@ -44,7 +45,8 @@ export async function POST(request, { params }) {
   try {
     // Authentication
     const user = await requireAuth();
-    const projectId = parseInt(params.id);
+    const resolvedParams = await params;
+    const projectId = parseInt(resolvedParams.id);
 
     // Check project access
     if (!hasProjectAccess(user, projectId)) {
@@ -98,7 +100,8 @@ export async function PUT(request, { params }) {
   try {
     // Authentication
     const user = await requireAuth();
-    const projectId = parseInt(params.id);
+    const resolvedParams = await params;
+    const projectId = parseInt(resolvedParams.id);
 
     // Check project access
     if (!hasProjectAccess(user, projectId)) {

@@ -162,11 +162,7 @@ export function AIBadgeSet({
   className = ''
 }) {
   if (!analyzed && !loading) {
-    return (
-      <div className={`flex items-center gap-1 ${className}`}>
-        <AIAnalysisIndicator analyzed={false} loading={loading} />
-      </div>
-    );
+    return null; // Don't show anything if not analyzed
   }
 
   if (loading) {
@@ -179,18 +175,9 @@ export function AIBadgeSet({
 
   return (
     <div className={`flex items-center gap-1 flex-wrap ${className}`}>
-      {compact ? (
-        <>
-          <AIAnalysisIndicator analyzed={true} />
-          {priority && <PriorityBadge priority={priority} />}
-        </>
-      ) : (
-        <>
-          <SentimentBadge sentiment={sentiment} confidence={confidence} />
-          <CategoryBadge category={category} />
-          <PriorityBadge priority={priority} />
-        </>
-      )}
+      <SentimentBadge sentiment={sentiment} confidence={confidence} />
+      <CategoryBadge category={category} />
+      {/* Priority badges are hidden but kept in DB */}
     </div>
   );
 }

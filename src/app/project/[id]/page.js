@@ -21,6 +21,8 @@ import ScreenshotLightbox from '../../../components/modals/ScreenshotLightbox';
 import TaskModalContainer from '../../../components/containers/TaskModalContainer';
 import TaskList from '../../../components/project/TaskList';
 import TaskBoard from '../../../components/project/TaskBoard';
+import AITaskBoard from '../../../components/project/AITaskBoard';
+import SentimentTaskBoard from '../../../components/project/SentimentTaskBoard';
 import { MessageSquare } from 'lucide-react';
 
 export default function ProjectPage() {
@@ -230,9 +232,9 @@ export default function ProjectPage() {
           jiraConfig={projectManager.jiraConfig}
         />
 
-        <div className={`grid gap-6 ${taskManager.viewMode === 'board' ? 'grid-cols-1' : 'lg:grid-cols-4'}`}>
+        <div className={`grid gap-6 ${taskManager.viewMode === 'board' || taskManager.viewMode === 'ai-board' || taskManager.viewMode === 'sentiment-board' ? 'grid-cols-1' : 'lg:grid-cols-4'}`}>
           {/* Main Content Area */}
-          <div className={taskManager.viewMode === 'board' ? '' : 'lg:col-span-3'}>
+          <div className={taskManager.viewMode === 'board' || taskManager.viewMode === 'ai-board' || taskManager.viewMode === 'sentiment-board' ? '' : 'lg:col-span-3'}>
             <WidgetInstallation project={projectManager.project} />
 
             {/* Tasks */}
@@ -281,7 +283,7 @@ export default function ProjectPage() {
                   viewMode={taskManager.viewMode}
                   projectStatuses={projectStatuses.statuses}
                 />
-              ) : (
+              ) : taskManager.viewMode === 'board' ? (
                 <TaskBoard
                   tasks={projectManager.tasks}
                   editingTask={taskManager.editingTask}
@@ -310,18 +312,69 @@ export default function ProjectPage() {
                   onDragStart={taskManager.onDragStart}
                   onDragEnd={taskManager.onDragEnd}
                 />
+              ) : taskManager.viewMode === 'ai-board' ? (
+                <AITaskBoard
+                  tasks={projectManager.tasks}
+                  editingTask={taskManager.editingTask}
+                  editForm={taskManager.editForm}
+                  onEditFormChange={taskManager.setEditForm}
+                  onStartEditing={taskManager.startEditing}
+                  onSaveTask={taskManager.saveTask}
+                  onCancelEditing={taskManager.cancelEditing}
+                  onUpdateAICategory={taskManager.updateTaskAICategory}
+                  onOpenTaskModal={taskManager.setSelectedTaskForModal}
+                  onOpenDeleteModal={taskManager.openTaskDeleteModal}
+                  onOpenJiraModal={openJiraModal}
+                  getScreenshotUrl={taskManager.getScreenshotUrl}
+                  getCommentCount={taskManager.getCommentCount}
+                  user={projectManager.user}
+                  creatingJira={jiraManager.creatingJira}
+                  loadingJiraModal={jiraManager.loadingJiraModal}
+                  loadingJiraConfig={projectManager.loadingJiraConfig}
+                  viewMode={taskManager.viewMode}
+                  updatingTaskCategory={taskManager.updatingTaskCategory}
+                  onDragStart={taskManager.onDragStart}
+                  onDragEnd={taskManager.onDragEnd}
+                />
+              ) : (
+                <SentimentTaskBoard
+                  tasks={projectManager.tasks}
+                  editingTask={taskManager.editingTask}
+                  editForm={taskManager.editForm}
+                  onEditFormChange={taskManager.setEditForm}
+                  onStartEditing={taskManager.startEditing}
+                  onSaveTask={taskManager.saveTask}
+                  onCancelEditing={taskManager.cancelEditing}
+                  onUpdateSentiment={() => {}} // Sentiment wird von AI bestimmt, nicht manuell änderbar
+                  onOpenTaskModal={taskManager.setSelectedTaskForModal}
+                  onOpenDeleteModal={taskManager.openTaskDeleteModal}
+                  onOpenJiraModal={openJiraModal}
+                  getScreenshotUrl={taskManager.getScreenshotUrl}
+                  getCommentCount={taskManager.getCommentCount}
+                  user={projectManager.user}
+                  creatingJira={jiraManager.creatingJira}
+                  loadingJiraModal={jiraManager.loadingJiraModal}
+                  loadingJiraConfig={projectManager.loadingJiraConfig}
+                  viewMode={taskManager.viewMode}
+                  updatingTaskSentiment={null} // Sentiment wird nicht manuell geändert
+                  onDragStart={taskManager.onDragStart}
+                  onDragEnd={taskManager.onDragEnd}
+                />
               )}
             </div>
           </div>
 
-          <ProjectSidebar
-            tasks={projectManager.tasks}
-            onExcelExport={() => projectManager.handleExcelExport(taskManager.loadTaskScreenshot)}
-            exportingExcel={projectManager.exportingExcel}
-            viewMode={taskManager.viewMode}
-            projectId={params.id}
-            onTasksUpdate={taskManager.loadTasks}
-          />
+          {/* Sidebar - hidden in board modes */}
+          {taskManager.viewMode !== 'board' && taskManager.viewMode !== 'ai-board' && taskManager.viewMode !== 'sentiment-board' && (
+            <ProjectSidebar
+              tasks={projectManager.tasks}
+              onExcelExport={() => projectManager.handleExcelExport(taskManager.loadTaskScreenshot)}
+              exportingExcel={projectManager.exportingExcel}
+              viewMode={taskManager.viewMode}
+              projectId={params.id}
+              onTasksUpdate={taskManager.loadTasks}
+            />
+          )}
         </div>
 
         {/* Modals */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Brain, Zap, TrendingUp, AlertTriangle, Loader, RefreshCw } from 'lucide-react';
 import { AIStatistics } from './AIBadges';
 
@@ -8,8 +8,14 @@ export default function AIProjectDashboard({ projectId, tasks = [], onTasksUpdat
   const [lastAnalysis, setLastAnalysis] = useState(null);
   const [error, setError] = useState(null);
 
-  // Check if OpenAI is configured
-  const [aiConfigured, setAiConfigured] = useState(false);
+  // OpenAI Status
+  const [aiStatus, setAiStatus] = useState({
+    configured: false,
+    available: false,
+    loading: true,
+    details: null,
+    lastChecked: null
+  });
 
   useEffect(() => {
     checkAIConfiguration();
@@ -17,23 +23,32 @@ export default function AIProjectDashboard({ projectId, tasks = [], onTasksUpdat
   }, [projectId]);
 
   const checkAIConfiguration = async () => {
-    try {
-      const response = await fetch('/api/ai/analyze-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: 0, text: 'test' }) // Test call
-      });
+    setAiStatus(prev => ({ ...prev, loading: true }));
 
-      if (response.status === 500) {
-        const data = await response.json();
-        if (data.error?.includes('OpenAI API key')) {
-          setAiConfigured(false);
-          return;
-        }
-      }
-      setAiConfigured(true);
+    try {
+      const response = await fetch('/api/ai/status');
+      const data = await response.json();
+
+      setAiStatus({
+        configured: data.configured,
+        available: data.available,
+        loading: false,
+        details: data.details,
+        lastChecked: new Date().toISOString(),
+        message: data.message,
+        status: data.status
+      });
     } catch (error) {
-      setAiConfigured(false);
+      console.error('Failed to check AI configuration:', error);
+      setAiStatus({
+        configured: false,
+        available: false,
+        loading: false,
+        details: null,
+        lastChecked: new Date().toISOString(),
+        message: 'Failed to check AI status',
+        status: 'error'
+      });
     }
   };
 
@@ -142,19 +157,59 @@ export default function AIProjectDashboard({ projectId, tasks = [], onTasksUpdat
     return Math.round((analyzed / tasks.length) * 100);
   };
 
-  if (!aiConfigured) {
+  // Show loading state while checking AI status
+  if (aiStatus.loading) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Brain className="w-5 h-5 text-yellow-600" />
-          <h3 className="font-semibold text-yellow-800">AI-Funktionen nicht verfügbar</h3>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center gap-2">
+          <Loader className="w-5 h-5 text-gray-600 animate-spin" />
+          <h3 className="font-semibold text-gray-800">AI-Status wird geprüft...</h3>
         </div>
-        <p className="text-sm text-yellow-700 mb-2">
-          Um AI-basierte Feedback-Analyse zu nutzen, muss der OpenAI API Key konfiguriert werden.
+      </div>
+    );
+  }
+
+  // Show AI status and configuration issues
+  if (!aiStatus.available) {
+    const statusColor = aiStatus.configured ? 'red' : 'yellow';
+    const statusIcon = aiStatus.configured ? AlertTriangle : Brain;
+
+    return (
+      <div className={`bg-${statusColor}-50 border border-${statusColor}-200 rounded-lg p-4`}>
+        <div className="flex items-center gap-2 mb-2">
+          {React.createElement(statusIcon, { className: `w-5 h-5 text-${statusColor}-600` })}
+          <h3 className={`font-semibold text-${statusColor}-800`}>
+            {aiStatus.configured ? 'AI-Service nicht verfügbar' : 'AI-Funktionen nicht konfiguriert'}
+          </h3>
+          <button
+            onClick={checkAIConfiguration}
+            className={`ml-auto p-1 text-${statusColor}-600 hover:text-${statusColor}-800`}
+            title="Status erneut prüfen"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+        <p className={`text-sm text-${statusColor}-700 mb-2`}>
+          {aiStatus.message}
         </p>
-        <p className="text-xs text-yellow-600">
-          Setzen Sie die Environment Variable <code>OPENAI_API_KEY</code> in Ihrer .env.local Datei.
-        </p>
+        {aiStatus.details && (
+          <div className={`text-xs text-${statusColor}-600 space-y-1`}>
+            {!aiStatus.configured ? (
+              <p>Setzen Sie die Environment Variable <code>OPENAI_API_KEY</code> in Ihrer .env.local Datei.</p>
+            ) : (
+              <div>
+                <p><strong>Details:</strong></p>
+                <ul className="ml-4 list-disc">
+                  <li>API Key: {aiStatus.details.hasApiKey ? '✓ vorhanden' : '✗ fehlt'}</li>
+                  {aiStatus.details.errorType && <li>Fehlertyp: {aiStatus.details.errorType}</li>}
+                  {aiStatus.details.responseTime && <li>Antwortzeit: {aiStatus.details.responseTime}ms</li>}
+                  {aiStatus.details.errorMessage && <li>Fehler: {aiStatus.details.errorMessage}</li>}
+                </ul>
+                <p className="mt-2">Letzte Prüfung: {new Date(aiStatus.lastChecked).toLocaleTimeString()}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -169,37 +224,17 @@ export default function AIProjectDashboard({ projectId, tasks = [], onTasksUpdat
             <h3 className="font-semibold text-blue-900">AI Feedback-Analyse</h3>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadStatistics}
-              disabled={analyzing}
-              className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
-              title="Statistiken aktualisieren"
-            >
-              <RefreshCw className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button
-              onClick={analyzeAllTasks}
-              disabled={analyzing || tasks.length === 0 || getUnanalyzedCount() === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
-            >
-              {analyzing ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  Analysiere...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4" />
-                  Alle analysieren ({getUnanalyzedCount()})
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={loadStatistics}
+            disabled={analyzing}
+            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
+            title="Statistiken aktualisieren"
+          >
+            <RefreshCw className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-3">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{tasks.length}</div>
             <div className="text-xs text-blue-700">Gesamt Tasks</div>
@@ -213,6 +248,33 @@ export default function AIProjectDashboard({ projectId, tasks = [], onTasksUpdat
             <div className="text-xs text-orange-700">Ausstehend</div>
           </div>
         </div>
+
+        {/* Analyze All Button */}
+        {getUnanalyzedCount() > 0 && (
+          <button
+            onClick={analyzeAllTasks}
+            disabled={analyzing || tasks.length === 0}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium text-sm"
+          >
+            {analyzing ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                <span>Analysiere...</span>
+                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                  {getUnanalyzedCount()}
+                </span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4" />
+                <span>Alle analysieren</span>
+                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">
+                  {getUnanalyzedCount()}
+                </span>
+              </>
+            )}
+          </button>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">

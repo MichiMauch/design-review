@@ -13,12 +13,13 @@ export async function OPTIONS() {
 
 export async function GET(request, { params }) {
   try {
+    const resolvedParams = await params;
     await initDatabase();
     const db = getDb();
 
     const result = await db.execute({
       sql: 'SELECT widget_installed, widget_last_ping FROM projects WHERE id = ?',
-      args: [params.id]
+      args: [resolvedParams.id]
     });
 
     if (result.rows.length === 0) {

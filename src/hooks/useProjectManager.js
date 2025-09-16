@@ -14,6 +14,7 @@ export function useProjectManager({ projectId, showToast, router }) {
     issueType: 'Task'
   });
   const [loadingJiraConfig, setLoadingJiraConfig] = useState(false);
+  const [lastAnalyzedTasks, setLastAnalyzedTasks] = useState(new Set());
 
   const loadProject = useCallback(async () => {
     try {
@@ -24,8 +25,13 @@ export function useProjectManager({ projectId, showToast, router }) {
       const projectData = await response.json();
       setProject(projectData);
 
-      // Load combined JIRA config immediately after project is set
-      await loadCombinedJiraConfigWithRetry(projectData.id);
+      // Load combined JIRA config immediately after project is set (non-blocking)
+      try {
+        await loadCombinedJiraConfigWithRetry(projectData.id);
+      } catch (jiraError) {
+        // JIRA config loading should not block project loading
+        console.warn('JIRA config loading failed but project will continue loading:', jiraError.message);
+      }
       return projectData;
     } catch (error) {
       router.push('/projects');
@@ -35,12 +41,52 @@ export function useProjectManager({ projectId, showToast, router }) {
     }
   }, [projectId, router]);
 
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (silent = false) => {
     try {
       // Loading tasks from API
       const response = await fetch(`/api/projects/${projectId}/tasks`);
       if (response.ok) {
         const tasksData = await response.json();
+
+        // Update tracking set first
+        const analyzedTaskIds = new Set(
+          tasksData
+            .filter(task => task.ai_analyzed_at)
+            .map(task => task.id)
+        );
+
+        // Check for newly analyzed tasks (only if we have previous data to compare)
+        if (!silent && lastAnalyzedTasks.size > 0) {
+          const newlyAnalyzed = tasksData.filter(task =>
+            task.ai_analyzed_at && !lastAnalyzedTasks.has(task.id)
+          );
+
+          // Show notifications for newly analyzed tasks
+          newlyAnalyzed.forEach(task => {
+            const sentiment = task.ai_sentiment;
+            const category = task.ai_category;
+            const priority = task.ai_priority;
+
+            let toastType = 'success';
+            let message = `AI-Analyse abgeschlossen für "${task.title.substring(0, 30)}${task.title.length > 30 ? '...' : ''}"`;
+
+            if (sentiment === 'negative' && priority === 'high') {
+              toastType = 'error';
+              message = `⚠️ Kritisches Feedback erkannt: "${task.title.substring(0, 30)}${task.title.length > 30 ? '...' : ''}" (${category})`;
+            } else if (priority === 'high') {
+              toastType = 'warning';
+              message = `⚡ Hochpriorisiertes Feedback: "${task.title.substring(0, 30)}${task.title.length > 30 ? '...' : ''}" (${category})`;
+            } else if (sentiment === 'positive') {
+              message = `✅ Positives Feedback analysiert: "${task.title.substring(0, 30)}${task.title.length > 30 ? '...' : ''}" (${category})`;
+            }
+
+            showToast(message, toastType);
+          });
+        }
+
+        // Always update the tracking set
+        setLastAnalyzedTasks(analyzedTaskIds);
+
         // Tasks loaded successfully
         setTasks(tasksData);
         return tasksData;
@@ -49,7 +95,7 @@ export function useProjectManager({ projectId, showToast, router }) {
       console.error('Error loading tasks:', error);
     }
     return [];
-  }, [projectId]);
+  }, [projectId, lastAnalyzedTasks, showToast]);
 
   const loadUser = useCallback(async () => {
     try {
@@ -165,8 +211,8 @@ export function useProjectManager({ projectId, showToast, router }) {
         checkWidgetStatus()
       ]);
 
-      // Dann Tasks laden
-      await loadTasks();
+      // Dann Tasks laden (silent refresh)
+      await loadTasks(true);
 
       showToast('Daten aktualisiert', 'success');
     } catch {
@@ -216,24 +262,30 @@ export function useProjectManager({ projectId, showToast, router }) {
   useEffect(() => {
     if (projectId) {
       loadProject();
-      loadTasks();
+      loadTasks(true); // Silent initial load
       loadJiraSettings();
       loadUser();
     }
-  }, [projectId, loadProject, loadTasks, loadJiraSettings, loadUser]);
+  }, [projectId]); // Only depend on projectId, not the functions
 
   // Set up widget status polling
   useEffect(() => {
     if (!projectId) return;
 
-    // Check widget installation status and refresh tasks every 10 seconds
-    const interval = setInterval(async () => {
+    // Check widget installation status every 10 seconds, refresh tasks every 3 seconds
+    const widgetInterval = setInterval(() => {
       checkWidgetStatus();
-      await loadTasks(); // Refresh tasks to catch new JIRA conversions
     }, 10000);
 
-    return () => clearInterval(interval);
-  }, [projectId, checkWidgetStatus, loadTasks]);
+    const tasksInterval = setInterval(async () => {
+      await loadTasks(); // Refresh tasks more frequently to catch AI analysis updates
+    }, 3000);
+
+    return () => {
+      clearInterval(widgetInterval);
+      clearInterval(tasksInterval);
+    };
+  }, [projectId]); // Only depend on projectId, not the functions
 
   // Load JIRA config from localStorage on component mount
   useEffect(() => {

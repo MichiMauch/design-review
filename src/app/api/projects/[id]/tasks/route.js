@@ -196,8 +196,8 @@ export async function POST(request, { params }) {
         const { analyzeFeedback } = await import('../../../../../lib/ai-service.js');
         const analysisText = [title, description].filter(Boolean).join('. ');
 
-        // Run analysis without blocking the response
-        analyzeFeedback(analysisText).then(async (aiResult) => {
+        // Run analysis without blocking the response (with debug mode)
+        analyzeFeedback(analysisText, { debug: true, retries: 1 }).then(async (aiResult) => {
           if (aiResult.success) {
             const analysis = aiResult.analysis;
             // Update task with AI analysis
@@ -224,10 +224,25 @@ export async function POST(request, { params }) {
                 taskId
               ]
             });
-            console.log(`AI analysis completed for task ${taskId}`);
+            console.log(`✅ AI analysis completed for task ${taskId}:`, {
+              sentiment: analysis.sentiment,
+              category: analysis.category,
+              priority: analysis.priority,
+              confidence: analysis.confidence,
+              processingTime: analysis.processingTime + 'ms'
+            });
+          } else {
+            console.warn(`⚠️ AI analysis failed for task ${taskId} but returned fallback:`, {
+              error: aiResult.error,
+              fallbackUsed: aiResult.analysis?.fallbackUsed
+            });
           }
         }).catch(error => {
-          console.warn(`AI analysis failed for task ${taskId}:`, error.message);
+          console.error(`❌ AI analysis failed for task ${taskId}:`, {
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          });
         });
       } catch (error) {
         console.warn('AI analysis initialization failed:', error.message);
