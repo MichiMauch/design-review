@@ -216,6 +216,58 @@
             return sessionId;
         },
 
+        // Test WebGL support
+        detectWebGLSupport() {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const renderer = gl.getParameter(gl.RENDERER);
+                    const vendor = gl.getParameter(gl.VENDOR);
+                    return { supported: true, renderer, vendor };
+                }
+                return { supported: false };
+            } catch (e) {
+                return { supported: false, error: e.message };
+            }
+        },
+
+        // Test localStorage support
+        testLocalStorage() {
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        // Test sessionStorage support
+        testSessionStorage() {
+            try {
+                sessionStorage.setItem('test', 'test');
+                sessionStorage.removeItem('test');
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        // Get performance metrics
+        getPerformanceMetrics() {
+            try {
+                const perf = performance.getEntriesByType('navigation')[0];
+                return {
+                    dom_content_loaded: perf?.domContentLoadedEventEnd - perf?.domContentLoadedEventStart || 0,
+                    load_complete: perf?.loadEventEnd - perf?.loadEventStart || 0,
+                    dns_lookup: perf?.domainLookupEnd - perf?.domainLookupStart || 0
+                };
+            } catch (e) {
+                return { error: 'performance_api_not_available' };
+            }
+        },
+
         // Collect browser information
         getBrowserInfo() {
             return {
@@ -223,10 +275,13 @@
                 browser_name: this.parseBrowserName(),
                 browser_version: this.parseBrowserVersion(),
                 language: navigator.language,
-                languages: navigator.languages?.join(','),
+                languages: navigator.languages?.join(',') || 'not_available',
                 cookies_enabled: navigator.cookieEnabled,
                 online: navigator.onLine,
-                do_not_track: navigator.doNotTrack
+                do_not_track: navigator.doNotTrack || 'not_set',
+                java_enabled: navigator.javaEnabled?.() || false,
+                webdriver: navigator.webdriver || false,
+                pdf_viewer_enabled: navigator.pdfViewerEnabled || false
             };
         },
 
@@ -235,13 +290,17 @@
             return {
                 screen_resolution: `${screen.width}x${screen.height}`,
                 screen_available: `${screen.availWidth}x${screen.availHeight}`,
-                screen_color_depth: screen.colorDepth,
-                screen_pixel_depth: screen.pixelDepth,
+                color_depth: screen.colorDepth,
+                pixel_depth: screen.pixelDepth,
                 viewport_size: `${window.innerWidth}x${window.innerHeight}`,
                 window_size: `${window.outerWidth}x${window.outerHeight}`,
-                device_pixel_ratio: window.devicePixelRatio,
+                window_position: `${window.screenX}x${window.screenY}`,
+                scroll_position: `${window.scrollX}x${window.scrollY}`,
+                document_size: `${document.documentElement.scrollWidth}x${document.documentElement.scrollHeight}`,
+                device_pixel_ratio: window.devicePixelRatio || 1,
                 orientation: screen.orientation?.type || 'unknown',
-                orientation_angle: screen.orientation?.angle
+                visual_viewport: `${window.visualViewport?.width || window.innerWidth}x${window.visualViewport?.height || window.innerHeight}`,
+                device_type: this.detectDeviceType()
             };
         },
 
@@ -249,16 +308,7 @@
         getSystemInfo() {
             return {
                 platform: navigator.platform,
-                vendor: navigator.vendor,
-                device_type: this.detectDeviceType(),
-                hardware_concurrency: navigator.hardwareConcurrency,
-                device_memory: navigator.deviceMemory,
-                max_touch_points: navigator.maxTouchPoints,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                timezone_offset: new Date().getTimezoneOffset(),
-                connection_type: navigator.connection?.effectiveType,
-                connection_downlink: navigator.connection?.downlink,
-                connection_rtt: navigator.connection?.rtt
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
         },
 
@@ -270,12 +320,7 @@
                 page_url: window.location.href,
                 page_domain: window.location.hostname,
                 page_protocol: window.location.protocol,
-                timestamp_client: new Date().toISOString(),
-                timestamp_unix: Date.now(),
-                session_id: this.getOrCreateSessionId(),
-                visibility_state: document.visibilityState,
-                document_mode: document.documentMode,
-                is_iframe: window.self !== window.top
+                timestamp_client: new Date().toISOString()
             };
         },
 
@@ -285,7 +330,8 @@
                 browser: this.getBrowserInfo(),
                 display: this.getDisplayInfo(),
                 system: this.getSystemInfo(),
-                context: this.getContextInfo()
+                context: this.getContextInfo(),
+                performance: this.getPerformanceMetrics()
             };
         }
     };

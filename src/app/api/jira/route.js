@@ -62,6 +62,200 @@ export async function POST(request) {
   }
 }
 
+// Metadaten-Formatter für JIRA-Kommentare
+function formatMetadataForJira(metadata) {
+  if (!metadata) return null;
+
+  let content = [];
+
+  // Header
+  content.push({
+    type: "heading",
+    attrs: { level: 2 },
+    content: [{ type: "text", text: "Technical Metadata" }]
+  });
+
+  // Browser Information
+  if (metadata.browser) {
+    content.push({
+      type: "heading",
+      attrs: { level: 3 },
+      content: [{ type: "text", text: "Browser Information" }]
+    });
+
+    const browserData = [
+      ["User Agent", metadata.browser.user_agent],
+      ["Browser", `${metadata.browser.browser_name} ${metadata.browser.browser_version}`],
+      ["Language", metadata.browser.language],
+      ["Languages", metadata.browser.languages],
+      ["Cookies Enabled", metadata.browser.cookies_enabled ? "Yes" : "No"],
+      ["Online", metadata.browser.online ? "Yes" : "No"],
+      ["Do Not Track", metadata.browser.do_not_track],
+      ["Java Enabled", metadata.browser.java_enabled ? "Yes" : "No"],
+      ["WebDriver", metadata.browser.webdriver ? "Yes" : "No"],
+      ["PDF Viewer", metadata.browser.pdf_viewer_enabled ? "Yes" : "No"]
+    ].filter(([_, value]) => value !== undefined && value !== null);
+
+    browserData.forEach(([key, value]) => {
+      content.push({
+        type: "paragraph",
+        content: [
+          { type: "text", text: `${key}: `, marks: [{ type: "strong" }] },
+          { type: "text", text: String(value) }
+        ]
+      });
+    });
+  }
+
+  // Display Information
+  if (metadata.display) {
+    content.push({
+      type: "heading",
+      attrs: { level: 3 },
+      content: [{ type: "text", text: "Display Information" }]
+    });
+
+    const displayData = [
+      ["Screen Resolution", metadata.display.screen_resolution],
+      ["Available Screen", metadata.display.screen_available],
+      ["Color Depth", metadata.display.color_depth],
+      ["Pixel Depth", metadata.display.pixel_depth],
+      ["Viewport Size", metadata.display.viewport_size],
+      ["Window Size", metadata.display.window_size],
+      ["Window Position", metadata.display.window_position],
+      ["Scroll Position", metadata.display.scroll_position],
+      ["Document Size", metadata.display.document_size],
+      ["Device Pixel Ratio", metadata.display.device_pixel_ratio],
+      ["Orientation", metadata.display.orientation],
+      ["Visual Viewport", metadata.display.visual_viewport],
+      ["Device Type", metadata.display.device_type]
+    ].filter(([_, value]) => value !== undefined && value !== null);
+
+    displayData.forEach(([key, value]) => {
+      content.push({
+        type: "paragraph",
+        content: [
+          { type: "text", text: `${key}: `, marks: [{ type: "strong" }] },
+          { type: "text", text: String(value) }
+        ]
+      });
+    });
+  }
+
+  // System Information
+  if (metadata.system) {
+    content.push({
+      type: "heading",
+      attrs: { level: 3 },
+      content: [{ type: "text", text: "System Information" }]
+    });
+
+    const systemData = [
+      ["Platform", metadata.system.platform],
+      ["Timezone", metadata.system.timezone]
+    ].filter(([_, value]) => value !== undefined && value !== null);
+
+    systemData.forEach(([key, value]) => {
+      content.push({
+        type: "paragraph",
+        content: [
+          { type: "text", text: `${key}: `, marks: [{ type: "strong" }] },
+          { type: "text", text: String(value) }
+        ]
+      });
+    });
+  }
+
+  // Performance Information
+  if (metadata.performance) {
+    content.push({
+      type: "heading",
+      attrs: { level: 3 },
+      content: [{ type: "text", text: "Performance Metrics" }]
+    });
+
+    const performanceData = [
+      ["DOM Content Loaded", `${metadata.performance.dom_content_loaded}ms`],
+      ["Load Complete", `${metadata.performance.load_complete}ms`],
+      ["DNS Lookup", `${metadata.performance.dns_lookup}ms`]
+    ].filter(([_, value]) => value !== undefined && value !== null && !value.includes("undefined"));
+
+    performanceData.forEach(([key, value]) => {
+      content.push({
+        type: "paragraph",
+        content: [
+          { type: "text", text: `${key}: `, marks: [{ type: "strong" }] },
+          { type: "text", text: String(value) }
+        ]
+      });
+    });
+  }
+
+  // Context Information
+  if (metadata.context) {
+    content.push({
+      type: "heading",
+      attrs: { level: 3 },
+      content: [{ type: "text", text: "Context Information" }]
+    });
+
+    const contextData = [
+      ["Referrer URL", metadata.context.referrer_url || "Direct access"],
+      ["Page Title", metadata.context.page_title],
+      ["Page URL", metadata.context.page_url],
+      ["Page Domain", metadata.context.page_domain],
+      ["Page Protocol", metadata.context.page_protocol],
+      ["Timestamp", metadata.context.timestamp_client]
+    ].filter(([_, value]) => value !== undefined && value !== null);
+
+    contextData.forEach(([key, value]) => {
+      content.push({
+        type: "paragraph",
+        content: [
+          { type: "text", text: `${key}: `, marks: [{ type: "strong" }] },
+          { type: "text", text: String(value) }
+        ]
+      });
+    });
+  }
+
+  return {
+    type: "doc",
+    version: 1,
+    content: content
+  };
+}
+
+async function addMetadataComment({ serverUrl, username, apiToken, issueKey, metadata }) {
+  if (!metadata) return;
+
+  try {
+    const commentBody = formatMetadataForJira(metadata);
+    if (!commentBody) return;
+
+    const response = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}/comment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        body: commentBody
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Failed to add metadata comment:', errorData);
+    } else {
+      console.log('Metadata comment added successfully');
+    }
+  } catch (error) {
+    console.error('Error adding metadata comment:', error);
+  }
+}
+
 async function createJiraTicket({ feedback, jiraConfig }) {
   const { 
     serverUrl, 
@@ -390,6 +584,27 @@ async function createJiraTicket({ feedback, jiraConfig }) {
       });
     } catch {
       // Ticket wurde erstellt, nur Status-Änderung fehlgeschlagen
+    }
+  }
+
+  // Metadaten-Kommentar hinzufügen falls vorhanden und aktiviert
+  if (feedback.metadata && responseData.key && feedback.includeMetadata !== false) {
+    try {
+      let metadata = feedback.metadata;
+      if (typeof metadata === 'string') {
+        metadata = JSON.parse(metadata);
+      }
+
+      await addMetadataComment({
+        serverUrl,
+        username,
+        apiToken,
+        issueKey: responseData.key,
+        metadata: metadata
+      });
+    } catch (error) {
+      // Ticket wurde erstellt, nur Metadaten-Kommentar fehlgeschlagen
+      console.error('Failed to add metadata comment:', error);
     }
   }
 

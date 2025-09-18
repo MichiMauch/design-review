@@ -120,6 +120,19 @@ export default function JiraModal({
               placeholder="label1, label2, label3"
             />
           </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="includeMetadata"
+              checked={taskData.includeMetadata !== false}
+              onChange={(e) => onTaskDataChange({ ...taskData, includeMetadata: e.target.checked })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="includeMetadata" className="ml-2 block text-sm text-gray-700">
+              Technische Metadaten als Kommentar anhängen
+            </label>
+          </div>
         </div>
 
         <div className="flex gap-3 mt-6">

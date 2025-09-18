@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { X, ExternalLink, MessageSquare, ChevronDown, ChevronUp, Copy, Globe, Monitor, Settings, MapPin } from 'lucide-react';
+import { X, ExternalLink, MessageSquare, Monitor } from 'lucide-react';
 import { ExternalLink as JiraIcon } from 'lucide-react';
 import { TASK_STATUSES } from '../../constants/taskStatuses';
 import { formatTime, getStatusInfo } from '../../utils/projectUtils';
+import MetadataModal from './MetadataModal';
 
 export default function TaskDetailModal({
   task,
@@ -26,8 +27,7 @@ export default function TaskDetailModal({
   loadingJiraModal,
   loadingJiraConfig
 }) {
-  const [metadataExpanded, setMetadataExpanded] = useState(false);
-  const [copiedMetadata, setCopiedMetadata] = useState(false);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
 
   if (!task) return null;
 
@@ -56,18 +56,11 @@ export default function TaskDetailModal({
     }
   };
 
-  const copyMetadataToClipboard = () => {
-    if (metadata) {
-      navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
-      setCopiedMetadata(true);
-      setTimeout(() => setCopiedMetadata(false), 2000);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="p-6">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 overflow-y-auto flex-1">
           {/* Modal Header */}
           <div className="flex items-start justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
@@ -198,41 +191,18 @@ export default function TaskDetailModal({
             {metadata && (
               <div>
                 <button
-                  onClick={() => setMetadataExpanded(!metadataExpanded)}
-                  className="flex items-center justify-between w-full text-left mb-2 group"
+                  onClick={() => setShowMetadataModal(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 group"
                 >
-                  <label className="block text-sm font-medium text-gray-700">
-                    Browser & System Information
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyMetadataToClipboard();
-                      }}
-                      className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
-                      title="Metadaten kopieren"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    {metadataExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-                    )}
-                  </div>
+                  <Monitor className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-700 group-hover:text-blue-800">
+                    Browser & System Details anzeigen
+                  </span>
+                  <ExternalLink className="h-3 w-3 text-blue-500 group-hover:text-blue-600" />
                 </button>
 
-                {copiedMetadata && (
-                  <div className="mb-2 text-xs text-green-600 flex items-center gap-1">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Metadaten kopiert!
-                  </div>
-                )}
 
-                {metadataExpanded && (
+                {false && (
                   <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
                     {/* Browser Information */}
                     {metadata.browser && (
@@ -513,6 +483,13 @@ export default function TaskDetailModal({
           </div>
         </div>
       </div>
+
+      {/* Metadata Modal */}
+      <MetadataModal
+        isOpen={showMetadataModal}
+        metadata={metadata}
+        onClose={() => setShowMetadataModal(false)}
+      />
     </div>
   );
 }
