@@ -1620,6 +1620,13 @@
                 <input id="jira-labels" type="text" placeholder="bug, frontend, ui" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-family: Arial, sans-serif; box-sizing: border-box; font-size: 14px;" />
             </div>
 
+            <div style="margin-bottom: 16px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-family: Arial, sans-serif; font-size: 13px; color: #555; cursor: pointer;">
+                    <input id="jira-include-metadata" type="checkbox" checked style="margin: 0;" />
+                    <span>Technische Metadaten als Kommentar anhängen</span>
+                </label>
+            </div>
+
             <button id="jira-create-btn" style="width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px;" fill="currentColor">
                     <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-6c0-2.4-1.96-4.4-4.4-4.4H11.53zm-6.77 6.77c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-6c0-2.4-1.96-4.4-4.4-4.4H4.76zm6.77 6.77c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.96 4.35 4.35 4.35v-6c0-2.4-1.96-4.4-4.4-4.4h-6.08z"/>
@@ -1665,12 +1672,24 @@
             const sprint = document.getElementById('jira-sprint')?.value || '';
             const column = document.getElementById('jira-column')?.value || '';
             const labelsInput = document.getElementById('jira-labels')?.value || '';
+            const includeMetadata = document.getElementById('jira-include-metadata')?.checked || false;
 
             // Parse labels
             const labels = labelsInput.split(',').map(label => label.trim()).filter(label => label);
 
             // Get stored board ID from earlier load
             const jiraData = await loadJiraDataForWidget();
+
+            // Collect metadata if requested
+            let metadata = null;
+            if (includeMetadata && window.MetadataCollector) {
+                try {
+                    metadata = MetadataCollector.collect();
+                    console.log('Widget: Collected metadata for JIRA:', metadata);
+                } catch (error) {
+                    console.warn('Widget: Failed to collect metadata:', error);
+                }
+            }
 
             // Create JIRA payload
             const jiraPayload = {
@@ -1681,7 +1700,9 @@
                     description: currentFeedbackData.description,
                     screenshot: currentFeedbackData.screenshot,
                     url: currentFeedbackData.url,
-                    projectId: currentFeedbackData.projectId
+                    projectId: currentFeedbackData.projectId,
+                    metadata: metadata,
+                    includeMetadata: includeMetadata
                 },
                 jiraConfig: {
                     serverUrl: jiraConfig.serverUrl,

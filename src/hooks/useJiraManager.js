@@ -307,7 +307,9 @@ export function useJiraManager({ combinedJiraConfig, jiraConfig, showToast }) {
             selected_area: currentTask.selected_area,
             screenshot: screenshotUrl,
             id: currentTask.id, // Add task ID for proper filename generation
-            projectId: projectId // Add project ID for Direct R2 Access
+            projectId: projectId, // Add project ID for Direct R2 Access
+            metadata: currentTask.metadata ? (typeof currentTask.metadata === 'string' ? JSON.parse(currentTask.metadata) : currentTask.metadata) : null,
+            includeMetadata: jiraTaskData.includeMetadata !== false
           },
           jiraConfig: {
             ...jiraConfig,
