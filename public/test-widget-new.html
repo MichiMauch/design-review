@@ -3,197 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Widget-New Test Seite</title>
+    <title>Widget Metadata Test</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: white;
+            padding: 20px;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         .header {
             text-align: center;
-            padding: 40px 0;
-        }
-
-        .header h1 {
-            font-size: 3em;
-            margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .header p {
-            font-size: 1.2em;
-            margin: 20px 0;
-            opacity: 0.9;
-        }
-
-        .content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin: 40px 0;
-        }
-
-        .card {
+            padding: 30px 0;
             background: rgba(255,255,255,0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 30px;
-            border: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 30px;
         }
 
-        .card h3 {
-            font-size: 1.5em;
-            margin: 0 0 15px 0;
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
         }
 
-        .card p {
-            line-height: 1.6;
+        .header p {
+            font-size: 1.1em;
             opacity: 0.9;
         }
 
-        .toolbar {
-            position: fixed;
-            top: 20px;
-            right: 20px;
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .controls {
             background: rgba(255,255,255,0.1);
             backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .controls h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            margin: 10px 0;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #00c896, #00e5a0);
+            border: none;
+            font-weight: bold;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            border: none;
+        }
+
+        .metadata-display {
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.2);
+            height: 600px;
+            overflow-y: auto;
+        }
+
+        .metadata-display h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .metadata-category {
+            background: rgba(255,255,255,0.1);
             border-radius: 10px;
             padding: 15px;
             border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .metadata-category h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: #00e5a0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .metadata-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
             font-size: 0.9em;
         }
 
-        .footer {
-            text-align: center;
-            padding: 40px 0;
-            opacity: 0.7;
+        .metadata-item:last-child {
+            border-bottom: none;
         }
 
-        /* Responsive Design Test */
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 2em;
-            }
+        .metadata-key {
+            color: #ffd700;
+            font-weight: 500;
+        }
 
-            .content {
+        .metadata-value {
+            color: white;
+            text-align: right;
+            word-break: break-all;
+            max-width: 60%;
+        }
+
+        .json-display {
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin: 5px;
+        }
+
+        .status-success {
+            background: rgba(0,255,0,0.3);
+            color: #00ff00;
+        }
+
+        .status-info {
+            background: rgba(0,191,255,0.3);
+            color: #00bfff;
+        }
+
+        .info-panel {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .info-panel h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+
+        .info-panel ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+
+        .info-panel li {
+            margin: 8px 0;
+            position: relative;
+        }
+
+        .info-panel li::before {
+            content: '▸';
+            position: absolute;
+            left: -20px;
+            color: #00e5a0;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .main-grid {
                 grid-template-columns: 1fr;
-                gap: 20px;
             }
 
-            .toolbar {
-                position: static;
-                margin: 20px 0;
-                text-align: center;
+            .metadata-display {
+                height: auto;
             }
         }
 
         @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
             body {
                 padding: 10px;
             }
+        }
 
-            .header h1 {
-                font-size: 1.5em;
-            }
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
 
-            .card {
-                padding: 20px;
-            }
+        ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.5);
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎨 Widget-New Test Seite</h1>
-            <p>Diese Seite testet das neue mobile-responsive Feedback Widget</p>
-            <p><strong>Anleitung:</strong> Verkleinere den Browser oder nutze die mobile Ansicht (F12 → Toggle Device Toolbar)</p>
+            <h1>🔍 Widget Metadata Test Dashboard</h1>
+            <p>Live-Ansicht der Metadaten, die vom Feedback Widget gesammelt werden</p>
         </div>
 
-        <div class="toolbar">
-            <strong>📱 Mobile Test:</strong><br>
-            1. Browser verkleinern (&lt; 1024px)<br>
-            2. Feedback-Button klicken<br>
-            3. "☰ Tools" Button suchen<br>
-            4. Zeichenwerkzeuge testen
+        <div class="info-panel">
+            <h3>📊 Was wird gesammelt?</h3>
+            <ul>
+                <li><strong>Browser-Daten:</strong> Name, Version, Sprache, Cookie-Status</li>
+                <li><strong>Display-Daten:</strong> Bildschirmauflösung, Viewport, Pixel Ratio</li>
+                <li><strong>System-Daten:</strong> Platform, Gerätetype, Zeitzone, Hardware</li>
+                <li><strong>Kontext-Daten:</strong> URL, Referrer, Session ID, Timestamp</li>
+            </ul>
         </div>
 
-        <div class="content">
-            <div class="card">
-                <h3>✨ Neue Features</h3>
-                <p>Das Widget wurde für mobile Geräte optimiert. Die Sidebar mit den Zeichenwerkzeugen ist jetzt auf allen Bildschirmgrößen zugänglich.</p>
-                <p>Bei kleinen Bildschirmen erscheint ein blauer "☰ Tools" Button, um die Werkzeuge ein- und auszublenden.</p>
+        <div class="main-grid">
+            <div class="controls">
+                <h2>🎮 Kontrollen</h2>
+
+                <button class="btn btn-primary" onclick="collectAndDisplayMetadata()">
+                    📊 Metadaten Sammeln
+                </button>
+
+                <button class="btn" onclick="showSessionInfo()">
+                    🔑 Session Info Anzeigen
+                </button>
+
+                <button class="btn" onclick="testMetadataCollection()">
+                    🧪 Test API-Payload
+                </button>
+
+                <button class="btn" onclick="clearDisplay()">
+                    🗑️ Anzeige Löschen
+                </button>
+
+                <button class="btn btn-secondary" onclick="openDevConsole()">
+                    💻 Console Öffnen
+                </button>
+
+                <div style="margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px;">
+                    <h3 style="margin-bottom: 10px;">📝 Feedback Widget</h3>
+                    <p style="font-size: 0.9em; opacity: 0.9;">
+                        Klicke auf den grünen "Feedback" Button rechts,
+                        um das Widget zu öffnen und echtes Feedback mit Metadaten zu senden.
+                    </p>
+                </div>
+
+                <div id="status-area" style="margin-top: 20px;">
+                    <!-- Status messages will appear here -->
+                </div>
             </div>
 
-            <div class="card">
-                <h3>🎯 Test-Bereiche</h3>
-                <p>Teste verschiedene Bildschirmgrößen:</p>
-                <ul>
-                    <li><strong>Desktop:</strong> > 1024px (Sidebar immer sichtbar)</li>
-                    <li><strong>Tablet:</strong> 768px - 1024px (Toggle-Button)</li>
-                    <li><strong>Mobile:</strong> < 768px (Optimierte Sidebar)</li>
-                    <li><strong>Klein:</strong> < 480px (Kompakte Ansicht)</li>
-                </ul>
+            <div class="metadata-display">
+                <h2>📈 Live Metadaten</h2>
+                <div id="metadata-content">
+                    <div class="metadata-grid" id="metadata-grid">
+                        <!-- Metadata categories will be inserted here -->
+                    </div>
+                    <div class="json-display" id="json-display" style="display: none;">
+                        <!-- JSON will be displayed here -->
+                    </div>
+                </div>
             </div>
-
-            <div class="card">
-                <h3>🔧 Interaktionen</h3>
-                <p>Verschiedene Wege die Sidebar zu schließen:</p>
-                <ul>
-                    <li>Klick auf "✕ Schließen" Button</li>
-                    <li>Klick außerhalb der Sidebar (dunkler Bereich)</li>
-                    <li>ESC-Taste drücken</li>
-                    <li>Browser auf Desktop-Größe vergrößern</li>
-                </ul>
-            </div>
-
-            <div class="card">
-                <h3>🎨 Zeichenwerkzeuge</h3>
-                <p>Teste alle verfügbaren Werkzeuge:</p>
-                <ul>
-                    <li>Verschiedene Stiftgrößen (1px - 5px)</li>
-                    <li>Farbauswahl (Schwarz, Rot, Grün, Blau, Gelb)</li>
-                    <li>Markierungen auf dem Screenshot</li>
-                    <li>"Alles löschen" Funktion</li>
-                </ul>
-            </div>
-
-            <div class="card">
-                <h3>📝 Feedback-Formular</h3>
-                <p>Das Formular wurde ebenfalls optimiert:</p>
-                <ul>
-                    <li>Touch-freundliche Eingabefelder</li>
-                    <li>Bessere Scrollbar-Integration</li>
-                    <li>Optimierte Button-Größen</li>
-                    <li>JIRA-Integration (falls konfiguriert)</li>
-                </ul>
-            </div>
-
-            <div class="card">
-                <h3>🚀 Performance</h3>
-                <p>Verbesserte Animationen und Übergänge:</p>
-                <ul>
-                    <li>Smooth cubic-bezier Transitions</li>
-                    <li>Backdrop-Blur Effekte</li>
-                    <li>Hardware-beschleunigte Animationen</li>
-                    <li>Optimierte z-index Hierarchie</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>💡 Tipp: Nutze die Browser-Entwicklertools (F12) um verschiedene Gerätegrößen zu simulieren</p>
-            <p>Widget-New Version • Responsive Design Test</p>
         </div>
     </div>
 
@@ -201,29 +332,273 @@
     <script src="/widget-new.js" data-project-id="widget-new-test" defer></script>
 
     <script>
-        // Add some debug info
-        console.log('🎯 Widget-New Test Seite geladen');
-        console.log('📱 Aktuelle Bildschirmbreite:', window.innerWidth);
-
-        // Log resize events for debugging
-        window.addEventListener('resize', () => {
-            console.log('📏 Neue Bildschirmbreite:', window.innerWidth);
+        // Wait for widget to load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (typeof window.MetadataCollector === 'undefined') {
+                    // Try to access MetadataCollector from widget scope
+                    const scripts = document.querySelectorAll('script');
+                    console.log('Looking for MetadataCollector...');
+                }
+                // Initial metadata collection
+                collectAndDisplayMetadata();
+            }, 1000);
         });
 
-        // Show current screen size in page
-        function updateScreenInfo() {
-            const width = window.innerWidth;
-            let size = '';
-            if (width > 1024) size = 'Desktop (> 1024px)';
-            else if (width > 768) size = 'Tablet (768px - 1024px)';
-            else if (width > 480) size = 'Mobile (480px - 768px)';
-            else size = 'Klein (< 480px)';
+        function collectAndDisplayMetadata() {
+            try {
+                // Create our own MetadataCollector since it's in widget scope
+                const metadata = {
+                    browser: getBrowserInfo(),
+                    display: getDisplayInfo(),
+                    system: getSystemInfo(),
+                    context: getContextInfo()
+                };
 
-            document.title = `Widget Test - ${size}`;
+                displayMetadata(metadata);
+                showStatus('Metadaten erfolgreich gesammelt!', 'success');
+            } catch (error) {
+                console.error('Error collecting metadata:', error);
+                showStatus('Fehler beim Sammeln der Metadaten: ' + error.message, 'error');
+            }
         }
 
-        updateScreenInfo();
-        window.addEventListener('resize', updateScreenInfo);
+        // Replicate MetadataCollector functions
+        function getBrowserInfo() {
+            const ua = navigator.userAgent;
+            return {
+                user_agent: ua,
+                browser_name: parseBrowserName(),
+                browser_version: parseBrowserVersion(),
+                language: navigator.language,
+                languages: navigator.languages?.join(','),
+                cookies_enabled: navigator.cookieEnabled,
+                online: navigator.onLine,
+                do_not_track: navigator.doNotTrack
+            };
+        }
+
+        function getDisplayInfo() {
+            return {
+                screen_resolution: `${screen.width}x${screen.height}`,
+                screen_available: `${screen.availWidth}x${screen.availHeight}`,
+                screen_color_depth: screen.colorDepth,
+                screen_pixel_depth: screen.pixelDepth,
+                viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+                window_size: `${window.outerWidth}x${window.outerHeight}`,
+                device_pixel_ratio: window.devicePixelRatio,
+                orientation: screen.orientation?.type || 'unknown',
+                orientation_angle: screen.orientation?.angle
+            };
+        }
+
+        function getSystemInfo() {
+            return {
+                platform: navigator.platform,
+                vendor: navigator.vendor,
+                device_type: detectDeviceType(),
+                hardware_concurrency: navigator.hardwareConcurrency,
+                device_memory: navigator.deviceMemory,
+                max_touch_points: navigator.maxTouchPoints,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timezone_offset: new Date().getTimezoneOffset(),
+                connection_type: navigator.connection?.effectiveType,
+                connection_downlink: navigator.connection?.downlink,
+                connection_rtt: navigator.connection?.rtt
+            };
+        }
+
+        function getContextInfo() {
+            return {
+                referrer_url: document.referrer,
+                page_title: document.title,
+                page_url: window.location.href,
+                page_domain: window.location.hostname,
+                page_protocol: window.location.protocol,
+                timestamp_client: new Date().toISOString(),
+                timestamp_unix: Date.now(),
+                session_id: getOrCreateSessionId(),
+                visibility_state: document.visibilityState,
+                document_mode: document.documentMode,
+                is_iframe: window.self !== window.top
+            };
+        }
+
+        function parseBrowserName() {
+            const ua = navigator.userAgent;
+            if (ua.includes('Firefox/')) return 'Firefox';
+            if (ua.includes('Edg/')) return 'Edge';
+            if (ua.includes('Chrome/')) return 'Chrome';
+            if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari';
+            if (ua.includes('Opera/') || ua.includes('OPR/')) return 'Opera';
+            return 'Unknown';
+        }
+
+        function parseBrowserVersion() {
+            const ua = navigator.userAgent;
+            const patterns = [
+                { name: 'Firefox', pattern: /Firefox\/(\S+)/ },
+                { name: 'Edge', pattern: /Edg\/(\S+)/ },
+                { name: 'Chrome', pattern: /Chrome\/(\S+)/ },
+                { name: 'Safari', pattern: /Version\/(\S+).*Safari/ },
+                { name: 'Opera', pattern: /(?:Opera|OPR)\/(\S+)/ }
+            ];
+
+            for (const { pattern } of patterns) {
+                const match = ua.match(pattern);
+                if (match) return match[1];
+            }
+            return 'Unknown';
+        }
+
+        function detectDeviceType() {
+            const ua = navigator.userAgent.toLowerCase();
+            const width = screen.width;
+
+            if (/mobile|android|iphone|ipod/.test(ua) || width < 768) return 'mobile';
+            if (/ipad|tablet/.test(ua) || (width >= 768 && width < 1024)) return 'tablet';
+            return 'desktop';
+        }
+
+        function getOrCreateSessionId() {
+            let sessionId = sessionStorage.getItem('feedback_session_id');
+            if (!sessionId) {
+                sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                sessionStorage.setItem('feedback_session_id', sessionId);
+            }
+            return sessionId;
+        }
+
+        function displayMetadata(metadata) {
+            const grid = document.getElementById('metadata-grid');
+            grid.innerHTML = '';
+
+            // Display each category
+            const categories = [
+                { key: 'browser', icon: '🌐', title: 'Browser Information' },
+                { key: 'display', icon: '🖥️', title: 'Display Information' },
+                { key: 'system', icon: '⚙️', title: 'System Information' },
+                { key: 'context', icon: '📍', title: 'Context Information' }
+            ];
+
+            categories.forEach(cat => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'metadata-category';
+
+                let html = `<h3>${cat.icon} ${cat.title}</h3>`;
+
+                const data = metadata[cat.key];
+                for (const [key, value] of Object.entries(data)) {
+                    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    const displayValue = value !== null && value !== undefined ? value : 'N/A';
+                    html += `
+                        <div class="metadata-item">
+                            <span class="metadata-key">${displayKey}:</span>
+                            <span class="metadata-value">${displayValue}</span>
+                        </div>
+                    `;
+                }
+
+                categoryDiv.innerHTML = html;
+                grid.appendChild(categoryDiv);
+            });
+
+            // Also update JSON display
+            const jsonDisplay = document.getElementById('json-display');
+            jsonDisplay.textContent = JSON.stringify(metadata, null, 2);
+        }
+
+        function showSessionInfo() {
+            const sessionId = getOrCreateSessionId();
+            showStatus(`Session ID: ${sessionId}`, 'info');
+            console.log('Current Session ID:', sessionId);
+        }
+
+        function testMetadataCollection() {
+            const metadata = {
+                browser: getBrowserInfo(),
+                display: getDisplayInfo(),
+                system: getSystemInfo(),
+                context: getContextInfo()
+            };
+
+            const payload = {
+                project_id: 'widget-new-test',
+                title: 'Test Feedback',
+                description: 'Testing metadata collection',
+                url: window.location.href,
+                metadata: metadata
+            };
+
+            console.log('API Payload that would be sent:', payload);
+
+            // Show JSON view
+            const jsonDisplay = document.getElementById('json-display');
+            jsonDisplay.style.display = 'block';
+            jsonDisplay.textContent = JSON.stringify(payload, null, 2);
+
+            showStatus('Test Payload in Console und JSON-Ansicht!', 'info');
+        }
+
+        function clearDisplay() {
+            document.getElementById('metadata-grid').innerHTML = '';
+            document.getElementById('json-display').style.display = 'none';
+            showStatus('Anzeige gelöscht', 'info');
+        }
+
+        function openDevConsole() {
+            console.log('%c📊 Metadata Collection Test', 'color: #00e5a0; font-size: 20px; font-weight: bold;');
+            console.log('Current metadata:', {
+                browser: getBrowserInfo(),
+                display: getDisplayInfo(),
+                system: getSystemInfo(),
+                context: getContextInfo()
+            });
+            showStatus('Metadaten in Console geloggt (F12)', 'info');
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusArea = document.getElementById('status-area');
+            const statusClass = type === 'success' ? 'status-success' : 'status-info';
+
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status-indicator ${statusClass}`;
+            statusDiv.textContent = message;
+
+            statusArea.innerHTML = '';
+            statusArea.appendChild(statusDiv);
+
+            setTimeout(() => {
+                statusDiv.style.opacity = '0';
+                setTimeout(() => statusDiv.remove(), 300);
+            }, 3000);
+        }
+
+        // Auto-update on resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                collectAndDisplayMetadata();
+                showStatus('Metadaten nach Resize aktualisiert', 'info');
+            }, 500);
+        });
+
+        // Monitor online/offline
+        window.addEventListener('online', () => {
+            collectAndDisplayMetadata();
+            showStatus('Online - Metadaten aktualisiert', 'success');
+        });
+
+        window.addEventListener('offline', () => {
+            collectAndDisplayMetadata();
+            showStatus('Offline - Metadaten aktualisiert', 'info');
+        });
+
+        // Initial load
+        console.log('🎯 Metadata Test Dashboard loaded');
+        console.log('📱 Current screen width:', window.innerWidth);
+        console.log('🔑 Session ID:', getOrCreateSessionId());
     </script>
 </body>
 </html>

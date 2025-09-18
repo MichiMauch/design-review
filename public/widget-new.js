@@ -162,7 +162,134 @@
     function showToast(message, type = 'success', duration = 3000) {
         return ToastManager.show(message, type, duration);
     }
-    
+
+    // --------------------------------------------------------------------------
+    // METADATA COLLECTOR: Modular system for collecting browser/system info
+    // --------------------------------------------------------------------------
+    const MetadataCollector = {
+        // Parse browser name from user agent
+        parseBrowserName() {
+            const ua = navigator.userAgent;
+            if (ua.includes('Firefox/')) return 'Firefox';
+            if (ua.includes('Edg/')) return 'Edge';
+            if (ua.includes('Chrome/')) return 'Chrome';
+            if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari';
+            if (ua.includes('Opera/') || ua.includes('OPR/')) return 'Opera';
+            return 'Unknown';
+        },
+
+        // Parse browser version from user agent
+        parseBrowserVersion() {
+            const ua = navigator.userAgent;
+            const patterns = [
+                { name: 'Firefox', pattern: /Firefox\/(\S+)/ },
+                { name: 'Edge', pattern: /Edg\/(\S+)/ },
+                { name: 'Chrome', pattern: /Chrome\/(\S+)/ },
+                { name: 'Safari', pattern: /Version\/(\S+).*Safari/ },
+                { name: 'Opera', pattern: /(?:Opera|OPR)\/(\S+)/ }
+            ];
+
+            for (const { pattern } of patterns) {
+                const match = ua.match(pattern);
+                if (match) return match[1];
+            }
+            return 'Unknown';
+        },
+
+        // Detect device type based on screen size and user agent
+        detectDeviceType() {
+            const ua = navigator.userAgent.toLowerCase();
+            const width = screen.width;
+
+            if (/mobile|android|iphone|ipod/.test(ua) || width < 768) return 'mobile';
+            if (/ipad|tablet/.test(ua) || (width >= 768 && width < 1024)) return 'tablet';
+            return 'desktop';
+        },
+
+        // Get or create a session ID
+        getOrCreateSessionId() {
+            let sessionId = sessionStorage.getItem('feedback_session_id');
+            if (!sessionId) {
+                sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                sessionStorage.setItem('feedback_session_id', sessionId);
+            }
+            return sessionId;
+        },
+
+        // Collect browser information
+        getBrowserInfo() {
+            return {
+                user_agent: navigator.userAgent,
+                browser_name: this.parseBrowserName(),
+                browser_version: this.parseBrowserVersion(),
+                language: navigator.language,
+                languages: navigator.languages?.join(','),
+                cookies_enabled: navigator.cookieEnabled,
+                online: navigator.onLine,
+                do_not_track: navigator.doNotTrack
+            };
+        },
+
+        // Collect display/screen information
+        getDisplayInfo() {
+            return {
+                screen_resolution: `${screen.width}x${screen.height}`,
+                screen_available: `${screen.availWidth}x${screen.availHeight}`,
+                screen_color_depth: screen.colorDepth,
+                screen_pixel_depth: screen.pixelDepth,
+                viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+                window_size: `${window.outerWidth}x${window.outerHeight}`,
+                device_pixel_ratio: window.devicePixelRatio,
+                orientation: screen.orientation?.type || 'unknown',
+                orientation_angle: screen.orientation?.angle
+            };
+        },
+
+        // Collect system/platform information
+        getSystemInfo() {
+            return {
+                platform: navigator.platform,
+                vendor: navigator.vendor,
+                device_type: this.detectDeviceType(),
+                hardware_concurrency: navigator.hardwareConcurrency,
+                device_memory: navigator.deviceMemory,
+                max_touch_points: navigator.maxTouchPoints,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timezone_offset: new Date().getTimezoneOffset(),
+                connection_type: navigator.connection?.effectiveType,
+                connection_downlink: navigator.connection?.downlink,
+                connection_rtt: navigator.connection?.rtt
+            };
+        },
+
+        // Collect page context information
+        getContextInfo() {
+            return {
+                referrer_url: document.referrer,
+                page_title: document.title,
+                page_url: window.location.href,
+                page_domain: window.location.hostname,
+                page_protocol: window.location.protocol,
+                timestamp_client: new Date().toISOString(),
+                timestamp_unix: Date.now(),
+                session_id: this.getOrCreateSessionId(),
+                visibility_state: document.visibilityState,
+                document_mode: document.documentMode,
+                is_iframe: window.self !== window.top
+            };
+        },
+
+        // Collect all metadata categories
+        collectAll() {
+            return {
+                browser: this.getBrowserInfo(),
+                display: this.getDisplayInfo(),
+                system: this.getSystemInfo(),
+                context: this.getContextInfo()
+            };
+        }
+    };
+
     // --------------------------------------------------------------------------
     // WIDGET PING: Inform server that widget is alive (every 60 minutes)
     // --------------------------------------------------------------------------
@@ -2174,8 +2301,11 @@
     async function submitFeedback(title, description, screenshot) {
         if (isSubmitting) return;
         isSubmitting = true;
-        
+
         try {
+            // Collect metadata using the MetadataCollector
+            const metadata = MetadataCollector.collectAll();
+
             const taskData = {
                 project_id: projectId,
                 title: title,
@@ -2184,7 +2314,8 @@
                 url: window.location.href,
                 selected_area: selectionArea ? JSON.stringify(selectionArea) : null,
                 user_agent: navigator.userAgent,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                metadata: metadata  // Add the collected metadata
             };
             
             

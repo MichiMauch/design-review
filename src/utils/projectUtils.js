@@ -60,3 +60,39 @@ export const formatTime = (dateString) => {
 export const getStatusInfo = (statusValue) => {
   return TASK_STATUSES.find(status => status.value === statusValue) || TASK_STATUSES[0];
 };
+
+/**
+ * Create a readable, single-line URL representation that preserves
+ * the hostname and the last path segment, collapsing the middle.
+ * Example: example.com/…/checkout?…
+ */
+export const formatUrlDisplay = (urlString, maxLength = 60) => {
+  try {
+    const u = new URL(urlString);
+    const host = u.host;
+    const segments = (u.pathname || '/').split('/').filter(Boolean);
+    const last = segments.length ? segments[segments.length - 1] : '';
+
+    // Base display: host + /…/ + last segment
+    let display = host;
+    if (last) {
+      display += (segments.length > 1 ? '/…/' : '/') + last;
+    }
+
+    // Indicate query/hash presence without long noise
+    if (u.search) display += '?…';
+    if (u.hash) display += '#…';
+
+    if (display.length <= maxLength) return display;
+
+    // If still too long, ellipsize the middle conservatively
+    const keep = Math.max(10, Math.floor((maxLength - 1) / 2));
+    return display.slice(0, keep) + '…' + display.slice(-keep);
+  } catch {
+    // Fallback for invalid URLs
+    if (!urlString) return '';
+    return urlString.length > maxLength
+      ? urlString.slice(0, Math.max(0, maxLength - 1)) + '…'
+      : urlString;
+  }
+};

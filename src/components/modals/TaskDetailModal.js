@@ -1,6 +1,7 @@
 'use client';
 
-import { X, ExternalLink, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { X, ExternalLink, MessageSquare, ChevronDown, ChevronUp, Copy, Globe, Monitor, Settings, MapPin } from 'lucide-react';
 import { ExternalLink as JiraIcon } from 'lucide-react';
 import { TASK_STATUSES } from '../../constants/taskStatuses';
 import { formatTime, getStatusInfo } from '../../utils/projectUtils';
@@ -25,7 +26,20 @@ export default function TaskDetailModal({
   loadingJiraModal,
   loadingJiraConfig
 }) {
+  const [metadataExpanded, setMetadataExpanded] = useState(false);
+  const [copiedMetadata, setCopiedMetadata] = useState(false);
+
   if (!task) return null;
+
+  // Parse metadata if it exists
+  let metadata = null;
+  if (task.metadata) {
+    try {
+      metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
+    } catch (e) {
+      console.error('Failed to parse metadata:', e);
+    }
+  }
 
   const handleStatusChange = (status) => {
     onUpdateStatus(task.id, status);
@@ -39,6 +53,14 @@ export default function TaskDetailModal({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleAddComment();
+    }
+  };
+
+  const copyMetadataToClipboard = () => {
+    if (metadata) {
+      navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
+      setCopiedMetadata(true);
+      setTimeout(() => setCopiedMetadata(false), 2000);
     }
   };
 
@@ -171,6 +193,194 @@ export default function TaskDetailModal({
                 {formatTime(task.created_at)}
               </div>
             </div>
+
+            {/* Browser & System Metadata */}
+            {metadata && (
+              <div>
+                <button
+                  onClick={() => setMetadataExpanded(!metadataExpanded)}
+                  className="flex items-center justify-between w-full text-left mb-2 group"
+                >
+                  <label className="block text-sm font-medium text-gray-700">
+                    Browser & System Information
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyMetadataToClipboard();
+                      }}
+                      className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                      title="Metadaten kopieren"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    {metadataExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
+                    )}
+                  </div>
+                </button>
+
+                {copiedMetadata && (
+                  <div className="mb-2 text-xs text-green-600 flex items-center gap-1">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Metadaten kopiert!
+                  </div>
+                )}
+
+                {metadataExpanded && (
+                  <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
+                    {/* Browser Information */}
+                    {metadata.browser && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Globe className="h-4 w-4 text-blue-600" />
+                          <h4 className="text-sm font-semibold text-gray-700">Browser</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {metadata.browser.browser_name && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Browser:</span>
+                              <span className="text-gray-900 font-medium">{metadata.browser.browser_name}</span>
+                            </div>
+                          )}
+                          {metadata.browser.browser_version && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Version:</span>
+                              <span className="text-gray-900 font-medium">{metadata.browser.browser_version.split('.')[0]}</span>
+                            </div>
+                          )}
+                          {metadata.browser.language && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Sprache:</span>
+                              <span className="text-gray-900 font-medium">{metadata.browser.language}</span>
+                            </div>
+                          )}
+                          {metadata.browser.online !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Online:</span>
+                              <span className="text-gray-900 font-medium">{metadata.browser.online ? 'Ja' : 'Nein'}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Display Information */}
+                    {metadata.display && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Monitor className="h-4 w-4 text-green-600" />
+                          <h4 className="text-sm font-semibold text-gray-700">Display</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {metadata.display.screen_resolution && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Auflösung:</span>
+                              <span className="text-gray-900 font-medium">{metadata.display.screen_resolution}</span>
+                            </div>
+                          )}
+                          {metadata.display.viewport_size && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Viewport:</span>
+                              <span className="text-gray-900 font-medium">{metadata.display.viewport_size}</span>
+                            </div>
+                          )}
+                          {metadata.display.device_pixel_ratio && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Pixel Ratio:</span>
+                              <span className="text-gray-900 font-medium">{metadata.display.device_pixel_ratio}x</span>
+                            </div>
+                          )}
+                          {metadata.display.orientation && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Orientierung:</span>
+                              <span className="text-gray-900 font-medium">{metadata.display.orientation.replace('-', ' ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* System Information */}
+                    {metadata.system && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Settings className="h-4 w-4 text-purple-600" />
+                          <h4 className="text-sm font-semibold text-gray-700">System</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {metadata.system.platform && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Platform:</span>
+                              <span className="text-gray-900 font-medium">{metadata.system.platform}</span>
+                            </div>
+                          )}
+                          {metadata.system.device_type && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Gerätetype:</span>
+                              <span className="text-gray-900 font-medium capitalize">{metadata.system.device_type}</span>
+                            </div>
+                          )}
+                          {metadata.system.timezone && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Zeitzone:</span>
+                              <span className="text-gray-900 font-medium">{metadata.system.timezone.split('/').pop()}</span>
+                            </div>
+                          )}
+                          {metadata.system.connection_type && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Verbindung:</span>
+                              <span className="text-gray-900 font-medium">{metadata.system.connection_type}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Context Information */}
+                    {metadata.context && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MapPin className="h-4 w-4 text-orange-600" />
+                          <h4 className="text-sm font-semibold text-gray-700">Kontext</h4>
+                        </div>
+                        <div className="space-y-1 text-xs">
+                          {metadata.context.session_id && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Session ID:</span>
+                              <span className="text-gray-900 font-medium text-right break-all" style={{ maxWidth: '200px' }}>
+                                {metadata.context.session_id}
+                              </span>
+                            </div>
+                          )}
+                          {metadata.context.referrer_url && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Referrer:</span>
+                              <span className="text-gray-900 font-medium text-right break-all" style={{ maxWidth: '200px' }}>
+                                {metadata.context.referrer_url || 'Direkt'}
+                              </span>
+                            </div>
+                          )}
+                          {metadata.context.timestamp_client && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Client Zeit:</span>
+                              <span className="text-gray-900 font-medium">
+                                {new Date(metadata.context.timestamp_client).toLocaleString('de-DE')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Comments Section */}
             <div>

@@ -24,7 +24,7 @@ import AITaskBoard from '../../../components/project/AITaskBoard';
 import SentimentTaskBoard from '../../../components/project/SentimentTaskBoard';
 import { MessageSquare, Download, Calendar, Clock, Users, MessageCircle } from 'lucide-react';
 import AIProjectDashboard from '../../../components/ai/AIProjectDashboard';
-import { getStatusInfo } from '../../../utils/projectUtils';
+import { getStatusInfo, formatUrlDisplay } from '../../../utils/projectUtils';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -47,6 +47,7 @@ export default function ProjectPage() {
     labels: '',
     column: ''
   });
+  const [topUrls, setTopUrls] = useState([]);
 
   // Custom hooks for separated concerns
   const projectManager = useProjectManager({
@@ -71,6 +72,18 @@ export default function ProjectPage() {
 
   // Load project-specific statuses
   const projectStatuses = useProjectStatuses(params.id);
+
+  const loadTopUrls = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.id}/top-urls`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) setTopUrls(data.topUrls || []);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [params.id]);
 
   // Enhanced JIRA modal opening with screenshot loading
   const openJiraModal = useCallback(async (task) => {
@@ -208,7 +221,14 @@ export default function ProjectPage() {
     }
   }, [taskManager.viewMode, taskManager.loadProjectComments]);
 
-  // Loading and error states
+  // Load Top URLs when on dashboard or on first render
+  useEffect(() => {
+    if (taskManager.viewMode === 'dashboard') {
+      loadTopUrls();
+    }
+  }, [taskManager.viewMode, loadTopUrls]);
+
+  // Loading and error states (must come after all hooks)
   if (projectManager.isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -417,8 +437,8 @@ export default function ProjectPage() {
                     </div>
                   </div>
 
-                  {/* Second Row - Recent Items */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Second Row - Recent Items + Top URLs */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Recent Feedbacks */}
                     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
                       <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -480,6 +500,33 @@ export default function ProjectPage() {
                           ))
                         ) : (
                           <p className="text-sm text-gray-500">Noch keine Kommentare vorhanden</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Top URLs */}
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                      <h3 className="font-semibold text-gray-900 mb-4">Top 5 URLs</h3>
+                      <div className="space-y-3">
+                        {topUrls && topUrls.length > 0 ? (
+                          topUrls.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:underline whitespace-nowrap max-w-[75%]"
+                                title={item.url}
+                              >
+                                {formatUrlDisplay(item.url, 48)}
+                              </a>
+                              <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full min-w-[2rem]">
+                                {item.count}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500">Keine Daten vorhanden</p>
                         )}
                       </div>
                     </div>

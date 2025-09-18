@@ -32,25 +32,34 @@ export async function POST(request) {
 
     const db = getDb();
 
-    // Find the project by name to get its numeric ID
-    let project;
+    // Resolve project ID: accept numeric ID or project name
+    let projectId;
     try {
-        const projectResult = await db.execute({
-            sql: 'SELECT id FROM projects WHERE name = ?',
-            args: [data.project_id],
-        });
-        if (projectResult.rows.length === 0) {
-            return NextResponse.json(
-                { success: false, error: `Project with name '${data.project_id}' not found.` },
-                { status: 404, headers: corsHeaders() }
-            );
+      const asNumber = Number(data.project_id);
+      if (!isNaN(asNumber) && String(asNumber) === String(data.project_id)) {
+        // Looks like a numeric ID
+        const check = await db.execute({ sql: 'SELECT id FROM projects WHERE id = ?', args: [asNumber] });
+        if (check.rows.length === 0) {
+          return NextResponse.json(
+            { success: false, error: `Project with id '${data.project_id}' not found.` },
+            { status: 404, headers: corsHeaders() }
+          );
         }
-        project = projectResult.rows[0];
+        projectId = asNumber;
+      } else {
+        // Treat as project name
+        const projectResult = await db.execute({ sql: 'SELECT id FROM projects WHERE name = ?', args: [data.project_id] });
+        if (projectResult.rows.length === 0) {
+          return NextResponse.json(
+            { success: false, error: `Project with name '${data.project_id}' not found.` },
+            { status: 404, headers: corsHeaders() }
+          );
+        }
+        projectId = projectResult.rows[0].id;
+      }
     } catch {
-        return NextResponse.json({ success: false, error: 'Failed to query projects' }, { status: 500, headers: corsHeaders() });
+      return NextResponse.json({ success: false, error: 'Failed to resolve project' }, { status: 500, headers: corsHeaders() });
     }
-    
-    const projectId = project.id; // This is the numeric ID
     
     // R2 Upload only - no Data URL storage
     let screenshotUrl = null;
@@ -145,11 +154,29 @@ export async function POST(request) {
       );
     }
 
+    // Process metadata if provided
+    let metadataJson = null;
+    if (data.metadata) {
+      try {
+        // Validate and structure metadata
+        const metadata = {
+          browser: data.metadata.browser || {},
+          display: data.metadata.display || {},
+          system: data.metadata.system || {},
+          context: data.metadata.context || {}
+        };
+        metadataJson = JSON.stringify(metadata);
+      } catch (error) {
+        console.warn('Failed to process metadata:', error);
+        // Continue without metadata if it fails
+      }
+    }
+
     // Insert task into database
     const result = await db.execute({
       sql: `
-        INSERT INTO tasks (project_id, title, description, screenshot, screenshot_url, url, selected_area, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+        INSERT INTO tasks (project_id, title, description, screenshot, screenshot_url, url, selected_area, metadata, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `,
       args: [
         projectId,
@@ -158,13 +185,56 @@ export async function POST(request) {
         screenshotFilename || null,
         screenshotUrl || null,
         data.url,
-        data.selected_area ? JSON.stringify(data.selected_area) : null
+        data.selected_area ? JSON.stringify(data.selected_area) : null,
+        metadataJson
       ]
     });
 
+    const taskId = Number(result.lastInsertRowid);
+
+    // Trigger AI analysis synchronously to ensure persistence
+    if (data.title || data.description) {
+      try {
+        const { analyzeFeedback } = await import('../../../lib/ai-service.js');
+        const analysisText = [data.title, data.description].filter(Boolean).join('. ');
+        const aiResult = await analyzeFeedback(analysisText, { debug: true, retries: 1 });
+        const analysis = aiResult?.analysis;
+        if (analysis) {
+          await db.execute({
+            sql: `
+              UPDATE tasks
+              SET
+                ai_sentiment = ?,
+                ai_confidence = ?,
+                ai_category = ?,
+                ai_priority = ?,
+                ai_summary = ?,
+                ai_keywords = ?,
+                ai_analyzed_at = datetime('now')
+              WHERE id = ?
+            `,
+            args: [
+              analysis.sentiment,
+              analysis.confidence,
+              analysis.category,
+              analysis.priority,
+              analysis.summary,
+              JSON.stringify(analysis.keywords),
+              taskId
+            ]
+          });
+          console.log(`✅ AI analysis stored for task ${taskId} (success: ${aiResult.success})`);
+        } else {
+          console.warn(`⚠️ AI analysis not available for task ${taskId}`);
+        }
+      } catch (err) {
+        console.warn('AI analysis failed or unavailable:', err.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      id: Number(result.lastInsertRowid),
+      id: taskId,
       project_id: projectId, // Return numeric project ID for PATCH updates
       screenshot: screenshotFilename,
       screenshot_url: screenshotUrl,

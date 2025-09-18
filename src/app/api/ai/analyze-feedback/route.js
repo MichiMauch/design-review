@@ -12,15 +12,7 @@ export async function POST(request) {
     const { taskId, text, batch = false, taskIds = [] } = body;
 
     // Validate OpenAI API key
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'OpenAI API key nicht konfiguriert. Bitte OPENAI_API_KEY Environment Variable setzen.'
-        },
-        { status: 500 }
-      );
-    }
+    // Wenn kein API Key vorhanden ist, erlauben wir Fallback-Analyse downstream
 
     const db = getDb();
 
@@ -97,17 +89,7 @@ async function processSingleAnalysis(db, taskId, text) {
     // Perform AI analysis
     const result = await analyzeFeedback(text);
 
-    if (!result.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'AI-Analyse fehlgeschlagen: ' + result.error,
-          fallback: result.analysis
-        },
-        { status: 500 }
-      );
-    }
-
+    // Persistiere auch Fallback-Analyse, damit UI Daten sieht
     const analysis = result.analysis;
 
     // Update task with AI analysis
@@ -121,7 +103,7 @@ async function processSingleAnalysis(db, taskId, text) {
           ai_priority = ?,
           ai_summary = ?,
           ai_keywords = ?,
-          ai_analyzed_at = datetime('now', 'localtime')
+          ai_analyzed_at = datetime('now')
         WHERE id = ?
       `,
       args: [
@@ -194,7 +176,7 @@ async function processBatchAnalysis(db, taskIds) {
               ai_priority = ?,
               ai_summary = ?,
               ai_keywords = ?,
-              ai_analyzed_at = datetime('now', 'localtime')
+              ai_analyzed_at = datetime('now')
             WHERE id = ?
           `,
           args: [

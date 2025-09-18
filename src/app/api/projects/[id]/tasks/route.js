@@ -172,7 +172,7 @@ export async function POST(request, { params }) {
     const result = await db.execute({
       sql: `
         INSERT INTO tasks (project_id, title, description, screenshot, screenshot_url, url, selected_area, title_en, description_en, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `,
       args: [
         projectId, // Now using the resolved numeric project ID
@@ -189,63 +189,50 @@ export async function POST(request, { params }) {
 
     const taskId = Number(result.lastInsertRowid);
 
-    // Trigger AI analysis in background (non-blocking)
-    if (process.env.OPENAI_API_KEY && (title || description)) {
+    // Trigger AI analysis synchronously to ensure persistence
+    if (title || description) {
       try {
-        // Import and analyze in background
         const { analyzeFeedback } = await import('../../../../../lib/ai-service.js');
         const analysisText = [title, description].filter(Boolean).join('. ');
-
-        // Run analysis without blocking the response (with debug mode)
-        analyzeFeedback(analysisText, { debug: true, retries: 1 }).then(async (aiResult) => {
-          if (aiResult.success) {
-            const analysis = aiResult.analysis;
-            // Update task with AI analysis
-            await db.execute({
-              sql: `
-                UPDATE tasks
-                SET
-                  ai_sentiment = ?,
-                  ai_confidence = ?,
-                  ai_category = ?,
-                  ai_priority = ?,
-                  ai_summary = ?,
-                  ai_keywords = ?,
-                  ai_analyzed_at = datetime('now', 'localtime')
-                WHERE id = ?
-              `,
-              args: [
-                analysis.sentiment,
-                analysis.confidence,
-                analysis.category,
-                analysis.priority,
-                analysis.summary,
-                JSON.stringify(analysis.keywords),
-                taskId
-              ]
-            });
-            console.log(`✅ AI analysis completed for task ${taskId}:`, {
-              sentiment: analysis.sentiment,
-              category: analysis.category,
-              priority: analysis.priority,
-              confidence: analysis.confidence,
-              processingTime: analysis.processingTime + 'ms'
-            });
-          } else {
-            console.warn(`⚠️ AI analysis failed for task ${taskId} but returned fallback:`, {
-              error: aiResult.error,
-              fallbackUsed: aiResult.analysis?.fallbackUsed
-            });
-          }
-        }).catch(error => {
-          console.error(`❌ AI analysis failed for task ${taskId}:`, {
-            error: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString()
+        const aiResult = await analyzeFeedback(analysisText, { debug: true, retries: 1 });
+        const analysis = aiResult?.analysis;
+        if (analysis) {
+          await db.execute({
+            sql: `
+              UPDATE tasks
+              SET
+                ai_sentiment = ?,
+                ai_confidence = ?,
+                ai_category = ?,
+                ai_priority = ?,
+                ai_summary = ?,
+                ai_keywords = ?,
+                ai_analyzed_at = datetime('now')
+              WHERE id = ?
+            `,
+            args: [
+              analysis.sentiment,
+              analysis.confidence,
+              analysis.category,
+              analysis.priority,
+              analysis.summary,
+              JSON.stringify(analysis.keywords),
+              taskId
+            ]
           });
-        });
+          console.log(`✅ AI analysis stored for task ${taskId}:`, {
+            success: aiResult.success,
+            sentiment: analysis.sentiment,
+            category: analysis.category,
+            priority: analysis.priority,
+            confidence: analysis.confidence,
+            processingTime: analysis.processingTime + 'ms'
+          });
+        } else {
+          console.warn(`⚠️ AI analysis not available for task ${taskId}`);
+        }
       } catch (error) {
-        console.warn('AI analysis initialization failed:', error.message);
+        console.warn('AI analysis failed or unavailable:', error.message);
       }
     }
 
