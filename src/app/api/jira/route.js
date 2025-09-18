@@ -227,13 +227,30 @@ function formatMetadataForJira(metadata) {
 }
 
 async function addMetadataComment({ serverUrl, username, apiToken, issueKey, metadata }) {
-  if (!metadata) return;
+  console.log('=== ADD METADATA COMMENT DEBUG ===');
+  console.log('serverUrl:', serverUrl);
+  console.log('issueKey:', issueKey);
+  console.log('metadata exists:', !!metadata);
+
+  if (!metadata) {
+    console.log('❌ No metadata provided');
+    return;
+  }
 
   try {
     const commentBody = formatMetadataForJira(metadata);
-    if (!commentBody) return;
+    console.log('commentBody generated:', !!commentBody);
 
-    const response = await fetch(`${serverUrl}/rest/api/3/issue/${issueKey}/comment`, {
+    if (!commentBody) {
+      console.log('❌ No comment body generated');
+      return;
+    }
+
+    const commentUrl = `${serverUrl}/rest/api/3/issue/${issueKey}/comment`;
+    console.log('Comment URL:', commentUrl);
+    console.log('Comment body content length:', JSON.stringify(commentBody).length);
+
+    const response = await fetch(commentUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${Buffer.from(`${username}:${apiToken}`).toString('base64')}`,
@@ -245,24 +262,41 @@ async function addMetadataComment({ serverUrl, username, apiToken, issueKey, met
       })
     });
 
+    console.log('JIRA comment response status:', response.status);
+    console.log('JIRA comment response statusText:', response.statusText);
+
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Failed to add metadata comment:', errorData);
+      console.error('❌ Failed to add metadata comment:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData
+      });
     } else {
-      console.log('Metadata comment added successfully');
+      const responseData = await response.json();
+      console.log('✅ Metadata comment added successfully:', responseData);
     }
   } catch (error) {
-    console.error('Error adding metadata comment:', error);
+    console.error('❌ Error adding metadata comment:', error);
   }
 }
 
 async function createJiraTicket({ feedback, jiraConfig }) {
-  const { 
-    serverUrl, 
-    username, 
-    apiToken, 
-    projectKey, 
-    issueType, 
+  // Debug-Logs für Metadaten (früh in der Funktion)
+  console.log('=== METADATA COMMENT DEBUG (START) ===');
+  console.log('feedback.metadata exists:', !!feedback.metadata);
+  console.log('feedback.includeMetadata:', feedback.includeMetadata);
+  console.log('metadata type:', typeof feedback.metadata);
+  if (feedback.metadata) {
+    console.log('Metadata keys:', Object.keys(feedback.metadata));
+  }
+
+  const {
+    serverUrl,
+    username,
+    apiToken,
+    projectKey,
+    issueType,
     defaultAssignee,
     defaultLabels,
     defaultDueDateDays,
@@ -271,7 +305,7 @@ async function createJiraTicket({ feedback, jiraConfig }) {
     selectedBoardId,
     selectedColumn
   } = jiraConfig;
-  
+
   if (!serverUrl || !username || !apiToken || !projectKey) {
     throw new Error('JIRA Konfiguration unvollständig');
   }
@@ -588,12 +622,21 @@ async function createJiraTicket({ feedback, jiraConfig }) {
   }
 
   // Metadaten-Kommentar hinzufügen falls vorhanden und aktiviert
+  console.log('=== METADATA COMMENT DEBUG ===');
+  console.log('feedback.metadata exists:', !!feedback.metadata);
+  console.log('responseData.key exists:', !!responseData.key);
+  console.log('feedback.includeMetadata:', feedback.includeMetadata);
+  console.log('metadata type:', typeof feedback.metadata);
+
   if (feedback.metadata && responseData.key && feedback.includeMetadata !== false) {
     try {
       let metadata = feedback.metadata;
       if (typeof metadata === 'string') {
         metadata = JSON.parse(metadata);
       }
+
+      console.log('Attempting to add metadata comment for issue:', responseData.key);
+      console.log('Metadata keys:', Object.keys(metadata));
 
       await addMetadataComment({
         serverUrl,
@@ -602,10 +645,14 @@ async function createJiraTicket({ feedback, jiraConfig }) {
         issueKey: responseData.key,
         metadata: metadata
       });
+
+      console.log('✅ Metadata comment added successfully');
     } catch (error) {
       // Ticket wurde erstellt, nur Metadaten-Kommentar fehlgeschlagen
-      console.error('Failed to add metadata comment:', error);
+      console.error('❌ Failed to add metadata comment:', error);
     }
+  } else {
+    console.log('❌ Metadata comment skipped - conditions not met');
   }
 
   return withCORS(NextResponse.json({

@@ -53,7 +53,9 @@
       "Bash(xargs kill:*)",
       "Bash(git checkout:*)",
       "Bash(sed:*)",
-      "Bash(export:*)"
+      "Bash(export:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:localhost)"
     ],
     "deny": []
   }
