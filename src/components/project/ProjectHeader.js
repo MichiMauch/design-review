@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -10,20 +10,33 @@ import {
   Globe,
   Calendar,
   Brain,
-  RefreshCw
+  RefreshCw,
+  BarChart3,
+  Zap,
+  Shield,
+  MoreVertical,
+  Download,
+  Users,
+  Search,
+  Image,
+  Cookie
 } from 'lucide-react';
 import { formatTime } from '../../utils/projectUtils';
 
 export default function ProjectHeader({
   project,
   combinedJiraConfig,
-  jiraConfig
+  jiraConfig,
+  onExcelExport,
+  exportingExcel
 }) {
   const [aiStatus, setAiStatus] = useState({
     configured: false,
     available: false,
     loading: true
   });
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const checkAIConfiguration = async () => {
     setAiStatus(prev => ({ ...prev, loading: true }));
@@ -48,6 +61,25 @@ export default function ProjectHeader({
   useEffect(() => {
     checkAIConfiguration();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleExcelExport = () => {
+    if (onExcelExport) {
+      onExcelExport();
+    }
+    setDropdownOpen(false);
+  };
 
   if (!project) return null;
 
@@ -143,15 +175,116 @@ export default function ProjectHeader({
                 </div>
               </div>
 
-              {/* Settings Button */}
-              <Link
-                href={`/project/${project.id}/settings`}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 rounded-lg transition-colors border border-gray-300 hover:border-blue-400"
-                title="Projekt-Einstellungen"
-              >
-                <Settings className="h-4 w-4" />
-                Einstellungen
-              </Link>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/project/${project.id}/seo-analysis`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-green-600 bg-gray-100 hover:bg-green-50 rounded-lg transition-colors border border-gray-300 hover:border-green-400"
+                  title="SEO & Content Analyse"
+                >
+                  <Search className="h-4 w-4" />
+                  SEO
+                </Link>
+                <Link
+                  href={`/project/${project.id}/meta-analysis`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 rounded-lg transition-colors border border-gray-300 hover:border-blue-400"
+                  title="Meta-Tags & Icons Analyse"
+                >
+                  <Globe className="h-4 w-4" />
+                  Meta-Analyse
+                </Link>
+                <Link
+                  href={`/project/${project.id}/analytics`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-purple-600 bg-gray-100 hover:bg-purple-50 rounded-lg transition-colors border border-gray-300 hover:border-purple-400"
+                  title="Analytics & Tracking Analyse"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Analytics
+                </Link>
+                <Link
+                  href={`/project/${project.id}/performance`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-yellow-600 bg-gray-100 hover:bg-yellow-50 rounded-lg transition-colors border border-gray-300 hover:border-yellow-400"
+                  title="Performance Analyse"
+                >
+                  <Zap className="h-4 w-4" />
+                  Performance
+                </Link>
+                <Link
+                  href={`/project/${project.id}/security`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-red-600 bg-gray-100 hover:bg-red-50 rounded-lg transition-colors border border-gray-300 hover:border-red-400"
+                  title="Security Analyse"
+                >
+                  <Shield className="h-4 w-4" />
+                  Security
+                </Link>
+                <Link
+                  href={`/project/${project.id}/media-analysis`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-violet-600 bg-gray-100 hover:bg-violet-50 rounded-lg transition-colors border border-gray-300 hover:border-violet-400"
+                  title="Media & Resources Analyse"
+                >
+                  <Image className="h-4 w-4" />
+                  Media
+                </Link>
+                <Link
+                  href={`/project/${project.id}/privacy-analysis`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-orange-600 bg-gray-100 hover:bg-orange-50 rounded-lg transition-colors border border-gray-300 hover:border-orange-400"
+                  title="Cookie & Privacy Compliance Analyse"
+                >
+                  <Cookie className="h-4 w-4" />
+                  Privacy
+                </Link>
+                {/* More Actions Dropdown */}
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300 hover:border-gray-400"
+                    title="Weitere Aktionen"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="py-1">
+                        <button
+                          onClick={handleExcelExport}
+                          disabled={exportingExcel}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:bg-gray-50 disabled:text-gray-400 transition-colors"
+                        >
+                          <Download className="h-4 w-4" />
+                          {exportingExcel ? 'Exportiere...' : 'Als Excel exportieren'}
+                        </button>
+
+                        <div className="border-t border-gray-100 my-1"></div>
+
+                        <Link
+                          href={`/project/${project.id}/settings`}
+                          onClick={() => setDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Einstellungen
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/settings#users`}
+                          onClick={() => setDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <Users className="h-4 w-4" />
+                          User
+                        </Link>
+
+                        <div className="border-t border-gray-100 mt-1 pt-1">
+                          <div className="px-4 py-2 text-xs text-gray-500">
+                            Weitere Aktionen folgen...
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center gap-6 text-gray-600">

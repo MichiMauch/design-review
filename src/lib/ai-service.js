@@ -268,6 +268,123 @@ function createFallbackAnalysis(feedbackText) {
 }
 
 /**
+ * Generate SEO suggestions for title and meta description using AI
+ * @param {Object} options - SEO analysis options
+ * @returns {Promise<Object>} SEO suggestions
+ */
+export async function generateSeoSuggestions(options = {}) {
+  const { url, currentTitle, currentDescription, pageContent } = options;
+
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    // Create AI prompt for SEO optimization
+    const prompt = `Als SEO-Experte sollst du optimierte Vorschläge für Title und Meta Description erstellen.
+
+Aktuelle Daten:
+- URL: ${url}
+- Aktueller Title: "${currentTitle}"
+- Aktuelle Meta Description: "${currentDescription}"
+- Seiteninhalt (Auszug): ${pageContent.substring(0, 1000)}
+
+Erstelle optimierte Vorschläge unter Berücksichtigung folgender SEO Best Practices:
+
+TITLE-TAG (30-60 Zeichen):
+- Hauptkeyword am Anfang
+- Einzigartig und aussagekräftig
+- Call-to-Action wenn möglich
+- Brand-Name am Ende (falls passend)
+
+META DESCRIPTION (120-160 Zeichen):
+- Überzeugende Beschreibung des Seiteninhalts
+- Relevante Keywords natürlich eingebaut
+- Call-to-Action oder Nutzenversprechen
+- Keine Keyword-Stuffing
+
+Antworte ausschließlich im folgenden JSON-Format:
+{
+  "title": {
+    "suggestion": "Optimierter Title-Tag hier",
+    "length": 45,
+    "reasoning": "Kurze Erklärung der Optimierung"
+  },
+  "metaDescription": {
+    "suggestion": "Optimierte Meta Description hier",
+    "length": 145,
+    "reasoning": "Kurze Erklärung der Optimierung"
+  },
+  "keywords": ["keyword1", "keyword2", "keyword3"]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'Du bist ein erfahrener SEO-Experte, der optimierte Title-Tags und Meta Descriptions erstellt. Antworte immer im geforderten JSON-Format.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 1000,
+      temperature: 0.7
+    });
+
+    const response = completion.choices[0]?.message?.content;
+
+    if (!response) {
+      throw new Error('No response from AI service');
+    }
+
+    // Parse JSON response
+    let suggestions;
+    try {
+      suggestions = JSON.parse(response);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', response);
+      throw new Error('Invalid AI response format');
+    }
+
+    // Validate response structure
+    if (!suggestions.title || !suggestions.metaDescription) {
+      throw new Error('Incomplete AI response');
+    }
+
+    // Add timestamp and validation
+    suggestions.generatedAt = new Date().toISOString();
+    suggestions.url = url;
+
+    return suggestions;
+
+  } catch (error) {
+    console.error('SEO suggestions generation error:', error);
+
+    // Provide fallback suggestions
+    return {
+      title: {
+        suggestion: currentTitle || 'Optimierter Title benötigt',
+        length: currentTitle?.length || 0,
+        reasoning: 'AI-Service nicht verfügbar. Bitte überprüfen Sie die OpenAI-Konfiguration.'
+      },
+      metaDescription: {
+        suggestion: currentDescription || 'Optimierte Meta Description benötigt',
+        length: currentDescription?.length || 0,
+        reasoning: 'AI-Service nicht verfügbar. Bitte überprüfen Sie die OpenAI-Konfiguration.'
+      },
+      keywords: [],
+      generatedAt: new Date().toISOString(),
+      url,
+      fallback: true,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Validate and normalize AI analysis response
  * @param {Object} analysis
  * @param {string} originalText

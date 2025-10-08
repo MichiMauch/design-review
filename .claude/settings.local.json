@@ -55,7 +55,8 @@
       "Bash(sed:*)",
       "Bash(export:*)",
       "Bash(python3:*)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "WebFetch(domain:economiesuisse.ch)"
     ],
     "deny": []
   }

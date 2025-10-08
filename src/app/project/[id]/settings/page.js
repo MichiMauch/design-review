@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Settings, AlertTriangle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Settings, AlertTriangle, Trash2, Code, Copy, CheckCircle } from 'lucide-react';
 import StatusManager from '../../../../components/status/StatusManager';
 import ProjectUserManager from '../../../../components/shared/users/ProjectUserManager';
 import { useProjectUsers } from '../../../../hooks/useProjectUsers';
@@ -24,6 +24,7 @@ export default function ProjectSettings() {
   const [deletingProject, setDeletingProject] = useState(false);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [copiedWidget, setCopiedWidget] = useState(false);
 
   // Project users management
   const { users, loading: loadingUsers, refreshUsers } = useProjectUsers(parseInt(params.id));
@@ -124,6 +125,28 @@ export default function ProjectSettings() {
   const closeDeleteModal = () => {
     setShowDeleteConfirm(false);
     setDeleteConfirmText('');
+  };
+
+  const copyWidgetScript = async () => {
+    if (!project) return;
+
+    const snippetCode = `<script>
+(function() {
+  const script = document.createElement('script');
+  script.src = '${process.env.NEXT_PUBLIC_BASE_URL || window.location.origin}/widget/widget.js';
+  script.setAttribute('data-project-id', '${project.id}');
+  script.async = true;
+  document.head.appendChild(script);
+})();
+</script>`;
+
+    try {
+      await navigator.clipboard.writeText(snippetCode);
+      setCopiedWidget(true);
+      setTimeout(() => setCopiedWidget(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy widget script:', err);
+    }
   };
 
   const saveJiraConfig = async () => {
@@ -348,6 +371,84 @@ export default function ProjectSettings() {
             />
           </div>
         </div>
+
+        {/* Widget Installation Script */}
+        {project && (
+          <div className="bg-white shadow rounded-lg overflow-hidden mb-6 mt-6">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center">
+                <Code className="w-5 h-5 text-blue-600 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">
+                  Widget Installation
+                </h2>
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Fügen Sie dieses Script auf Ihrer Website ein, um das Feedback-Widget zu aktivieren.
+              </p>
+            </div>
+
+            <div className="px-6 py-6">
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <pre className="text-sm text-gray-800 overflow-x-auto font-mono whitespace-pre-wrap">
+{`<script>
+(function() {
+  const script = document.createElement('script');
+  script.src = '${process.env.NEXT_PUBLIC_BASE_URL || typeof window !== 'undefined' ? window.location.origin : ''}/widget/widget.js';
+  script.setAttribute('data-project-id', '${project.id}');
+  script.async = true;
+  document.head.appendChild(script);
+})();
+</script>`}
+                </pre>
+              </div>
+
+              <button
+                onClick={copyWidgetScript}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                {copiedWidget ? (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Kopiert!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    Script kopieren
+                  </>
+                )}
+              </button>
+
+              <div className="mt-4 space-y-2 text-sm text-gray-600">
+                <p className="flex items-start">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Fügen Sie diesen Code vor dem schließenden <code className="bg-gray-100 px-1 rounded">&lt;/body&gt;</code> Tag ein
+                </p>
+                <p className="flex items-start">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Das Widget erscheint als Button am rechten Bildschirmrand
+                </p>
+                <p className="flex items-start">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Nutzer können Elemente auswählen und Feedback hinterlassen
+                </p>
+              </div>
+
+              {project.widget_installed && project.widget_last_ping && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Widget ist aktiv - Letzter Ping: {new Date(project.widget_last_ping).toLocaleString('de-DE', {
+                      timeZone: 'Europe/Zurich',
+                      dateStyle: 'medium',
+                      timeStyle: 'short'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div className="bg-white shadow rounded-lg mt-8 border-2 border-red-200">

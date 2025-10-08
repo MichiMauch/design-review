@@ -22,8 +22,9 @@ import TaskList from '../../../components/project/TaskList';
 import TaskBoard from '../../../components/project/TaskBoard';
 import AITaskBoard from '../../../components/project/AITaskBoard';
 import SentimentTaskBoard from '../../../components/project/SentimentTaskBoard';
-import { MessageSquare, Download, Calendar, Clock, Users, MessageCircle } from 'lucide-react';
-import AIProjectDashboard from '../../../components/ai/AIProjectDashboard';
+import { MessageSquare, Calendar, MessageCircle } from 'lucide-react';
+import SentimentStatistics from '../../../components/dashboard/SentimentStatistics';
+import PriorityStatistics from '../../../components/dashboard/PriorityStatistics';
 import { getStatusInfo, formatUrlDisplay } from '../../../utils/projectUtils';
 
 export default function ProjectPage() {
@@ -214,19 +215,57 @@ export default function ProjectPage() {
     taskManager.setSelectedTaskForModal(prev => prev ? {...prev, status} : null);
   }, [taskManager]);
 
-  // Load comments when dashboard or list view is activated
+  // Track if initial load is done
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  // Load dashboard data on initial render and view mode changes
   useEffect(() => {
+    // Always load comments for dashboard and list views
     if (taskManager.viewMode === 'dashboard' || taskManager.viewMode === 'list') {
       taskManager.loadProjectComments();
     }
-  }, [taskManager.viewMode, taskManager.loadProjectComments]);
 
-  // Load Top URLs when on dashboard or on first render
-  useEffect(() => {
+    // Always load Top URLs for dashboard view
     if (taskManager.viewMode === 'dashboard') {
       loadTopUrls();
     }
-  }, [taskManager.viewMode, loadTopUrls]);
+
+    // Mark initial load as done
+    if (!initialLoadDone) {
+      setInitialLoadDone(true);
+    }
+  }, [taskManager.viewMode, taskManager.loadProjectComments, loadTopUrls, initialLoadDone]);
+
+  // Set up periodic refresh for dashboard data
+  useEffect(() => {
+    if (taskManager.viewMode !== 'dashboard') return;
+
+    // Refresh dashboard data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      taskManager.loadProjectComments();
+      loadTopUrls();
+    }, 30000);
+
+    return () => clearInterval(refreshInterval);
+  }, [taskManager.viewMode, taskManager.loadProjectComments, loadTopUrls]);
+
+  // Refresh dashboard data when tasks change (new task, status update, etc.)
+  useEffect(() => {
+    if (taskManager.viewMode === 'dashboard' && projectManager.tasks.length > 0) {
+      // Small delay to ensure task data is updated first
+      const timeoutId = setTimeout(() => {
+        taskManager.loadProjectComments();
+        loadTopUrls();
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [projectManager.tasks.length, taskManager.viewMode]);
+
+  // Handle Excel Export
+  const handleExcelExport = useCallback(() => {
+    projectManager.handleExcelExport(taskManager.loadTaskScreenshot);
+  }, [projectManager, taskManager]);
 
   // Loading and error states (must come after all hooks)
   if (projectManager.isLoading) {
@@ -260,6 +299,8 @@ export default function ProjectPage() {
           project={projectManager.project}
           combinedJiraConfig={projectManager.combinedJiraConfig}
           jiraConfig={projectManager.jiraConfig}
+          onExcelExport={handleExcelExport}
+          exportingExcel={projectManager.exportingExcel}
         />
 
         <div className="grid gap-6 grid-cols-1">
@@ -284,7 +325,7 @@ export default function ProjectPage() {
                 // Dashboard View
                 <div className="space-y-6">
                   {/* First Row - Main Stats */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Project Stats */}
                     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
                       <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -353,88 +394,11 @@ export default function ProjectPage() {
                       </div>
                     </div>
 
-                    {/* User Access */}
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-                      <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <Users className="h-5 w-5 text-purple-600" />
-                        Projekt-Zugriff
-                      </h3>
-                      <div className="space-y-2">
-                        {projectManager.project.users ? (
-                          <>
-                            {projectManager.project.users.split(',').slice(0, 3).map((user, index) => (
-                              <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
-                                  {user.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                                </div>
-                                <span className="text-sm text-gray-700">{user.trim()}</span>
-                              </div>
-                            ))}
-                            {projectManager.project.users.split(',').length > 3 && (
-                              <Link
-                                href={`/project/${params.id}/settings`}
-                                className="block w-full p-2 text-center text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg border border-purple-200 transition-colors"
-                              >
-                                +{projectManager.project.users.split(',').length - 3} weitere anzeigen
-                              </Link>
-                            )}
-                          </>
-                        ) : projectManager.authorizedUsers && projectManager.authorizedUsers.length > 0 ? (
-                          <>
-                            {projectManager.authorizedUsers.slice(0, 3).map((user) => (
-                              <div key={user.email} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                <div className={`
-                                  w-10 h-10 rounded-full flex items-center justify-center text-white font-medium
-                                  ${user.role === 'admin' ? 'bg-red-500' : 'bg-blue-500'}
-                                `}>
-                                  {(user.name || user.email).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                                </div>
-                                <div className="flex-1">
-                                  <span className="text-sm text-gray-700">{user.name || user.email}</span>
-                                  {user.role === 'admin' && (
-                                    <span className="ml-2 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                                      Admin
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                            {projectManager.authorizedUsers.length > 3 && (
-                              <Link
-                                href={`/project/${params.id}/settings`}
-                                className="block w-full p-2 text-center text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg border border-purple-200 transition-colors"
-                              >
-                                +{projectManager.authorizedUsers.length - 3} weitere anzeigen
-                              </Link>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-500">Keine User-Informationen verfügbar</p>
-                        )}
-                      </div>
-                    </div>
+                    {/* Sentiment Statistics */}
+                    <SentimentStatistics tasks={projectManager.tasks} />
 
-                    {/* Project Actions */}
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-                      <h3 className="font-semibold text-gray-900 mb-4">Projekt-Aktionen</h3>
-                      <button
-                        onClick={taskManager.handleExcelExport}
-                        disabled={taskManager.exportingExcel}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {taskManager.exportingExcel ? (
-                          <>
-                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                            Exportiere...
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4" />
-                            Als Excel exportieren
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    {/* Priority Statistics */}
+                    <PriorityStatistics tasks={projectManager.tasks} />
                   </div>
 
                   {/* Second Row - Recent Items + Top URLs */}
@@ -446,7 +410,10 @@ export default function ProjectPage() {
                         Letzte 5 Feedbacks
                       </h3>
                       <div className="space-y-3">
-                        {projectManager.tasks.slice(0, 5).map((task) => (
+                        {[...projectManager.tasks]
+                          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                          .slice(0, 5)
+                          .map((task) => (
                           <div key={task.id} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                                onClick={() => taskManager.setSelectedTaskForModal(task)}>
                             <div className="flex justify-between items-start">
@@ -531,13 +498,6 @@ export default function ProjectPage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* AI Dashboard - full width */}
-                  <AIProjectDashboard
-                    tasks={projectManager.tasks}
-                    projectId={params.id}
-                    onTasksUpdate={projectManager.setTasks}
-                  />
                 </div>
               ) : projectManager.tasks.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
