@@ -19,7 +19,9 @@ import {
   Users,
   Search,
   Image,
-  Cookie
+  Cookie,
+  ChevronDown,
+  LineChart
 } from 'lucide-react';
 import { formatTime } from '../../utils/projectUtils';
 
@@ -36,7 +38,9 @@ export default function ProjectHeader({
     loading: true
   });
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [analysisDropdownOpen, setAnalysisDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const analysisDropdownRef = useRef(null);
 
   const checkAIConfiguration = async () => {
     setAiStatus(prev => ({ ...prev, loading: true }));
@@ -62,11 +66,14 @@ export default function ProjectHeader({
     checkAIConfiguration();
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
+      }
+      if (analysisDropdownRef.current && !analysisDropdownRef.current.contains(event.target)) {
+        setAnalysisDropdownOpen(false);
       }
     };
 
@@ -177,62 +184,111 @@ export default function ProjectHeader({
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <Link
-                  href={`/project/${project.id}/seo-analysis`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-green-600 bg-gray-100 hover:bg-green-50 rounded-lg transition-colors border border-gray-300 hover:border-green-400"
-                  title="SEO & Content Analyse"
-                >
-                  <Search className="h-4 w-4" />
-                  SEO
-                </Link>
-                <Link
-                  href={`/project/${project.id}/meta-analysis`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 rounded-lg transition-colors border border-gray-300 hover:border-blue-400"
-                  title="Meta-Tags & Icons Analyse"
-                >
-                  <Globe className="h-4 w-4" />
-                  Meta-Analyse
-                </Link>
-                <Link
-                  href={`/project/${project.id}/analytics`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-purple-600 bg-gray-100 hover:bg-purple-50 rounded-lg transition-colors border border-gray-300 hover:border-purple-400"
-                  title="Analytics & Tracking Analyse"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Analytics
-                </Link>
-                <Link
-                  href={`/project/${project.id}/performance`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-yellow-600 bg-gray-100 hover:bg-yellow-50 rounded-lg transition-colors border border-gray-300 hover:border-yellow-400"
-                  title="Performance Analyse"
-                >
-                  <Zap className="h-4 w-4" />
-                  Performance
-                </Link>
-                <Link
-                  href={`/project/${project.id}/security`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-red-600 bg-gray-100 hover:bg-red-50 rounded-lg transition-colors border border-gray-300 hover:border-red-400"
-                  title="Security Analyse"
-                >
-                  <Shield className="h-4 w-4" />
-                  Security
-                </Link>
-                <Link
-                  href={`/project/${project.id}/media-analysis`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-violet-600 bg-gray-100 hover:bg-violet-50 rounded-lg transition-colors border border-gray-300 hover:border-violet-400"
-                  title="Media & Resources Analyse"
-                >
-                  <Image className="h-4 w-4" />
-                  Media
-                </Link>
-                <Link
-                  href={`/project/${project.id}/privacy-analysis`}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-orange-600 bg-gray-100 hover:bg-orange-50 rounded-lg transition-colors border border-gray-300 hover:border-orange-400"
-                  title="Cookie & Privacy Compliance Analyse"
-                >
-                  <Cookie className="h-4 w-4" />
-                  Privacy
-                </Link>
+                {/* Analysis Tools Dropdown */}
+                <div className="relative" ref={analysisDropdownRef}>
+                  <button
+                    onClick={() => setAnalysisDropdownOpen(!analysisDropdownOpen)}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 hover:border-blue-300"
+                    title="Website Analysen"
+                  >
+                    <LineChart className="h-4 w-4" />
+                    Analysen
+                    <ChevronDown className={`h-3 w-3 transition-transform ${analysisDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {analysisDropdownOpen && (
+                    <div className="absolute left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="py-1">
+                        <Link
+                          href={`/project/${project.id}/seo-analysis`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors group"
+                        >
+                          <Search className="h-4 w-4 text-green-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">SEO & Content</div>
+                            <div className="text-xs text-gray-500 group-hover:text-green-600">Suchmaschinen-Optimierung</div>
+                          </div>
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/meta-analysis`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
+                        >
+                          <Globe className="h-4 w-4 text-blue-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Meta-Tags & Icons</div>
+                            <div className="text-xs text-gray-500 group-hover:text-blue-600">Social Media Previews</div>
+                          </div>
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/analytics`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors group"
+                        >
+                          <BarChart3 className="h-4 w-4 text-purple-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Analytics & Tracking</div>
+                            <div className="text-xs text-gray-500 group-hover:text-purple-600">Tracking-Tools Analyse</div>
+                          </div>
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/performance`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 transition-colors group"
+                        >
+                          <Zap className="h-4 w-4 text-yellow-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Performance</div>
+                            <div className="text-xs text-gray-500 group-hover:text-yellow-600">Ladezeiten & Optimierung</div>
+                          </div>
+                        </Link>
+
+                        <div className="border-t border-gray-100 my-1"></div>
+
+                        <Link
+                          href={`/project/${project.id}/security`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors group"
+                        >
+                          <Shield className="h-4 w-4 text-red-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Security</div>
+                            <div className="text-xs text-gray-500 group-hover:text-red-600">Sicherheits-Analyse</div>
+                          </div>
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/media-analysis`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700 transition-colors group"
+                        >
+                          <Image className="h-4 w-4 text-violet-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Media & Resources</div>
+                            <div className="text-xs text-gray-500 group-hover:text-violet-600">Bilder & Dateien</div>
+                          </div>
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/privacy-analysis`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors group"
+                        >
+                          <Cookie className="h-4 w-4 text-orange-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Cookie & Privacy</div>
+                            <div className="text-xs text-gray-500 group-hover:text-orange-600">Datenschutz & Compliance</div>
+                          </div>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* More Actions Dropdown */}
                 <div className="relative" ref={dropdownRef}>
                   <button
