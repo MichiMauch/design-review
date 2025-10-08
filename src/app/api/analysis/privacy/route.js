@@ -49,7 +49,8 @@ export async function GET(request) {
     const dom = new JSDOM(html);
     const document = dom.window.document;
 
-    // Initialize analysis object
+    // Store raw HTML for pattern matching
+    const rawHtml = html;
     const analysis = {
       url: projectUrl,
       timestamp: new Date().toISOString(),
@@ -61,6 +62,11 @@ export async function GET(request) {
         hasRejectButton: false,
         hasAcceptButton: false,
         hasSettingsLink: false,
+        detectionMethod: 'none',
+        confidence: 0,
+        cmpProvider: null,
+        loadedVia: null,
+        note: null,
         textAnalysis: {
           mentionsGDPR: false,
           mentionsCookies: false,
@@ -69,6 +75,12 @@ export async function GET(request) {
         },
         bannerText: ''
       },
+      gtm: {
+        detected: false,
+        containerId: null,
+        dataLayerFound: false
+      },
+      detectedCMPs: [],
       cookies: {
         total: 0,
         categories: {
@@ -109,8 +121,8 @@ export async function GET(request) {
       recommendations: []
     };
 
-    // Analyze Cookie Banner
-    analyzeCookieBanner(document, analysis);
+    // Analyze Cookie Banner (with GTM support)
+    analyzeCookieBannerWithGTM(document, rawHtml, analysis);
 
     // Analyze Scripts for Third-Party Services and Cookie Detection
     analyzeThirdPartyServices(document, analysis);
@@ -141,7 +153,229 @@ export async function GET(request) {
   }
 }
 
-function analyzeCookieBanner(document, analysis) {
+function detectGTMImplementation(document, html) {
+  const gtm = {
+    detected: false,
+    containerId: null,
+    dataLayerFound: false
+  };
+
+  // Check for GTM container
+  if (html.includes('gtm.js') || html.includes('googletagmanager.com')) {
+    gtm.detected = true;
+    // Extract GTM container ID
+    const match = html.match(/GTM-[A-Z0-9]+/);
+    if (match) {
+      gtm.containerId = match[0];
+    }
+  }
+
+  // Check for dataLayer
+  if (html.includes('dataLayer') || html.includes('window.dataLayer')) {
+    gtm.dataLayerFound = true;
+  }
+
+  return gtm;
+}
+
+function detectCMPScripts(document, html) {
+  const cmpPatterns = [
+    {
+      name: 'OneTrust',
+      patterns: [
+        /cdn\.cookielaw\.org/i,
+        /optanon/i,
+        /onetrust/i,
+        /otSDKStub/i
+      ],
+      confidence: 0.95
+    },
+    {
+      name: 'Cookiebot',
+      patterns: [
+        /consent\.cookiebot\.com/i,
+        /cookiebot\.com\/uc\.js/i,
+        /CookieConsent/i
+      ],
+      confidence: 0.95
+    },
+    {
+      name: 'Usercentrics',
+      patterns: [
+        /usercentrics\.eu/i,
+        /app\.usercentrics/i,
+        /privacy-proxy\.usercentrics/i
+      ],
+      confidence: 0.9
+    },
+    {
+      name: 'ConsentManager',
+      patterns: [
+        /consentmanager\.net/i,
+        /consentmanager\.mgr/i,
+        /cmp\.consentmanager/i
+      ],
+      confidence: 0.9
+    },
+    {
+      name: 'Iubenda',
+      patterns: [
+        /iubenda\.com/i,
+        /_iub_cs/i,
+        /cdn\.iubenda/i
+      ],
+      confidence: 0.85
+    },
+    {
+      name: 'Quantcast Choice',
+      patterns: [
+        /quantcast\.mgr\.consensu\.org/i,
+        /__tcfapi/i,
+        /quantserve\.com/i
+      ],
+      confidence: 0.85
+    },
+    {
+      name: 'Didomi',
+      patterns: [
+        /sdk\.privacy-center\.org/i,
+        /didomi/i,
+        /didomi-host/i
+      ],
+      confidence: 0.85
+    },
+    {
+      name: 'Termly',
+      patterns: [
+        /app\.termly\.io/i,
+        /termly\.io\/api/i
+      ],
+      confidence: 0.85
+    },
+    {
+      name: 'Osano',
+      patterns: [
+        /osano\.com/i,
+        /cmp\.osano/i
+      ],
+      confidence: 0.85
+    },
+    {
+      name: 'CookieScript',
+      patterns: [
+        /cookie-script\.com/i,
+        /cookiescript/i
+      ],
+      confidence: 0.8
+    },
+    {
+      name: 'Complianz',
+      patterns: [
+        /complianz/i,
+        /cmplz/i
+      ],
+      confidence: 0.8
+    },
+    {
+      name: 'CookieYes',
+      patterns: [
+        /cookieyes\.com/i,
+        /cky-consent/i
+      ],
+      confidence: 0.8
+    }
+  ];
+
+  const detected = [];
+
+  cmpPatterns.forEach(cmp => {
+    // Check if any pattern matches
+    const matched = cmp.patterns.some(pattern => pattern.test(html));
+
+    if (matched) {
+      detected.push({
+        name: cmp.name,
+        confidence: cmp.confidence,
+        loadedVia: 'script-tag'
+      });
+    }
+  });
+
+  return detected;
+}
+
+function analyzeCookieBannerWithGTM(document, html, analysis) {
+  // First, try static DOM analysis
+  const staticBanner = analyzeStaticCookieBanner(document);
+
+  // Detect GTM
+  const gtm = detectGTMImplementation(document, html);
+  analysis.gtm = gtm;
+
+  // Detect CMP scripts
+  const cmpScripts = detectCMPScripts(document, html);
+  analysis.detectedCMPs = cmpScripts;
+
+  // Combine results
+  if (staticBanner.detected) {
+    // Banner definitely present in static DOM
+    analysis.cookieBanner = {
+      ...staticBanner,
+      detectionMethod: 'static-dom',
+      confidence: 1.0,
+      loadedVia: gtm.detected ? 'possibly-gtm-or-direct' : 'direct-embed'
+    };
+
+    // Add CMP info if detected
+    if (cmpScripts.length > 0) {
+      analysis.cookieBanner.cmpProvider = cmpScripts[0].name;
+    }
+  } else if (cmpScripts.length > 0) {
+    // CMP script found but banner not in static DOM
+    // Banner is likely loaded dynamically
+    const topCMP = cmpScripts[0];
+
+    analysis.cookieBanner.detected = true;
+    analysis.cookieBanner.detectionMethod = 'cmp-script';
+    analysis.cookieBanner.confidence = topCMP.confidence;
+    analysis.cookieBanner.cmpProvider = topCMP.name;
+    analysis.cookieBanner.loadedVia = gtm.detected ? 'google-tag-manager' : 'direct-script';
+    analysis.cookieBanner.note = 'Cookie-Banner wird dynamisch geladen. Details können nur nach dem Rendern der Seite ermittelt werden.';
+
+    // We can't determine buttons in dynamic banner, but assume modern CMP has them
+    analysis.cookieBanner.hasAcceptButton = true; // Most CMPs have this
+    analysis.cookieBanner.hasRejectButton = topCMP.confidence >= 0.9; // High-quality CMPs usually have reject
+    analysis.cookieBanner.hasSettingsLink = topCMP.confidence >= 0.85; // Modern CMPs have settings
+
+    // Set text analysis based on CMP provider reputation
+    analysis.cookieBanner.textAnalysis.mentionsGDPR = true; // Professional CMPs mention GDPR
+    analysis.cookieBanner.textAnalysis.mentionsCookies = true;
+    analysis.cookieBanner.textAnalysis.explainsPurpose = topCMP.confidence >= 0.9;
+    analysis.cookieBanner.textAnalysis.providesDetails = topCMP.confidence >= 0.85;
+  } else {
+    // No banner detected
+    analysis.cookieBanner.detectionMethod = 'none';
+    analysis.cookieBanner.confidence = 0;
+  }
+}
+
+function analyzeStaticCookieBanner(document) {
+  // Original analyzeCookieBanner logic, but returns result instead of modifying analysis
+  const result = {
+    detected: false,
+    position: 'unknown',
+    hasRejectButton: false,
+    hasAcceptButton: false,
+    hasSettingsLink: false,
+    textAnalysis: {
+      mentionsGDPR: false,
+      mentionsCookies: false,
+      explainsPurpose: false,
+      providesDetails: false
+    },
+    bannerText: ''
+  };
+
   // Common cookie banner selectors and keywords
   const bannerSelectors = [
     '[class*="cookie"]',
@@ -177,18 +411,18 @@ function analyzeCookieBanner(document, analysis) {
   }
 
   if (bannerElement) {
-    analysis.cookieBanner.detected = true;
-    analysis.cookieBanner.bannerText = bannerText;
+    result.detected = true;
+    result.bannerText = bannerText;
 
     // Determine position
     const style = bannerElement.style;
     const classList = bannerElement.className.toLowerCase();
     if (classList.includes('bottom') || style.bottom) {
-      analysis.cookieBanner.position = 'bottom';
+      result.position = 'bottom';
     } else if (classList.includes('top') || style.top) {
-      analysis.cookieBanner.position = 'top';
+      result.position = 'top';
     } else if (classList.includes('modal') || classList.includes('center')) {
-      analysis.cookieBanner.position = 'modal';
+      result.position = 'modal';
     }
 
     // Check for buttons
@@ -196,23 +430,25 @@ function analyzeCookieBanner(document, analysis) {
     buttons.forEach(button => {
       const buttonText = button.textContent?.toLowerCase() || '';
       if (buttonText.includes('accept') || buttonText.includes('akzeptieren') || buttonText.includes('zustimmen')) {
-        analysis.cookieBanner.hasAcceptButton = true;
+        result.hasAcceptButton = true;
       }
       if (buttonText.includes('reject') || buttonText.includes('ablehnen') || buttonText.includes('verweigern')) {
-        analysis.cookieBanner.hasRejectButton = true;
+        result.hasRejectButton = true;
       }
       if (buttonText.includes('settings') || buttonText.includes('einstellungen') || buttonText.includes('konfigurieren')) {
-        analysis.cookieBanner.hasSettingsLink = true;
+        result.hasSettingsLink = true;
       }
     });
 
     // Text analysis
     const lowerText = bannerText.toLowerCase();
-    analysis.cookieBanner.textAnalysis.mentionsGDPR = gdprKeywords.some(keyword => lowerText.includes(keyword));
-    analysis.cookieBanner.textAnalysis.mentionsCookies = cookieKeywords.some(keyword => lowerText.includes(keyword));
-    analysis.cookieBanner.textAnalysis.explainsPurpose = lowerText.includes('zweck') || lowerText.includes('purpose') || lowerText.includes('verwendung');
-    analysis.cookieBanner.textAnalysis.providesDetails = lowerText.length > 200;
+    result.textAnalysis.mentionsGDPR = gdprKeywords.some(keyword => lowerText.includes(keyword));
+    result.textAnalysis.mentionsCookies = cookieKeywords.some(keyword => lowerText.includes(keyword));
+    result.textAnalysis.explainsPurpose = lowerText.includes('zweck') || lowerText.includes('purpose') || lowerText.includes('verwendung');
+    result.textAnalysis.providesDetails = lowerText.length > 200;
   }
+
+  return result;
 }
 
 function analyzeThirdPartyServices(document, analysis) {

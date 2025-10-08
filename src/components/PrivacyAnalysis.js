@@ -150,10 +150,59 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
 
       {/* Cookie Banner Analysis */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center mb-4">
-          <Cookie className="h-5 w-5 text-orange-600 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Cookie-Banner Analyse</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Cookie className="h-5 w-5 text-orange-600 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">Cookie-Banner Analyse</h3>
+          </div>
+          {analysis.cookieBanner.confidence > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Confidence:</span>
+              <span className={`px-2 py-1 rounded text-sm font-medium ${
+                analysis.cookieBanner.confidence >= 0.9 ? 'bg-green-100 text-green-700' :
+                analysis.cookieBanner.confidence >= 0.7 ? 'bg-yellow-100 text-yellow-700' :
+                'bg-orange-100 text-orange-700'
+              }`}>
+                {Math.round(analysis.cookieBanner.confidence * 100)}%
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* GTM & CMP Detection Info */}
+        {(analysis.gtm?.detected || analysis.detectedCMPs?.length > 0) && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="font-medium text-blue-900 text-sm">Erkannte Implementierung:</h4>
+                <div className="mt-1 space-y-1">
+                  {analysis.gtm?.detected && (
+                    <p className="text-xs text-blue-800">
+                      ✓ Google Tag Manager erkannt {analysis.gtm.containerId && `(${analysis.gtm.containerId})`}
+                    </p>
+                  )}
+                  {analysis.detectedCMPs?.length > 0 && (
+                    <p className="text-xs text-blue-800">
+                      ✓ CMP-Provider: <strong>{analysis.detectedCMPs.map(c => c.name).join(', ')}</strong>
+                    </p>
+                  )}
+                  {analysis.cookieBanner.loadedVia === 'google-tag-manager' && (
+                    <p className="text-xs text-blue-700 mt-1">
+                      ℹ Cookie-Banner wird dynamisch über Google Tag Manager geladen
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {analysis.cookieBanner.note && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">{analysis.cookieBanner.note}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className={`text-center p-4 rounded-lg ${analysis.cookieBanner.detected ? 'bg-green-50' : 'bg-red-50'}`}>
@@ -161,6 +210,9 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
               {analysis.cookieBanner.detected ? '✓' : '✗'}
             </div>
             <div className="text-sm text-gray-600">Banner erkannt</div>
+            {analysis.cookieBanner.cmpProvider && (
+              <div className="text-xs text-gray-500 mt-1">{analysis.cookieBanner.cmpProvider}</div>
+            )}
           </div>
           <div className={`text-center p-4 rounded-lg ${analysis.cookieBanner.hasRejectButton ? 'bg-green-50' : 'bg-red-50'}`}>
             <div className={`text-2xl font-bold ${analysis.cookieBanner.hasRejectButton ? 'text-green-600' : 'text-red-600'}`}>
