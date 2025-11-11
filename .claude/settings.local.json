@@ -56,7 +56,9 @@
       "Bash(export:*)",
       "Bash(python3:*)",
       "WebFetch(domain:localhost)",
-      "WebFetch(domain:economiesuisse.ch)"
+      "WebFetch(domain:economiesuisse.ch)",
+      "Bash(tree:*)",
+      "Bash(git pull:*)"
     ],
     "deny": []
   }

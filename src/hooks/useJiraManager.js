@@ -312,7 +312,7 @@ export function useJiraManager({ combinedJiraConfig, jiraConfig, showToast }) {
             includeMetadata: jiraTaskData.includeMetadata !== false
           },
           jiraConfig: {
-            ...jiraConfig,
+            ...combinedJiraConfig, // Use combinedJiraConfig instead of jiraConfig to include serverUrl, username, apiToken
             defaultAssignee: jiraTaskData.assignee,
             selectedSprint: jiraTaskData.sprint,
             selectedBoardId: jiraBoardId,
@@ -392,7 +392,7 @@ export function useJiraManager({ combinedJiraConfig, jiraConfig, showToast }) {
     } finally {
       setCreatingJira(null);
     }
-  }, [combinedJiraConfig, jiraConfig, jiraBoardId, loadJiraStatuses, showToast]);
+  }, [combinedJiraConfig, jiraBoardId, loadJiraStatuses, showToast]);
 
   const loadJiraModalData = useCallback(async () => {
     // First load boards to get board ID

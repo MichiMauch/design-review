@@ -61,6 +61,7 @@ export async function GET(request) {
         sizes: [],
         withAlt: 0,
         missingAlt: 0,
+        imagesWithoutAlt: [],
         lazy: 0,
         responsive: 0,
         webp: 0,
@@ -127,6 +128,17 @@ export async function GET(request) {
         analysis.images.withAlt++;
       } else {
         analysis.images.missingAlt++;
+        // Collect images without alt text
+        if (src) {
+          // Make URL absolute if relative
+          const absoluteSrc = src.startsWith('http') ? src :
+                             src.startsWith('/') ? new URL(src, projectUrl).href :
+                             new URL(src, projectUrl).href;
+          analysis.images.imagesWithoutAlt.push({
+            src: absoluteSrc,
+            alt: alt || null
+          });
+        }
       }
 
       // Lazy loading

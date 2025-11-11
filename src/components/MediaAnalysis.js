@@ -162,32 +162,51 @@ export default function MediaAnalysis({ projectId, projectUrl, showHeader = true
             </div>
           </div>
 
-          {/* Image Formats */}
-          {Object.keys(analysis.images.formats).length > 0 && (
-            <div className="mb-4">
-              <h4 className="font-medium text-gray-900 mb-2">Bildformate</h4>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(analysis.images.formats).map(([format, count]) => (
-                  <span
-                    key={format}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium"
-                  >
-                    {format.toUpperCase()}: {count}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Issues */}
           {analysis.images.missingAlt > 0 && (
-            <div className="p-3 bg-yellow-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm text-yellow-700">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-medium text-yellow-900">
                   {analysis.images.missingAlt} Bilder ohne Alt-Text gefunden
-                </span>
+                </h4>
               </div>
+              {analysis.images.imagesWithoutAlt && analysis.images.imagesWithoutAlt.length > 0 && (
+                <div className="space-y-3 mt-3">
+                  {analysis.images.imagesWithoutAlt.slice(0, 20).map((image, index) => (
+                    <div key={index} className="flex items-start gap-3 p-2 bg-white rounded border border-yellow-200 hover:border-yellow-300 transition-colors">
+                      <img
+                        src={image.src}
+                        alt=""
+                        className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div className="hidden w-20 h-20 items-center justify-center bg-gray-100 rounded border border-gray-200 flex-shrink-0">
+                        <Image className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={image.src}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-xs break-all"
+                        >
+                          {image.src}
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                  {analysis.images.imagesWithoutAlt.length > 20 && (
+                    <p className="text-xs text-yellow-700 mt-2">
+                      +{analysis.images.imagesWithoutAlt.length - 20} weitere Bilder
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -282,64 +301,6 @@ export default function MediaAnalysis({ projectId, projectUrl, showHeader = true
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Icons Analysis */}
-      {analysis.icons && analysis.icons.total > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center mb-4">
-            <Star className="h-5 w-5 text-orange-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">Icon-System</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{analysis.icons.total}</div>
-              <div className="text-sm text-gray-600">Icons gesamt</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{analysis.icons.svg}</div>
-              <div className="text-sm text-gray-600">SVG Icons</div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{analysis.icons.iconFont}</div>
-              <div className="text-sm text-gray-600">Icon Fonts</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">{analysis.icons.sprites}</div>
-              <div className="text-sm text-gray-600">Sprites</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resource Hints */}
-      {analysis.resourceHints && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center mb-4">
-            <Zap className="h-5 w-5 text-yellow-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">Resource Hints</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">{analysis.resourceHints.preload}</div>
-              <div className="text-sm text-gray-600">Preload</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{analysis.resourceHints.prefetch}</div>
-              <div className="text-sm text-gray-600">Prefetch</div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{analysis.resourceHints.preconnect}</div>
-              <div className="text-sm text-gray-600">Preconnect</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">{analysis.resourceHints.dnsPrefetch}</div>
-              <div className="text-sm text-gray-600">DNS Prefetch</div>
-            </div>
-          </div>
         </div>
       )}
 

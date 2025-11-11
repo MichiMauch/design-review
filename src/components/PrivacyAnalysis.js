@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, Cookie, Check, X, AlertTriangle, Shield, Eye, FileText, Users, ExternalLink } from 'lucide-react';
+import { RefreshCw, Cookie, Check, X, AlertTriangle, Shield, Eye, FileText, Users, ExternalLink, BarChart3 } from 'lucide-react';
 
 export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = true }) {
   const [analysis, setAnalysis] = useState(null);
@@ -36,44 +36,6 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getScoreColor = (score) => {
-    if (score >= 90) return 'text-green-700 bg-green-100';
-    if (score >= 70) return 'text-yellow-700 bg-yellow-100';
-    return 'text-red-700 bg-red-100';
-  };
-
-  const getScoreIcon = (score) => {
-    if (score >= 90) return <Check className="h-4 w-4" />;
-    if (score >= 70) return <AlertTriangle className="h-4 w-4" />;
-    return <X className="h-4 w-4" />;
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high':
-        return 'bg-red-100 text-red-700';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'low':
-        return 'bg-blue-100 text-blue-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case 'compliance':
-        return 'bg-orange-100 text-orange-700';
-      case 'ux':
-        return 'bg-purple-100 text-purple-700';
-      case 'security':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -128,26 +90,6 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
         </div>
       )}
 
-      {/* Privacy Score Overview */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Privacy Compliance Score</h3>
-          <div className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2 ${getScoreColor(analysis.score)}`}>
-            {getScoreIcon(analysis.score)}
-            {analysis.score}/100
-          </div>
-        </div>
-
-        <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-          <div
-            className="bg-orange-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${analysis.score}%` }}
-          ></div>
-        </div>
-
-        <p className="text-sm text-gray-600">{analysis.summary}</p>
-      </div>
-
       {/* Cookie Banner Analysis */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
@@ -169,27 +111,25 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
           )}
         </div>
 
-        {/* GTM & CMP Detection Info */}
-        {(analysis.gtm?.detected || analysis.detectedCMPs?.length > 0) && (
+        {/* GTM & CMP Detection Info - Only show if CMP is detected */}
+        {analysis.detectedCMPs?.length > 0 && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <Check className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <h4 className="font-medium text-blue-900 text-sm">Erkannte Implementierung:</h4>
                 <div className="mt-1 space-y-1">
+                  <p className="text-xs text-blue-800">
+                    ✓ CMP-Provider: <strong>{analysis.detectedCMPs.map(c => c.name).join(', ')}</strong>
+                  </p>
                   {analysis.gtm?.detected && (
-                    <p className="text-xs text-blue-800">
-                      ✓ Google Tag Manager erkannt {analysis.gtm.containerId && `(${analysis.gtm.containerId})`}
+                    <p className="text-xs text-blue-700">
+                      ✓ Wird über Google Tag Manager geladen {analysis.gtm.containerId && `(${analysis.gtm.containerId})`}
                     </p>
                   )}
-                  {analysis.detectedCMPs?.length > 0 && (
-                    <p className="text-xs text-blue-800">
-                      ✓ CMP-Provider: <strong>{analysis.detectedCMPs.map(c => c.name).join(', ')}</strong>
-                    </p>
-                  )}
-                  {analysis.cookieBanner.loadedVia === 'google-tag-manager' && (
-                    <p className="text-xs text-blue-700 mt-1">
-                      ℹ Cookie-Banner wird dynamisch über Google Tag Manager geladen
+                  {analysis.cookieBanner.detectionMethod === 'cmp-script' && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      ℹ Banner wird dynamisch geladen - Details nach Seiten-Rendering verfügbar
                     </p>
                   )}
                 </div>
@@ -198,9 +138,37 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
           </div>
         )}
 
-        {analysis.cookieBanner.note && (
+        {/* Warning if GTM detected but no CMP */}
+        {analysis.gtm?.detected && analysis.detectedCMPs?.length === 0 && !analysis.cookieBanner.detected && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">{analysis.cookieBanner.note}</p>
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="font-medium text-yellow-900 text-sm">Hinweis:</h4>
+                <p className="text-xs text-yellow-800 mt-1">
+                  Google Tag Manager erkannt {analysis.gtm.containerId && `(${analysis.gtm.containerId})`}, aber kein bekannter Cookie-Banner oder CMP gefunden. Bitte überprüfen Sie die GTM-Tags manuell.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error message if no banner detected at all */}
+        {!analysis.cookieBanner.detected && analysis.detectedCMPs?.length === 0 && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <X className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="font-medium text-red-900 text-sm">Kein Cookie-Banner erkannt</h4>
+                <p className="text-xs text-red-800 mt-1">
+                  Es wurde weder ein Cookie-Banner im DOM gefunden, noch ein bekannter CMP-Provider erkannt.
+                  {analysis.gtm?.detected ?
+                    ' Überprüfen Sie die GTM-Tags manuell auf Cookie-Banner-Implementierungen.' :
+                    ' Möglicherweise verwenden Sie einen Custom-Banner oder es ist kein Banner vorhanden.'
+                  }
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -233,88 +201,6 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
             <div className="text-sm text-gray-600">Einstellungen</div>
           </div>
         </div>
-
-        {analysis.cookieBanner.detected && (
-          <div className="space-y-3">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Banner-Details</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                <span className="px-2 py-1 bg-gray-100 rounded">Position: {analysis.cookieBanner.position}</span>
-                <span className={`px-2 py-1 rounded ${analysis.cookieBanner.textAnalysis.mentionsGDPR ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                  DSGVO: {analysis.cookieBanner.textAnalysis.mentionsGDPR ? 'Ja' : 'Nein'}
-                </span>
-                <span className={`px-2 py-1 rounded ${analysis.cookieBanner.textAnalysis.explainsPurpose ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                  Zweck: {analysis.cookieBanner.textAnalysis.explainsPurpose ? 'Erklärt' : 'Unklar'}
-                </span>
-                <span className={`px-2 py-1 rounded ${analysis.cookieBanner.textAnalysis.providesDetails ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                  Details: {analysis.cookieBanner.textAnalysis.providesDetails ? 'Ausführlich' : 'Kurz'}
-                </span>
-              </div>
-            </div>
-
-            {analysis.cookieBanner.bannerText && (
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2">Banner-Text (Auszug)</h4>
-                <div className="p-3 bg-gray-50 rounded text-sm text-gray-700 max-h-24 overflow-y-auto">
-                  {analysis.cookieBanner.bannerText.substring(0, 300)}
-                  {analysis.cookieBanner.bannerText.length > 300 && '...'}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Cookies Overview */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center mb-4">
-          <Eye className="h-5 w-5 text-blue-600 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Cookie-Kategorien</h3>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="text-2xl font-bold text-gray-600">{analysis.cookies.total}</div>
-            <div className="text-sm text-gray-600">Cookies gesamt</div>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{analysis.cookies.categories.necessary}</div>
-            <div className="text-sm text-gray-600">Notwendig</div>
-          </div>
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">{analysis.cookies.categories.analytics}</div>
-            <div className="text-sm text-gray-600">Analytik</div>
-          </div>
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">{analysis.cookies.categories.marketing}</div>
-            <div className="text-sm text-gray-600">Marketing</div>
-          </div>
-          <div className="text-center p-4 bg-yellow-50 rounded-lg">
-            <div className="text-2xl font-bold text-yellow-600">{analysis.cookies.categories.functional}</div>
-            <div className="text-sm text-gray-600">Funktional</div>
-          </div>
-        </div>
-
-        {analysis.cookies.domains.length > 0 && (
-          <div>
-            <h4 className="font-medium text-gray-900 mb-2">Third-Party Domains</h4>
-            <div className="flex flex-wrap gap-2">
-              {analysis.cookies.domains.slice(0, 10).map((domain, index) => (
-                <span
-                  key={index}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                >
-                  {domain}
-                </span>
-              ))}
-              {analysis.cookies.domains.length > 10 && (
-                <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm">
-                  +{analysis.cookies.domains.length - 10} weitere
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* GDPR Compliance */}
@@ -324,7 +210,7 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
           <h3 className="text-lg font-medium text-gray-900">DSGVO/GDPR Compliance</h3>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className={`text-center p-4 rounded-lg ${analysis.gdprCompliance.hasPrivacyPolicy ? 'bg-green-50' : 'bg-red-50'}`}>
             <div className={`text-2xl font-bold ${analysis.gdprCompliance.hasPrivacyPolicy ? 'text-green-600' : 'text-red-600'}`}>
               {analysis.gdprCompliance.hasPrivacyPolicy ? '✓' : '✗'}
@@ -343,37 +229,29 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
             </div>
             <div className="text-sm text-gray-600">Kontaktdaten</div>
           </div>
-          <div className={`text-center p-4 rounded-lg ${analysis.gdprCompliance.rightToErasure ? 'bg-green-50' : 'bg-yellow-50'}`}>
-            <div className={`text-2xl font-bold ${analysis.gdprCompliance.rightToErasure ? 'text-green-600' : 'text-yellow-600'}`}>
-              {analysis.gdprCompliance.rightToErasure ? '✓' : '?'}
-            </div>
-            <div className="text-sm text-gray-600">Recht auf Löschung</div>
-          </div>
-          <div className={`text-center p-4 rounded-lg ${analysis.gdprCompliance.dataPortability ? 'bg-green-50' : 'bg-yellow-50'}`}>
-            <div className={`text-2xl font-bold ${analysis.gdprCompliance.dataPortability ? 'text-green-600' : 'text-yellow-600'}`}>
-              {analysis.gdprCompliance.dataPortability ? '✓' : '?'}
-            </div>
-            <div className="text-sm text-gray-600">Datenportabilität</div>
-          </div>
-          <div className={`text-center p-4 rounded-lg ${analysis.gdprCompliance.rightToWithdraw ? 'bg-green-50' : 'bg-yellow-50'}`}>
-            <div className={`text-2xl font-bold ${analysis.gdprCompliance.rightToWithdraw ? 'text-green-600' : 'text-yellow-600'}`}>
-              {analysis.gdprCompliance.rightToWithdraw ? '✓' : '?'}
-            </div>
-            <div className="text-sm text-gray-600">Widerrufsrecht</div>
-          </div>
         </div>
 
         {/* Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
           {analysis.gdprCompliance.privacyPolicyLinks.length > 0 && (
             <div>
-              <h4 className="font-medium text-gray-900 mb-2">Datenschutz-Links</h4>
-              <div className="space-y-1">
-                {analysis.gdprCompliance.privacyPolicyLinks.slice(0, 3).map((link, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm">
-                    <FileText className="h-3 w-3 text-gray-400" />
-                    <span className="text-gray-700">{link.text}</span>
-                    <ExternalLink className="h-3 w-3 text-gray-400" />
+              <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-green-600" />
+                Datenschutzerklärung
+              </h4>
+              <div className="space-y-2 pl-6">
+                {analysis.gdprCompliance.privacyPolicyLinks.slice(0, 5).map((link, index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <a
+                      href={link.href.startsWith('http') ? link.href : `https://${analysis.url}${link.href}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium flex items-center gap-1"
+                    >
+                      {link.text}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <span className="text-xs text-gray-500 font-mono truncate">{link.href}</span>
                   </div>
                 ))}
               </div>
@@ -382,13 +260,48 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
 
           {analysis.gdprCompliance.imprintLinks.length > 0 && (
             <div>
-              <h4 className="font-medium text-gray-900 mb-2">Impressum-Links</h4>
-              <div className="space-y-1">
-                {analysis.gdprCompliance.imprintLinks.slice(0, 3).map((link, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm">
-                    <FileText className="h-3 w-3 text-gray-400" />
-                    <span className="text-gray-700">{link.text}</span>
-                    <ExternalLink className="h-3 w-3 text-gray-400" />
+              <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-600" />
+                Impressum
+              </h4>
+              <div className="space-y-2 pl-6">
+                {analysis.gdprCompliance.imprintLinks.slice(0, 5).map((link, index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <a
+                      href={link.href.startsWith('http') ? link.href : `https://${analysis.url}${link.href}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium flex items-center gap-1"
+                    >
+                      {link.text}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <span className="text-xs text-gray-500 font-mono truncate">{link.href}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {analysis.gdprCompliance.contactLinks.length > 0 && (
+            <div>
+              <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                <Users className="h-4 w-4 text-purple-600" />
+                Kontakt
+              </h4>
+              <div className="space-y-2 pl-6">
+                {analysis.gdprCompliance.contactLinks.slice(0, 5).map((link, index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <a
+                      href={link.href.startsWith('http') ? link.href : `https://${analysis.url}${link.href}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium flex items-center gap-1"
+                    >
+                      {link.text}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <span className="text-xs text-gray-500 font-mono truncate">{link.href}</span>
                   </div>
                 ))}
               </div>
@@ -465,40 +378,6 @@ export default function PrivacyAnalysis({ projectId, projectUrl, showHeader = tr
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Recommendations */}
-      {analysis.recommendations && analysis.recommendations.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Empfehlungen</h3>
-          <div className="space-y-3">
-            {analysis.recommendations.map((rec, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <AlertTriangle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                  rec.priority === 'high' ? 'text-red-600' :
-                  rec.priority === 'medium' ? 'text-yellow-600' :
-                  'text-blue-600'
-                }`} />
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{rec.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getPriorityColor(rec.priority)}`}>
-                      {rec.priority === 'high' ? 'Hoch' : rec.priority === 'medium' ? 'Mittel' : 'Niedrig'}
-                    </span>
-                    {rec.category && (
-                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getCategoryColor(rec.category)}`}>
-                        {rec.category === 'compliance' ? 'Compliance' :
-                         rec.category === 'ux' ? 'Benutzererfahrung' :
-                         rec.category === 'security' ? 'Sicherheit' : rec.category}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}
