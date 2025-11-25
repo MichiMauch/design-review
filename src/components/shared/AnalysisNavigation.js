@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Globe, BarChart3, Zap, Shield, AlertTriangle, Search, Image, Cookie } from 'lucide-react';
+import { Globe, BarChart3, Zap, Shield, AlertTriangle, Search, Image, Cookie, Smartphone, Tags, FileText } from 'lucide-react';
 
 export default function AnalysisNavigation({ projectId, className = '' }) {
   const pathname = usePathname();
@@ -15,10 +15,22 @@ export default function AnalysisNavigation({ projectId, className = '' }) {
       description: 'SEO-Analyse, Content-Qualität und Suchmaschinenoptimierung'
     },
     {
-      name: 'Meta-Tags & Icons',
-      path: `/project/${projectId}/meta-analysis`,
-      icon: Globe,
-      description: 'Analyse von Meta-Tags, Open Graph, Twitter Cards und Icons'
+      name: 'Content-Qualität',
+      path: `/project/${projectId}/content-analysis`,
+      icon: FileText,
+      description: 'AI-basierte Analyse von Textqualität, Struktur und Zielgruppenansprache'
+    },
+    {
+      name: 'Favicons',
+      path: `/project/${projectId}/icons-analysis`,
+      icon: Smartphone,
+      description: 'Analyse von Favicons, Apple Touch Icons, Android Icons und Microsoft Tiles'
+    },
+    {
+      name: 'Meta & OpenGraph',
+      path: `/project/${projectId}/meta-tags-analysis`,
+      icon: Tags,
+      description: 'Analyse von Meta-Tags, Open Graph und Twitter Cards'
     },
     {
       name: 'Analytics & Tracking',

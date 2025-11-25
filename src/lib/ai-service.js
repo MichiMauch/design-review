@@ -491,6 +491,324 @@ export async function batchAnalyzeFeedback(feedbackItems) {
 }
 
 /**
+ * Analyze content quality using AI
+ * @param {Object} options - Content analysis options
+ * @returns {Promise<Object>} Content analysis results
+ */
+export async function analyzeContent(options = {}) {
+  const { url, pageContent, headings = [], pageTitle = '' } = options;
+  const startTime = Date.now();
+
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    if (!pageContent || pageContent.trim().length < 50) {
+      throw new Error('Insufficient content for analysis');
+    }
+
+    const prompt = `Du bist ein erfahrener Content-Strategist und UX-Writer. Analysiere den folgenden Webseiteninhalt strukturiert.
+
+URL: ${url}
+Page Title: ${pageTitle}
+Überschriften-Struktur: ${headings.map(h => `${h.level}: ${h.text}`).join(' | ')}
+
+INHALT:
+${pageContent.substring(0, 6000)}
+
+Analysiere nach diesen Kriterien und antworte AUSSCHLIESSLICH im folgenden JSON-Format:
+
+{
+  "overallScore": {
+    "score": <Zahl 0-100>,
+    "summary": "<Zusammenfassung der Gesamtbewertung in 1-2 Sätzen>"
+  },
+  "coreMessage": {
+    "clear": <true/false - Wird klar kommuniziert, worum es geht?>,
+    "understandableIn5Seconds": <true/false - Versteht ein Besucher in 5 Sekunden den Nutzen?>,
+    "identifiedMessage": "<Die identifizierte Kernaussage der Seite>",
+    "feedback": "<Detailliertes Feedback zur Kernaussage>"
+  },
+  "targetAudience": {
+    "identified": "<Vermutete Zielgruppe>",
+    "languageFit": "<gut/mittel/schlecht>",
+    "toneFit": "<gut/mittel/schlecht>",
+    "feedback": "<Detailliertes Feedback zum Zielgruppen-Fit>"
+  },
+  "structure": {
+    "headingsCorrect": <true/false - Überschriften sinnvoll und hierarchisch?>,
+    "paragraphsOrganized": <true/false - Absätze klar gegliedert?>,
+    "hasRedThread": <true/false - Roter Faden vorhanden?>,
+    "feedback": "<Detailliertes Feedback zur Struktur>"
+  },
+  "contentQuality": {
+    "repetitions": <true/false - Gibt es Wiederholungen?>,
+    "gaps": <true/false - Gibt es inhaltliche Lücken?>,
+    "accurate": <true/false - Fachlich korrekt?>,
+    "fillerSentences": <true/false - Gibt es unnötige Füllsätze?>,
+    "feedback": "<Detailliertes Feedback zur inhaltlichen Qualität>"
+  },
+  "callToAction": {
+    "hasCtAs": <true/false - Gibt es klare CTAs?>,
+    "logicallyPlaced": <true/false - Sind sie logisch platziert?>,
+    "identifiedCtAs": ["<Liste der gefundenen CTAs>"],
+    "feedback": "<Detailliertes Feedback zu den CTAs>"
+  },
+  "recommendations": [
+    {
+      "title": "<Kurzer Titel>",
+      "description": "<Präziser, sofort umsetzbarer Vorschlag>",
+      "priority": "<high/medium/low>"
+    }
+  ],
+  "keyTextSections": {
+    "hero": "<Identifizierter Hero-Text, falls vorhanden>",
+    "intro": "<Identifizierter Intro-Text, falls vorhanden>",
+    "mainContent": "<Wichtigster Kernabschnitt, falls identifizierbar>"
+  }
+}
+
+WICHTIG:
+- Maximal 6 Empfehlungen in "recommendations"
+- Bewerte ehrlich und kritisch
+- Alle Texte auf Deutsch
+- Antworte NUR mit dem JSON, keine zusätzlichen Erklärungen`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'Du bist ein erfahrener Content-Strategist und UX-Writer, der Webseiteninhalte analysiert. Antworte immer im geforderten JSON-Format.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 3000,
+      temperature: 0.4
+    });
+
+    const response = completion.choices[0]?.message?.content;
+
+    if (!response) {
+      throw new Error('No response from AI service');
+    }
+
+    // Parse JSON response
+    let analysis;
+    try {
+      // Remove potential markdown code blocks
+      const cleanedResponse = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      analysis = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', response);
+      throw new Error('Invalid AI response format');
+    }
+
+    // Validate and ensure required fields
+    if (!analysis.overallScore || typeof analysis.overallScore.score !== 'number') {
+      throw new Error('Invalid analysis structure');
+    }
+
+    return {
+      success: true,
+      analysis: {
+        ...analysis,
+        processingTime: Date.now() - startTime,
+        analyzedAt: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('Content analysis error:', error);
+    return {
+      success: false,
+      error: error.message,
+      analysis: createFallbackContentAnalysis(pageContent)
+    };
+  }
+}
+
+/**
+ * Create fallback content analysis when AI fails
+ * @param {string} pageContent
+ * @returns {Object} Fallback analysis
+ */
+function createFallbackContentAnalysis(pageContent) {
+  const wordCount = pageContent ? pageContent.split(/\s+/).filter(w => w.length > 0).length : 0;
+  const hasStructure = pageContent && pageContent.length > 500;
+
+  return {
+    overallScore: {
+      score: 50,
+      summary: 'AI-Analyse nicht verfügbar. Manuelle Überprüfung empfohlen.'
+    },
+    coreMessage: {
+      clear: null,
+      understandableIn5Seconds: null,
+      identifiedMessage: 'Konnte nicht ermittelt werden',
+      feedback: 'AI-Service nicht verfügbar für detaillierte Analyse.'
+    },
+    targetAudience: {
+      identified: 'Nicht ermittelt',
+      languageFit: 'unbekannt',
+      toneFit: 'unbekannt',
+      feedback: 'AI-Service nicht verfügbar.'
+    },
+    structure: {
+      headingsCorrect: null,
+      paragraphsOrganized: hasStructure,
+      hasRedThread: null,
+      feedback: `${wordCount} Wörter gefunden. Detaillierte Analyse nicht verfügbar.`
+    },
+    contentQuality: {
+      repetitions: null,
+      gaps: null,
+      accurate: null,
+      fillerSentences: null,
+      feedback: 'AI-Service nicht verfügbar.'
+    },
+    callToAction: {
+      hasCtAs: null,
+      logicallyPlaced: null,
+      identifiedCtAs: [],
+      feedback: 'AI-Service nicht verfügbar.'
+    },
+    recommendations: [
+      {
+        title: 'Manuelle Überprüfung',
+        description: 'AI-Analyse nicht verfügbar. Bitte Content manuell überprüfen.',
+        priority: 'medium'
+      }
+    ],
+    keyTextSections: {
+      hero: null,
+      intro: null,
+      mainContent: null
+    },
+    fallback: true,
+    analyzedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Generate optimized content versions using AI
+ * @param {Object} options - Content optimization options
+ * @returns {Promise<Object>} Optimized content
+ */
+export async function generateContentOptimization(options = {}) {
+  const { sections, url, targetAudience = '' } = options;
+
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    if (!sections || Object.keys(sections).length === 0) {
+      throw new Error('No content sections provided for optimization');
+    }
+
+    const sectionsText = Object.entries(sections)
+      .filter(([key, value]) => value && value.trim())
+      .map(([key, value]) => `### ${key.toUpperCase()}:\n${value}`)
+      .join('\n\n');
+
+    if (!sectionsText.trim()) {
+      throw new Error('No valid content sections to optimize');
+    }
+
+    const prompt = `Du bist ein erfahrener UX-Writer und Content-Optimierer. Erstelle optimierte Versionen der folgenden Textabschnitte.
+
+URL: ${url}
+${targetAudience ? `Zielgruppe: ${targetAudience}` : ''}
+
+ORIGINAL-TEXTE:
+${sectionsText}
+
+Die optimierten Texte sollen:
+- KLARER: Eindeutige Aussagen, keine Mehrdeutigkeiten
+- VERSTÄNDLICHER: Einfache Sprache, kurze Sätze
+- NUTZERZENTRIERTER: Vorteile und Nutzen hervorheben
+- KÜRZER oder STRUKTURIERTER: Unnötiges entfernen, besser gliedern
+
+Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
+
+{
+  "optimizations": [
+    {
+      "section": "<hero/intro/mainContent>",
+      "original": "<Original-Text>",
+      "optimized": "<Optimierter Text>",
+      "changes": ["<Änderung 1>", "<Änderung 2>"],
+      "reasoning": "<Warum diese Änderungen die Qualität verbessern>"
+    }
+  ],
+  "generalTips": [
+    "<Allgemeiner Tipp 1>",
+    "<Allgemeiner Tipp 2>"
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'Du bist ein erfahrener UX-Writer der Texte optimiert. Antworte immer im geforderten JSON-Format auf Deutsch.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 3000,
+      temperature: 0.6
+    });
+
+    const response = completion.choices[0]?.message?.content;
+
+    if (!response) {
+      throw new Error('No response from AI service');
+    }
+
+    let optimization;
+    try {
+      const cleanedResponse = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      optimization = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', response);
+      throw new Error('Invalid AI response format');
+    }
+
+    return {
+      success: true,
+      optimization: {
+        ...optimization,
+        generatedAt: new Date().toISOString(),
+        url
+      }
+    };
+
+  } catch (error) {
+    console.error('Content optimization error:', error);
+    return {
+      success: false,
+      error: error.message,
+      optimization: {
+        optimizations: [],
+        generalTips: ['AI-Service nicht verfügbar. Bitte später erneut versuchen.'],
+        fallback: true,
+        generatedAt: new Date().toISOString(),
+        url
+      }
+    };
+  }
+}
+
+/**
  * Get statistics from analyzed feedback
  * @param {Array} analyzedFeedback - Array of feedback with AI analysis
  * @returns {Object} Statistics

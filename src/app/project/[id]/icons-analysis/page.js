@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Globe } from 'lucide-react';
-import MetaAnalysis from '../../../../components/MetaAnalysis';
+import { ArrowLeft, Smartphone } from 'lucide-react';
+import IconsAnalysis from '../../../../components/IconsAnalysis';
 import UrlSelector from '../../../../components/shared/UrlSelector';
 import AnalysisNavigation from '../../../../components/shared/AnalysisNavigation';
 
-export default function ProjectMetaAnalysisPage() {
+export default function ProjectIconsAnalysisPage() {
   const params = useParams();
   const router = useRouter();
   const [project, setProject] = useState(null);
@@ -77,7 +77,7 @@ export default function ProjectMetaAnalysisPage() {
   if (loading || !authChecked) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Lade Meta-Analyse...</div>
+        <div className="text-gray-500">Lade Icons-Analyse...</div>
       </div>
     );
   }
@@ -121,10 +121,10 @@ export default function ProjectMetaAnalysisPage() {
           </button>
 
           <div className="flex items-center">
-            <Globe className="w-8 h-8 text-blue-600 mr-3" />
+            <Smartphone className="w-8 h-8 text-blue-600 mr-3" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Meta-Tags & Icons Analyse
+                Favicons Analyse
               </h1>
               {project && (
                 <p className="text-gray-600">{project.name}</p>
@@ -147,9 +147,9 @@ export default function ProjectMetaAnalysisPage() {
           className="mb-6"
         />
 
-        {/* Meta Analysis Content */}
+        {/* Icons Analysis Content */}
         <div className="bg-white shadow rounded-lg p-6">
-          <MetaAnalysis
+          <IconsAnalysis
             projectId={params.id}
             projectUrl={currentAnalysisUrl}
             showHeader={false}

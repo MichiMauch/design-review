@@ -58,7 +58,9 @@
       "WebFetch(domain:localhost)",
       "WebFetch(domain:economiesuisse.ch)",
       "Bash(tree:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(PORT=3005 npm run dev:*)",
+      "Bash(turso auth:*)"
     ],
     "deny": []
   }

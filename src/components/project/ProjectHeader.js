@@ -21,7 +21,9 @@ import {
   Image,
   Cookie,
   ChevronDown,
-  LineChart
+  LineChart,
+  Smartphone,
+  Tags
 } from 'lucide-react';
 import { formatTime } from '../../utils/projectUtils';
 
@@ -212,14 +214,26 @@ export default function ProjectHeader({
                         </Link>
 
                         <Link
-                          href={`/project/${project.id}/meta-analysis`}
+                          href={`/project/${project.id}/icons-analysis`}
                           onClick={() => setAnalysisDropdownOpen(false)}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
                         >
-                          <Globe className="h-4 w-4 text-blue-600" />
+                          <Smartphone className="h-4 w-4 text-blue-600" />
                           <div className="flex-1">
-                            <div className="font-medium">Meta-Tags & Icons</div>
-                            <div className="text-xs text-gray-500 group-hover:text-blue-600">Social Media Previews</div>
+                            <div className="font-medium">Favicons</div>
+                            <div className="text-xs text-gray-500 group-hover:text-blue-600">Browser & App Icons</div>
+                          </div>
+                        </Link>
+
+                        <Link
+                          href={`/project/${project.id}/meta-tags-analysis`}
+                          onClick={() => setAnalysisDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group"
+                        >
+                          <Tags className="h-4 w-4 text-indigo-600" />
+                          <div className="flex-1">
+                            <div className="font-medium">Meta & OpenGraph</div>
+                            <div className="text-xs text-gray-500 group-hover:text-indigo-600">Social Media Tags</div>
                           </div>
                         </Link>
 

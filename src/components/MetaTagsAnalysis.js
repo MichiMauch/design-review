@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ExternalLink, CheckCircle, XCircle, AlertCircle, RefreshCw, Globe, Image, Share2, Search } from 'lucide-react';
+import { ExternalLink, CheckCircle, XCircle, AlertCircle, RefreshCw, Tags, Globe, Share2, Search } from 'lucide-react';
 import InfoTooltip, { InfoTooltipMultiline } from './shared/InfoTooltip';
 
-export default function MetaAnalysis({ projectId, projectUrl, showHeader = true }) {
+export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = true }) {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,9 +17,8 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
 
     try {
       // Build URL with optional custom URL parameter
-      let apiUrl = `/api/projects/${projectId}/meta-analysis`;
+      let apiUrl = `/api/projects/${projectId}/meta-tags-analysis`;
       if (projectUrl) {
-        // If projectUrl is provided, use it as a custom URL
         const urlParam = encodeURIComponent(projectUrl);
         apiUrl += `?url=${urlParam}`;
       }
@@ -45,18 +44,6 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
     }
   }, [projectId, projectUrl]);
 
-  const StatusIcon = ({ exists, found }) => {
-    if (!found) return <XCircle className="h-4 w-4 text-gray-400" />;
-    if (exists) return <CheckCircle className="h-4 w-4 text-green-500" />;
-    return <AlertCircle className="h-4 w-4 text-orange-500" />;
-  };
-
-  const getStatusText = ({ exists, found }) => {
-    if (!found) return 'Nicht gefunden';
-    if (exists) return 'Verfügbar';
-    return 'Definiert aber nicht erreichbar';
-  };
-
   const renderSocialImage = (imageData) => {
     if (!imageData) return null;
 
@@ -64,13 +51,17 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
       <div className="mt-3 p-3 bg-gray-50 rounded-lg">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0">
-            <StatusIcon exists={imageData.exists} found={true} />
+            {imageData.exists ? (
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+            )}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm font-medium text-gray-700">Social Media Bild</span>
               <span className="text-xs text-gray-500">
-                ({getStatusText({ exists: imageData.exists, found: true })})
+                ({imageData.exists ? 'Verfügbar' : 'Definiert aber nicht erreichbar'})
               </span>
             </div>
             {imageData.exists ? (
@@ -402,98 +393,12 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
     );
   };
 
-  const renderIconSection = (title, icons, type) => (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Image className="h-5 w-5 text-blue-600" />
-        <h3 className="font-semibold text-gray-900">{title}</h3>
-        {title === 'Favicon' && (
-          <InfoTooltip
-            content="Das kleine Icon das im Browser-Tab, Lesezeichen und Favoriten angezeigt wird"
-            className="ml-2"
-          />
-        )}
-        {title === 'Apple Touch Icons' && (
-          <InfoTooltip
-            content="Spezielle Icons für iOS Geräte wenn die Website zum Homescreen hinzugefügt wird"
-            className="ml-2"
-          />
-        )}
-        {title === 'Android Icons' && (
-          <InfoTooltip
-            content="Icons für Android Geräte und Progressive Web Apps (PWA)"
-            className="ml-2"
-          />
-        )}
-      </div>
-
-      {icons.length === 0 ? (
-        <p className="text-gray-500 text-sm">Keine Icons gefunden</p>
-      ) : (
-        <div className="space-y-3">
-          {icons.map((icon, index) => (
-            <div key={index} className="p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <StatusIcon exists={icon.exists} found={icon.found} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{icon.name}</div>
-                      {icon.sizes && (
-                        <div className="text-xs text-gray-500">Größe: {icon.sizes}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600">
-                        {getStatusText(icon)}
-                      </span>
-                      {icon.url && (
-                        <a
-                          href={icon.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  {/* Icon preview */}
-                  {icon.exists && icon.url && (
-                    <div className="mt-2">
-                      <img
-                        src={icon.url}
-                        alt={icon.name}
-                        className="w-8 h-8 rounded border border-gray-200 bg-white"
-                        style={{ objectFit: 'contain' }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'inline-block';
-                        }}
-                      />
-                      <span style={{ display: 'none' }} className="text-xs text-red-600">
-                        Bild nicht ladbar
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
   if (!projectUrl) {
     return (
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <div className="flex items-center gap-2">
           <AlertCircle className="h-5 w-5 text-yellow-600" />
-          <p className="text-yellow-800">Keine Projekt-URL konfiguriert. Meta-Analyse nicht verfügbar.</p>
+          <p className="text-yellow-800">Keine Projekt-URL konfiguriert. Meta-Tags-Analyse nicht verfügbar.</p>
         </div>
       </div>
     );
@@ -505,9 +410,9 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
       {showHeader && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Globe className="h-6 w-6 text-blue-600" />
+            <Tags className="h-6 w-6 text-blue-600" />
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Meta-Tags & Icons Analyse</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Meta & OpenGraph Analyse</h2>
               <p className="text-sm text-gray-600">
                 Analyse von: <a href={projectUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{projectUrl}</a>
               </p>
@@ -547,7 +452,7 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Analysiere Website...</span>
+          <span className="ml-3 text-gray-600">Analysiere Meta-Tags...</span>
         </div>
       )}
 
@@ -573,22 +478,22 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
                 title="Meta-Tags Übersicht"
                 content="Schnellübersicht aller wichtigen Meta-Elemente:"
                 items={[
-                  "Favicon: Website-Icon im Browser-Tab",
+                  "Basic Meta: Titel und Beschreibung",
                   "Open Graph: Social Media Vorschaubilder (Facebook, LinkedIn)",
                   "Twitter Card: Spezielle Twitter Vorschaubilder",
-                  "Apple Icons: Icons für iOS Geräte"
+                  "SEO Tags: Canonical, Hreflang, etc."
                 ]}
                 className="ml-2"
               />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                {analysis.summary.hasFavicon ? (
+                {analysis.summary.hasBasicMeta ? (
                   <CheckCircle className="h-4 w-4 text-green-500" />
                 ) : (
                   <XCircle className="h-4 w-4 text-red-500" />
                 )}
-                <span>Favicon</span>
+                <span>Basic Meta</span>
               </div>
               <div className="flex items-center gap-2">
                 {analysis.summary.hasOpenGraph ? (
@@ -607,20 +512,20 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
                 <span>Twitter Card</span>
               </div>
               <div className="flex items-center gap-2">
-                {analysis.summary.hasAppleIcons ? (
+                {analysis.summary.hasSeoTags ? (
                   <CheckCircle className="h-4 w-4 text-green-500" />
                 ) : (
                   <XCircle className="h-4 w-4 text-red-500" />
                 )}
-                <span>Apple Icons</span>
+                <span>SEO Tags</span>
               </div>
             </div>
             <div className="mt-3 text-sm text-blue-800">
-              Icons gefunden: {analysis.summary.totalIconsFound} | Verfügbar: {analysis.summary.totalIconsExist}
+              Basic: {analysis.summary.basicMetaCount} | OpenGraph: {analysis.summary.openGraphCount} | Twitter: {analysis.summary.twitterCount}
             </div>
           </div>
 
-          {/* Meta Tags */}
+          {/* Meta Tags Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {renderMetaSection(
               'Basis Meta-Tags',
@@ -648,13 +553,6 @@ export default function MetaAnalysis({ projectId, projectUrl, showHeader = true 
             )}
 
             {renderSeoSection('SEO Tags', analysis.seo)}
-          </div>
-
-          {/* Icons */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {renderIconSection('Favicon', analysis.icons.favicon, 'favicon')}
-            {renderIconSection('Apple Touch Icons', analysis.icons.apple, 'apple')}
-            {renderIconSection('Android Icons', analysis.icons.android, 'android')}
           </div>
         </>
       )}

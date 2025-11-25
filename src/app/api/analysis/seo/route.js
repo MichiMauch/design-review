@@ -228,10 +228,20 @@ export async function GET(request) {
 
     // Title (25 points)
     maxScore += 25;
-    if (analysis.titleMeta.title && analysis.titleMeta.title.status === 'good') {
-      score += 25;
-    } else if (analysis.titleMeta.title && analysis.titleMeta.title.status === 'warning') {
-      score += 15;
+    if (analysis.titleMeta.title) {
+      const titleLength = analysis.titleMeta.title.length || 0;
+
+      if (titleLength >= 30 && titleLength <= 60) {
+        score += 25;  // Optimal
+      } else if (titleLength >= 20 && titleLength < 30) {
+        score += 15;  // Somewhat short
+      } else if (titleLength >= 10 && titleLength < 20) {
+        score += 8;   // Very short
+      } else if (titleLength > 60 && titleLength <= 70) {
+        score += 10;  // Somewhat long
+      } else if (titleLength > 0) {
+        score += 3;   // Extremely short (<10) or too long (>70)
+      }
     }
 
     // Meta Description (20 points)

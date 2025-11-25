@@ -25,6 +25,7 @@ import SentimentTaskBoard from '../../../components/project/SentimentTaskBoard';
 import { MessageSquare, Calendar, MessageCircle } from 'lucide-react';
 import SentimentStatistics from '../../../components/dashboard/SentimentStatistics';
 import PriorityStatistics from '../../../components/dashboard/PriorityStatistics';
+import AnalyticsOverview from '../../../components/dashboard/AnalyticsOverview';
 import { getStatusInfo, formatUrlDisplay } from '../../../utils/projectUtils';
 
 export default function ProjectPage() {
@@ -308,6 +309,14 @@ export default function ProjectPage() {
           <div>
             {taskManager.viewMode !== 'dashboard' && (
               <WidgetInstallation project={projectManager.project} />
+            )}
+
+            {/* Analytics Overview - Only show in dashboard view */}
+            {taskManager.viewMode === 'dashboard' && (
+              <AnalyticsOverview
+                projectId={projectManager.project?.id}
+                projectUrl={projectManager.project?.domain}
+              />
             )}
 
             {/* Sticky Tab Navigation */}
