@@ -49,12 +49,8 @@ function MagicLinkContent() {
             console.log('🔍 Session test:', testResponse.ok ? 'SUCCESS' : 'FAILED', testResult);
             
             if (testResponse.ok) {
-              console.log('🔄 Redirecting to projects/admin');
-              if (result.user.role === 'admin') {
-                router.push('/admin');
-              } else {
-                router.push('/projects');
-              }
+              console.log('🔄 Redirecting to projects');
+              router.push('/projects');
             } else {
               console.error('❌ Session cookie not working, staying on login');
               setStatus('error');
