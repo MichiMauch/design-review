@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Single search result component for desktop
-const SearchResult = ({ title, description, url, siteName, favicon, isHighlighted, label }) => {
+const SearchResult = ({ title, description, url, siteName, favicon }) => {
     const truncatedTitle = title && title.length > 60 ? title.substring(0, 57) + '...' : title;
     const truncatedDesc = description && description.length > 160 ? description.substring(0, 157) + '...' : description;
 
@@ -9,6 +9,7 @@ const SearchResult = ({ title, description, url, siteName, favicon, isHighlighte
     if (!fullUrl.startsWith('http')) {
         fullUrl = 'https://' + fullUrl;
     }
+    const truncatedUrl = fullUrl.length > 56 ? fullUrl.substring(0, 53) + '...' : fullUrl;
 
     let domain = '';
     let displaySiteName = siteName || '';
@@ -27,18 +28,7 @@ const SearchResult = ({ title, description, url, siteName, favicon, isHighlighte
     }
 
     return (
-        <div className={`py-4 ${isHighlighted ? 'bg-blue-50 -mx-4 px-4 border-l-4 border-blue-500' : ''}`}>
-            {label && (
-                <div className="mb-1">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                        label === 'Optimal' ? 'bg-green-100 text-green-700' :
-                        label === 'Zu lang' ? 'bg-red-100 text-red-700' :
-                        'bg-blue-100 text-blue-700'
-                    }`}>
-                        {label}
-                    </span>
-                </div>
-            )}
+        <div className="py-4">
             <div className="flex items-center gap-3 mb-1">
                 {favicon ? (
                     <img
@@ -55,7 +45,7 @@ const SearchResult = ({ title, description, url, siteName, favicon, isHighlighte
                 <div className="flex flex-col">
                     <span className="text-sm text-[#202124] leading-tight">{displaySiteName}</span>
                     <div className="flex items-center gap-1">
-                        <span className="text-xs text-[#4d5156]">{fullUrl}</span>
+                        <span className="text-xs text-[#4d5156]">{truncatedUrl}</span>
                         <span className="text-[#70757a] text-lg leading-none ml-1">⋮</span>
                     </div>
                 </div>
@@ -71,7 +61,7 @@ const SearchResult = ({ title, description, url, siteName, favicon, isHighlighte
 };
 
 // Single search result component for mobile
-const MobileSearchResult = ({ title, description, url, isHighlighted, label }) => {
+const MobileSearchResult = ({ title, description, url }) => {
     const truncatedTitle = title && title.length > 55 ? title.substring(0, 52) + '...' : title;
     const truncatedDesc = description && description.length > 120 ? description.substring(0, 117) + '...' : description;
 
@@ -94,18 +84,7 @@ const MobileSearchResult = ({ title, description, url, isHighlighted, label }) =
     }
 
     return (
-        <div className={`py-3 ${isHighlighted ? 'bg-blue-50 -mx-4 px-4 border-l-4 border-blue-500' : ''}`}>
-            {label && (
-                <div className="mb-1">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                        label === 'Optimal' ? 'bg-green-100 text-green-700' :
-                        label === 'Zu lang' ? 'bg-red-100 text-red-700' :
-                        'bg-blue-100 text-blue-700'
-                    }`}>
-                        {label}
-                    </span>
-                </div>
-            )}
+        <div className="py-3">
             <div className="text-sm text-[#202124] mb-1">{breadcrumb}</div>
             <h3 className="text-base leading-snug" style={{ color: '#1a0dab' }}>
                 {truncatedTitle || 'Kein Titel gefunden'}
@@ -130,7 +109,7 @@ const GooglePreview = ({ title, description, url, siteName, favicon, goodExample
                 <span className="text-sm font-medium text-gray-600">Google Desktop Vorschau</span>
             </div>
 
-            <div className="max-w-[600px] rounded-lg shadow-lg overflow-hidden border border-gray-300">
+            <div className="max-w-[590px] rounded-lg shadow-lg overflow-hidden border border-gray-300">
                 {/* Browser Chrome */}
                 <div className="bg-gray-100 px-4 py-2 flex items-center gap-3 border-b border-gray-300">
                     <div className="flex items-center gap-1.5">
@@ -148,24 +127,21 @@ const GooglePreview = ({ title, description, url, siteName, favicon, goodExample
 
                 {/* Search Results */}
                 <div className="bg-white p-4 divide-y divide-gray-100">
-                    {/* Good Example */}
-                    <SearchResult
-                        title={goodExample.title}
-                        description={goodExample.description}
-                        url={goodExample.url}
-                        siteName={goodExample.siteName}
-                        label="Optimal"
-                    />
-
-                    {/* Current Page - Highlighted */}
+                    {/* Current Page - First */}
                     <SearchResult
                         title={title}
                         description={description}
                         url={url}
                         siteName={siteName}
                         favicon={favicon}
-                        isHighlighted={true}
-                        label="Ihre Seite"
+                    />
+
+                    {/* Good Example */}
+                    <SearchResult
+                        title={goodExample.title}
+                        description={goodExample.description}
+                        url={goodExample.url}
+                        siteName={goodExample.siteName}
                     />
 
                     {/* Bad Example */}
@@ -174,7 +150,6 @@ const GooglePreview = ({ title, description, url, siteName, favicon, goodExample
                         description={badExample.description}
                         url={badExample.url}
                         siteName={badExample.siteName}
-                        label="Zu lang"
                     />
                 </div>
             </div>
@@ -210,21 +185,18 @@ const GoogleMobilePreview = ({ title, description, url, goodExample, badExample 
 
                         {/* Search Results */}
                         <div className="px-4 py-2 divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+                            {/* Current Page - First */}
+                            <MobileSearchResult
+                                title={title}
+                                description={description}
+                                url={url}
+                            />
+
                             {/* Good Example */}
                             <MobileSearchResult
                                 title={goodExample.title}
                                 description={goodExample.description}
                                 url={goodExample.url}
-                                label="Optimal"
-                            />
-
-                            {/* Current Page - Highlighted */}
-                            <MobileSearchResult
-                                title={title}
-                                description={description}
-                                url={url}
-                                isHighlighted={true}
-                                label="Ihre Seite"
                             />
 
                             {/* Bad Example */}
@@ -232,7 +204,6 @@ const GoogleMobilePreview = ({ title, description, url, goodExample, badExample 
                                 title={badExample.title}
                                 description={badExample.description}
                                 url={badExample.url}
-                                label="Zu lang"
                             />
                         </div>
                     </div>
@@ -270,7 +241,7 @@ const SocialPreview = ({ ogData, twitterData, projectUrl, basicData, favicon }) 
                 So erscheint Ihre Seite in Google-Suchergebnissen im Vergleich zu optimalen und zu langen Texten.
             </p>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="flex flex-row flex-wrap gap-8">
                 <GooglePreview
                     title={title}
                     description={description}
