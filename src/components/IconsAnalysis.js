@@ -73,58 +73,93 @@ export default function IconsAnalysis({ projectId, projectUrl, showHeader = true
         <p className="text-gray-500 text-sm">Keine Icons gefunden</p>
       ) : (
         <div className="space-y-3">
-          {icons.map((icon, index) => (
-            <div key={index} className="p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <StatusIcon exists={icon.exists} found={icon.found} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{icon.name}</div>
-                      {icon.sizes && (
-                        <div className="text-xs text-gray-500">Größe: {icon.sizes}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600">
-                        {getStatusText(icon)}
-                      </span>
-                      {icon.url && (
-                        <a
-                          href={icon.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                    </div>
+          {icons.map((icon, index) => {
+            let finalImageUrl = null;
+            let absoluteIconUrl = null;
+
+            if (icon.url) {
+              if (icon.url.startsWith('data:')) {
+                finalImageUrl = icon.url;
+                absoluteIconUrl = null; // No external link for data URIs
+              } else {
+                absoluteIconUrl = new URL(icon.url, projectUrl).href;
+                finalImageUrl = `/api/image-proxy?url=${encodeURIComponent(
+                  absoluteIconUrl
+                )}`;
+              }
+            }
+
+            return (
+              <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <StatusIcon exists={icon.exists} found={icon.found} />
                   </div>
-                  {/* Icon preview */}
-                  {icon.exists && icon.url && (
-                    <div className="mt-2">
-                      <img
-                        src={icon.url}
-                        alt={icon.name}
-                        className="w-8 h-8 rounded border border-gray-200 bg-white"
-                        style={{ objectFit: 'contain' }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'inline-block';
-                        }}
-                      />
-                      <span style={{ display: 'none' }} className="text-xs text-red-600">
-                        Bild nicht ladbar
-                      </span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{icon.name}</div>
+                        {icon.sizes && (
+                          <div className="text-xs text-gray-500">Größe: {icon.sizes}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600">
+                          {getStatusText(icon)}
+                        </span>
+                        {absoluteIconUrl && (
+                          <a
+                            href={absoluteIconUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  )}
+                    {/* Icon preview */}
+                    {icon.exists && finalImageUrl && (
+                      <div className="mt-2">
+                        <img
+                          src={finalImageUrl}
+                          alt={icon.name}
+                          className="w-8 h-8 rounded border border-gray-200 bg-white"
+                          style={{ objectFit: 'contain' }}
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (img.dataset.fallbackAttempted) {
+                              img.style.display = 'none';
+                              const errorSpan = img.nextElementSibling;
+                              if (errorSpan) errorSpan.style.display = 'inline-block';
+                              return;
+                            }
+                            
+                            try {
+                              const siteUrl = new URL(projectUrl);
+                              const fallbackUrl = `${siteUrl.origin}/favicon.ico`;
+                              const proxiedFallbackUrl = `/api/image-proxy?url=${encodeURIComponent(fallbackUrl)}`;
+                              
+                              img.setAttribute('data-fallback-attempted', 'true');
+                              img.src = proxiedFallbackUrl;
+                            } catch (error) {
+                              img.style.display = 'none';
+                              const errorSpan = img.nextElementSibling;
+                              if (errorSpan) errorSpan.style.display = 'inline-block';
+                            }
+                          }}
+                        />
+                        <span style={{ display: 'none' }} className="text-xs text-red-600">
+                          Bild nicht ladbar
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

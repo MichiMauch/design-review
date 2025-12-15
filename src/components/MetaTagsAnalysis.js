@@ -511,7 +511,7 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
                 className="ml-2"
               />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-3 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 {analysis.summary.hasBasicMeta ? (
                   <CheckCircle className="h-4 w-4 text-green-500" />
@@ -535,14 +535,6 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
                   <XCircle className="h-4 w-4 text-red-500" />
                 )}
                 <span>Twitter Card</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {analysis.summary.hasSeoTags ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-red-500" />
-                )}
-                <span>SEO Tags</span>
               </div>
             </div>
             <div className="mt-3 text-sm text-blue-800">
@@ -584,8 +576,6 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
               'Keine Twitter Card Tags gefunden',
               'twitter'
             )}
-
-            {renderSeoSection('SEO Tags', analysis.seo)}
           </div>
         </>
       )}
