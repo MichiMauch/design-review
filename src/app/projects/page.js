@@ -11,7 +11,8 @@ import {
   LogOut,
   AlertCircle,
   CheckCircle,
-  Loader
+  Loader,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import UserAvatarList from '../../components/shared/users/UserAvatarList';
@@ -23,6 +24,11 @@ export default function ProjectsPage() {
   const [user, setUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [error, setError] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDomain, setNewProjectDomain] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   useEffect(() => {
     loadUserAndProjects();
@@ -63,6 +69,40 @@ export default function ProjectsPage() {
     } catch {
       // Force redirect even if logout fails
       router.push('/login');
+    }
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    setCreateError('');
+    setCreating(true);
+
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newProjectName.trim(),
+          domain: newProjectDomain.trim()
+        })
+      });
+
+      if (response.ok) {
+        const newProject = await response.json();
+        setProjects([newProject, ...projects]);
+        setShowCreateModal(false);
+        setNewProjectName('');
+        setNewProjectDomain('');
+        // Optional: Navigate to the new project
+        router.push(`/project/${newProject.id}`);
+      } else {
+        const errorText = await response.text();
+        setCreateError(errorText || 'Fehler beim Erstellen des Projekts');
+      }
+    } catch {
+      setCreateError('Verbindungsfehler');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -172,13 +212,13 @@ export default function ProjectsPage() {
           </div>
           
           {user?.role === 'admin' && (
-            <Link
-              href="/admin"
+            <button
+              onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               <Plus className="h-4 w-4 mr-2" />
               Neues Projekt
-            </Link>
+            </button>
           )}
         </div>
 
@@ -253,6 +293,107 @@ export default function ProjectsPage() {
           </div>
         )}
       </main>
+
+      {/* Create Project Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Neues Projekt erstellen
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCreateError('');
+                  setNewProjectName('');
+                  setNewProjectDomain('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="p-4 space-y-4">
+              {createError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
+                  <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
+                  <span className="text-sm text-red-700">{createError}</span>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="projectName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Projektname
+                </label>
+                <input
+                  type="text"
+                  id="projectName"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="z.B. Meine Website"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  disabled={creating}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="projectDomain" className="block text-sm font-medium text-gray-700 mb-1">
+                  Domain
+                </label>
+                <input
+                  type="text"
+                  id="projectDomain"
+                  value={newProjectDomain}
+                  onChange={(e) => setNewProjectDomain(e.target.value)}
+                  placeholder="z.B. example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  disabled={creating}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Die Domain der Website, die du reviewen möchtest
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateError('');
+                    setNewProjectName('');
+                    setNewProjectDomain('');
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  disabled={creating}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !newProjectName.trim() || !newProjectDomain.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                >
+                  {creating ? (
+                    <>
+                      <Loader className="h-4 w-4 mr-2 animate-spin" />
+                      Erstelle...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Projekt erstellen
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
