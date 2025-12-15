@@ -4,6 +4,18 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  serverExternalPackages: ['sharp', 'favicons', 'jsdom'],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'sharp': 'commonjs sharp',
+        'favicons': 'commonjs favicons',
+        'jsdom': 'commonjs jsdom',
+      });
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {

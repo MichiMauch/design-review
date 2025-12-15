@@ -1,13 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ExternalLink, CheckCircle, XCircle, AlertCircle, RefreshCw, Smartphone, Image, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ExternalLink, CheckCircle, XCircle, AlertCircle, RefreshCw, Smartphone, Image, Search, Wand2, Upload, Copy, Download, X, Code, ImageIcon } from 'lucide-react';
 import InfoTooltip, { InfoTooltipMultiline } from './shared/InfoTooltip';
 
 export default function IconsAnalysis({ projectId, projectUrl, showHeader = true }) {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Favicon Generator State
+  const [showGeneratorModal, setShowGeneratorModal] = useState(false);
+  const [generatorLoading, setGeneratorLoading] = useState(false);
+  const [generatorError, setGeneratorError] = useState(null);
+  const [generatedFavicons, setGeneratedFavicons] = useState(null);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [copiedHtml, setCopiedHtml] = useState(false);
+  const fileInputRef = useRef(null);
 
   const fetchAnalysis = async () => {
     if (!projectId) return;
@@ -43,6 +53,125 @@ export default function IconsAnalysis({ projectId, projectUrl, showHeader = true
       fetchAnalysis();
     }
   }, [projectId, projectUrl]);
+
+  // Favicon Generator Functions
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setGeneratorError('Bitte wähle eine Bilddatei aus (PNG, JPG, SVG)');
+      return;
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setGeneratorError('Die Datei ist zu gross (max. 5MB)');
+      return;
+    }
+
+    setUploadedImage(file);
+    setGeneratorError(null);
+    setGeneratedFavicons(null);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const generateFavicons = async () => {
+    if (!uploadedImage && !imagePreview) {
+      setGeneratorError('Bitte wähle zuerst ein Bild aus');
+      return;
+    }
+
+    setGeneratorLoading(true);
+    setGeneratorError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/generate-favicons`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageData: imagePreview,
+          appName: new URL(projectUrl).hostname.replace('www.', '')
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Favicon-Generierung fehlgeschlagen');
+      }
+
+      setGeneratedFavicons(data);
+    } catch (err) {
+      setGeneratorError(err.message);
+    } finally {
+      setGeneratorLoading(false);
+    }
+  };
+
+  const copyHtmlToClipboard = () => {
+    if (!generatedFavicons?.html) return;
+
+    const htmlCode = generatedFavicons.html.join('\n');
+    navigator.clipboard.writeText(htmlCode);
+    setCopiedHtml(true);
+    setTimeout(() => setCopiedHtml(false), 2000);
+  };
+
+  const downloadAsZip = async () => {
+    if (!generatedFavicons) return;
+
+    // Dynamic import for JSZip
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+
+    // Add images
+    generatedFavicons.images.forEach((image) => {
+      const base64Data = image.contents.replace(/^data:image\/\w+;base64,/, '');
+      zip.file(image.name, base64Data, { base64: true });
+    });
+
+    // Add HTML as a file
+    zip.file('favicon-tags.html', generatedFavicons.html.join('\n'));
+
+    // Add manifest and other files
+    generatedFavicons.files.forEach((file) => {
+      zip.file(file.name, file.contents);
+    });
+
+    // Generate and download
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'favicons.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const resetGenerator = () => {
+    setUploadedImage(null);
+    setImagePreview(null);
+    setGeneratedFavicons(null);
+    setGeneratorError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const closeModal = () => {
+    setShowGeneratorModal(false);
+    resetGenerator();
+  };
 
   const StatusIcon = ({ exists, found }) => {
     if (!found) return <XCircle className="h-4 w-4 text-gray-400" />;
@@ -190,14 +319,23 @@ export default function IconsAnalysis({ projectId, projectUrl, showHeader = true
               </p>
             </div>
           </div>
-          <button
-            onClick={fetchAnalysis}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Aktualisieren
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowGeneratorModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            >
+              <Wand2 className="h-4 w-4" />
+              Favicons generieren
+            </button>
+            <button
+              onClick={fetchAnalysis}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Aktualisieren
+            </button>
+          </div>
         </div>
       )}
 
@@ -209,14 +347,23 @@ export default function IconsAnalysis({ projectId, projectUrl, showHeader = true
               Analyse von: <a href={projectUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{projectUrl}</a>
             </p>
           </div>
-          <button
-            onClick={fetchAnalysis}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Aktualisieren
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowGeneratorModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            >
+              <Wand2 className="h-4 w-4" />
+              Favicons generieren
+            </button>
+            <button
+              onClick={fetchAnalysis}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Aktualisieren
+            </button>
+          </div>
         </div>
       )}
 
@@ -327,6 +474,208 @@ export default function IconsAnalysis({ projectId, projectUrl, showHeader = true
             </div>
           )}
         </>
+      )}
+
+      {/* Favicon Generator Modal */}
+      {showGeneratorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <Wand2 className="h-6 w-6 text-purple-600" />
+                <h2 className="text-xl font-semibold text-gray-900">Favicon Generator</h2>
+              </div>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Upload Section */}
+              {!generatedFavicons && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-2">Bild hochladen</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Lade ein quadratisches Bild hoch (mindestens 512x512px empfohlen).
+                      Am besten eignet sich ein PNG mit transparentem Hintergrund.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-6">
+                    {/* Upload Area */}
+                    <div className="flex-1">
+                      <label
+                        className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-colors"
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                        <Upload className="h-10 w-10 text-gray-400 mb-3" />
+                        <span className="text-sm text-gray-600">Klicken oder Datei hierher ziehen</span>
+                        <span className="text-xs text-gray-400 mt-1">PNG, JPG, SVG (max. 5MB)</span>
+                      </label>
+                    </div>
+
+                    {/* Preview */}
+                    {imagePreview && (
+                      <div className="flex-shrink-0">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Vorschau</p>
+                        <div className="w-32 h-32 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <button
+                          onClick={resetGenerator}
+                          className="mt-2 text-sm text-red-600 hover:text-red-700"
+                        >
+                          Bild entfernen
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Error */}
+                  {generatorError && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <XCircle className="h-5 w-5 text-red-500" />
+                      <span className="text-sm text-red-700">{generatorError}</span>
+                    </div>
+                  )}
+
+                  {/* Generate Button */}
+                  <button
+                    onClick={generateFavicons}
+                    disabled={!imagePreview || generatorLoading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+                  >
+                    {generatorLoading ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                        Generiere Favicons...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-5 w-5" />
+                        Favicons generieren
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Results Section */}
+              {generatedFavicons && (
+                <div className="space-y-6">
+                  {/* Success Message */}
+                  <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <span className="text-green-700">
+                      {generatedFavicons.summary.totalImages} Icons erfolgreich generiert!
+                    </span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={downloadAsZip}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <Download className="h-4 w-4" />
+                      Als ZIP herunterladen
+                    </button>
+                    <button
+                      onClick={copyHtmlToClipboard}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                    >
+                      <Copy className="h-4 w-4" />
+                      {copiedHtml ? 'Kopiert!' : 'HTML kopieren'}
+                    </button>
+                    <button
+                      onClick={resetGenerator}
+                      className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                      Neues Bild
+                    </button>
+                  </div>
+
+                  {/* Icons Preview */}
+                  <div>
+                    <h3 className="flex items-center gap-2 font-medium text-gray-900 mb-3">
+                      <ImageIcon className="h-5 w-5 text-purple-600" />
+                      Generierte Icons
+                    </h3>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 p-4 bg-gray-50 rounded-lg">
+                      {generatedFavicons.images.slice(0, 16).map((image, index) => (
+                        <div key={index} className="flex flex-col items-center">
+                          <div className="w-12 h-12 border border-gray-200 rounded bg-white flex items-center justify-center overflow-hidden">
+                            <img
+                              src={image.contents}
+                              alt={image.name}
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1 truncate max-w-full" title={image.name}>
+                            {image.name.replace(/\.\w+$/, '').slice(0, 10)}
+                          </span>
+                        </div>
+                      ))}
+                      {generatedFavicons.images.length > 16 && (
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="text-sm text-gray-500">
+                            +{generatedFavicons.images.length - 16} mehr
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* HTML Code */}
+                  <div>
+                    <h3 className="flex items-center gap-2 font-medium text-gray-900 mb-3">
+                      <Code className="h-5 w-5 text-purple-600" />
+                      HTML-Code für &lt;head&gt;
+                    </h3>
+                    <div className="relative">
+                      <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-sm">
+                        <code>{generatedFavicons.html.join('\n')}</code>
+                      </pre>
+                      <button
+                        onClick={copyHtmlToClipboard}
+                        className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                        title="HTML kopieren"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Files Info */}
+                  {generatedFavicons.files.length > 0 && (
+                    <div>
+                      <h3 className="font-medium text-gray-900 mb-2">Zusätzliche Dateien</h3>
+                      <p className="text-sm text-gray-600">
+                        Im ZIP enthalten: {generatedFavicons.files.map(f => f.name).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
