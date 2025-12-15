@@ -30,9 +30,6 @@ const GooglePreview = ({ title, description, url, siteName, favicon }) => {
         }
     }
 
-    // Get first letter for favicon placeholder
-    const faviconLetter = displaySiteName.charAt(0).toUpperCase();
-
     return (
         <div className="flex flex-col gap-2" style={{ fontFamily: 'Arial, sans-serif' }}>
             <div className="flex items-center gap-2 mb-1">
@@ -49,24 +46,17 @@ const GooglePreview = ({ title, description, url, siteName, favicon }) => {
             <div className="max-w-[600px]">
                 {/* Site info row: Favicon + Site Name */}
                 <div className="flex items-center gap-3 mb-1">
-                    {/* Favicon circle */}
-                    {favicon ? (
+                    {/* Favicon - only show if available */}
+                    {favicon && (
                         <img
                             src={favicon}
                             alt=""
-                            className="w-7 h-7 rounded-full bg-gray-100"
+                            className="w-7 h-7 rounded-full bg-gray-100 object-contain"
                             onError={(e) => {
                                 e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
                             }}
                         />
-                    ) : null}
-                    <div
-                        className="w-7 h-7 rounded-full bg-gray-800 flex items-center justify-center text-white text-xs font-medium"
-                        style={{ display: favicon ? 'none' : 'flex' }}
-                    >
-                        {faviconLetter}
-                    </div>
+                    )}
 
                     {/* Site name and URL */}
                     <div className="flex flex-col">
@@ -98,7 +88,7 @@ const GooglePreview = ({ title, description, url, siteName, favicon }) => {
     );
 };
 
-const SocialPreview = ({ ogData, twitterData, projectUrl, basicData }) => {
+const SocialPreview = ({ ogData, twitterData, projectUrl, basicData, favicon }) => {
   // Use basic meta data as fallback if no OG data
   const title = ogData?.title || basicData?.title || 'Titel nicht gefunden';
   const description = ogData?.description || basicData?.description || 'Beschreibung nicht gefunden.';
@@ -112,6 +102,7 @@ const SocialPreview = ({ ogData, twitterData, projectUrl, basicData }) => {
         description={description}
         url={projectUrl}
         siteName={siteName}
+        favicon={favicon}
       />
     </div>
   );

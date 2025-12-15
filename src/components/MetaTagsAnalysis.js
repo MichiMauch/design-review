@@ -9,12 +9,14 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [favicon, setFavicon] = useState(null);
 
   const fetchAnalysis = async () => {
     if (!projectId) return;
 
     setLoading(true);
     setError(null);
+    setFavicon(null);
 
     try {
       // Build URL with optional custom URL parameter
@@ -24,14 +26,36 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
         apiUrl += `?url=${urlParam}`;
       }
 
-      const response = await fetch(apiUrl);
-      const data = await response.json();
+      // Fetch meta-tags analysis and icons analysis in parallel
+      const [metaResponse, iconsResponse] = await Promise.all([
+        fetch(apiUrl),
+        fetch(`/api/projects/${projectId}/icons-analysis${projectUrl ? `?url=${encodeURIComponent(projectUrl)}` : ''}`)
+      ]);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch analysis');
+      const metaData = await metaResponse.json();
+
+      if (!metaResponse.ok) {
+        throw new Error(metaData.error || 'Failed to fetch analysis');
       }
 
-      setAnalysis(data);
+      setAnalysis(metaData);
+
+      // Extract favicon from icons analysis
+      if (iconsResponse.ok) {
+        const iconsData = await iconsResponse.json();
+        // Find the first existing favicon
+        const existingFavicon = iconsData.icons?.favicon?.find(icon => icon.exists && icon.url);
+        if (existingFavicon) {
+          // Make URL absolute
+          const baseUrl = projectUrl?.startsWith('http') ? projectUrl : `https://${projectUrl}`;
+          try {
+            const faviconUrl = new URL(existingFavicon.url, baseUrl).href;
+            setFavicon(faviconUrl);
+          } catch {
+            setFavicon(existingFavicon.url);
+          }
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -531,6 +555,7 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
             twitterData={analysis.twitter}
             projectUrl={projectUrl}
             basicData={analysis.basic}
+            favicon={favicon}
           />
 
           {/* Meta Tags Grid */}
