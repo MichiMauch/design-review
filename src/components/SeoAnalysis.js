@@ -264,7 +264,9 @@ export default function SeoAnalysis({ projectId, projectUrl, showHeader = true }
           </div>
 
           <div className="space-y-2">
-            {analysis.headings.map((heading, index) => (
+            {[...analysis.headings]
+              .sort((a, b) => parseInt(a.level.substring(1)) - parseInt(b.level.substring(1)))
+              .map((heading, index) => (
               <div key={index} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-b-0">
                 <span className={`px-2 py-1 rounded text-xs font-mono font-medium ${
                   heading.level === 'h1' ? 'bg-red-100 text-red-700' :
