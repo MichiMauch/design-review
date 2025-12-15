@@ -130,7 +130,11 @@
     // ============================================================================
     // CONFIGURATION
     // ============================================================================
-    const script = document.currentScript || document.querySelector('script[data-project-id]');
+    // Finde das Script-Element (auch wenn dynamisch geladen via Next.js etc.)
+    const script = document.currentScript ||
+        document.querySelector('script[data-project-id][src*="widget-new.js"]') ||
+        document.querySelector('script[data-project-id][src*="widget.js"]') ||
+        document.querySelector('script[data-project-id]');
     const projectId = script?.getAttribute('data-project-id') || 'default-project';
     
     // Auto-detect baseUrl
