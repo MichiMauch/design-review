@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ExternalLink, CheckCircle, XCircle, AlertCircle, RefreshCw, Tags, Globe, Share2, Search } from 'lucide-react';
 import InfoTooltip, { InfoTooltipMultiline } from './shared/InfoTooltip';
+import SocialPreview from './shared/SocialPreview';
 
 export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = true }) {
   const [analysis, setAnalysis] = useState(null);
@@ -524,6 +525,13 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
               Basic: {analysis.summary.basicMetaCount} | OpenGraph: {analysis.summary.openGraphCount} | Twitter: {analysis.summary.twitterCount}
             </div>
           </div>
+          
+          <SocialPreview
+            ogData={analysis.openGraph}
+            twitterData={analysis.twitter}
+            projectUrl={projectUrl}
+            basicData={analysis.basic}
+          />
 
           {/* Meta Tags Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
