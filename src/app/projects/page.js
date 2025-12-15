@@ -12,10 +12,13 @@ import {
   AlertCircle,
   CheckCircle,
   Loader,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import UserAvatarList from '../../components/shared/users/UserAvatarList';
+import WhatsNewModal from '../../components/shared/WhatsNewModal';
+import { getLatestVersion, getUnreadCount } from '../../data/releaseNotes';
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -29,11 +32,26 @@ export default function ProjectsPage() {
   const [newProjectDomain, setNewProjectDomain] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     loadUserAndProjects();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load unread count from localStorage
+  useEffect(() => {
+    const lastSeenVersion = localStorage.getItem('design-review-whats-new-version');
+    setUnreadCount(getUnreadCount(lastSeenVersion));
+  }, []);
+
+  const handleOpenWhatsNew = () => {
+    setShowWhatsNew(true);
+    // Mark as read
+    localStorage.setItem('design-review-whats-new-version', getLatestVersion());
+    setUnreadCount(0);
+  };
 
   const loadUserAndProjects = async () => {
     try {
@@ -154,6 +172,20 @@ export default function ProjectsPage() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* What's New Button */}
+              <button
+                onClick={handleOpenWhatsNew}
+                className="relative flex items-center px-3 py-2 text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                What&apos;s New
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
               {user?.role === 'admin' && (
                 <Link
                   href="/admin"
@@ -394,6 +426,12 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+
+      {/* What's New Modal */}
+      <WhatsNewModal
+        isOpen={showWhatsNew}
+        onClose={() => setShowWhatsNew(false)}
+      />
     </div>
   );
 }
