@@ -42,47 +42,67 @@ const GooglePreview = ({ title, description, url, siteName, favicon }) => {
                 <span className="text-sm font-medium text-gray-600">Google Vorschau</span>
             </div>
 
-            {/* Google Search Result Card */}
-            <div className="max-w-[600px]">
-                {/* Site info row: Favicon + Site Name */}
-                <div className="flex items-center gap-3 mb-1">
-                    {/* Favicon - only show if available */}
-                    {favicon && (
-                        <img
-                            src={favicon}
-                            alt=""
-                            className="w-7 h-7 rounded-full bg-gray-100 object-contain"
-                            onError={(e) => {
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    )}
-
-                    {/* Site name and URL */}
-                    <div className="flex flex-col">
-                        <span className="text-sm text-[#202124] leading-tight">{displaySiteName}</span>
-                        <div className="flex items-center gap-1">
-                            <span className="text-xs text-[#4d5156]">{fullUrl}</span>
-                            <span className="text-[#70757a] text-lg leading-none ml-1">⋮</span>
-                        </div>
+            {/* Browser Window Frame */}
+            <div className="max-w-[600px] rounded-lg shadow-lg overflow-hidden border border-gray-300">
+                {/* Browser Chrome */}
+                <div className="bg-gray-100 px-4 py-2 flex items-center gap-3 border-b border-gray-300">
+                    {/* Traffic lights */}
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                    </div>
+                    {/* URL bar */}
+                    <div className="flex-1 bg-white rounded-md px-3 py-1 text-xs text-gray-500 flex items-center gap-2">
+                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                        </svg>
+                        <span>google.com/search</span>
                     </div>
                 </div>
 
-                {/* Title */}
-                <h3
-                    className="text-xl leading-tight cursor-pointer hover:underline"
-                    style={{ color: '#1a0dab', fontFamily: 'Arial, sans-serif' }}
-                >
-                    {truncatedTitle || 'Kein Titel gefunden'}
-                </h3>
+                {/* Browser Content */}
+                <div className="bg-white p-4">
+                    {/* Site info row: Favicon + Site Name */}
+                    <div className="flex items-center gap-3 mb-1">
+                        {/* Favicon - only show if available */}
+                        {favicon && (
+                            <img
+                                src={favicon}
+                                alt=""
+                                className="w-7 h-7 rounded-full bg-gray-100 object-contain"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                }}
+                            />
+                        )}
 
-                {/* Description */}
-                <p
-                    className="text-sm mt-1 leading-relaxed"
-                    style={{ color: '#4d5156', lineHeight: '1.58' }}
-                >
-                    {truncatedDesc || 'Keine Beschreibung verfügbar.'}
-                </p>
+                        {/* Site name and URL */}
+                        <div className="flex flex-col">
+                            <span className="text-sm text-[#202124] leading-tight">{displaySiteName}</span>
+                            <div className="flex items-center gap-1">
+                                <span className="text-xs text-[#4d5156]">{fullUrl}</span>
+                                <span className="text-[#70757a] text-lg leading-none ml-1">⋮</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Title */}
+                    <h3
+                        className="text-xl leading-tight cursor-pointer hover:underline"
+                        style={{ color: '#1a0dab', fontFamily: 'Arial, sans-serif' }}
+                    >
+                        {truncatedTitle || 'Kein Titel gefunden'}
+                    </h3>
+
+                    {/* Description */}
+                    <p
+                        className="text-sm mt-1 leading-relaxed"
+                        style={{ color: '#4d5156', lineHeight: '1.58' }}
+                    >
+                        {truncatedDesc || 'Keine Beschreibung verfügbar.'}
+                    </p>
+                </div>
             </div>
         </div>
     );
