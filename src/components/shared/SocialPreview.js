@@ -196,16 +196,71 @@ const GoogleMobilePreview = ({ title, description, url }) => {
     );
 };
 
+// Mini preview for examples
+const ExamplePreview = ({ title, description, isGood }) => {
+    const borderColor = isGood ? 'border-green-400' : 'border-red-400';
+    const bgColor = isGood ? 'bg-green-50' : 'bg-red-50';
+    const labelBg = isGood ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+    const label = isGood ? 'Optimal' : 'Zu lang';
+
+    // Apply same truncation rules as Google
+    const truncatedTitle = title.length > 60 ? title.substring(0, 57) + '...' : title;
+    const truncatedDesc = description.length > 160 ? description.substring(0, 157) + '...' : description;
+
+    return (
+        <div className={`rounded-lg border-2 ${borderColor} ${bgColor} p-3`}>
+            <div className="flex items-center justify-between mb-2">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded ${labelBg}`}>
+                    {label}
+                </span>
+                <span className="text-xs text-gray-500">
+                    Titel: {title.length} / Description: {description.length} Zeichen
+                </span>
+            </div>
+            <div className="bg-white rounded p-2">
+                <div className="text-xs text-gray-500 mb-1">www.beispiel.ch</div>
+                <div className="text-sm font-medium" style={{ color: '#1a0dab' }}>
+                    {truncatedTitle}
+                </div>
+                <div className="text-xs mt-1" style={{ color: '#4d5156' }}>
+                    {truncatedDesc}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SocialPreview = ({ ogData, twitterData, projectUrl, basicData, favicon }) => {
   // Use basic meta data as fallback if no OG data
   const title = ogData?.title || basicData?.title || 'Titel nicht gefunden';
   const description = ogData?.description || basicData?.description || 'Beschreibung nicht gefunden.';
   const siteName = ogData?.site_name || ogData?.siteName || '';
 
+  // Example texts
+  const goodTitle = 'Beispiel Website - Optimale Titellänge hier';  // 46 chars
+  const goodDesc = 'Dies ist eine optimale Meta-Beschreibung mit der richtigen Länge. Sie enthält alle wichtigen Informationen und wird vollständig in Google angezeigt.';  // 156 chars
+
+  const badTitle = 'Dies ist ein viel zu langer Titel der definitiv von Google abgeschnitten wird weil er mehr als sechzig Zeichen enthält';  // 116 chars
+  const badDesc = 'Diese Meta-Beschreibung ist viel zu lang und wird von Google abgeschnitten werden. Der Text geht einfach immer weiter und weiter, obwohl niemand so viel lesen möchte. Google zeigt nur die ersten 160 Zeichen an, alles andere wird ignoriert und durch drei Punkte ersetzt.';  // 270 chars
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="font-semibold text-gray-900 mb-4">Suchmaschinen Vorschau</h3>
 
+      {/* Example Previews */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Beispiele: Optimale vs. zu lange Texte</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ExamplePreview title={goodTitle} description={goodDesc} isGood={true} />
+          <ExamplePreview title={badTitle} description={badDesc} isGood={false} />
+        </div>
+        <p className="text-xs text-gray-500 mt-3">
+          Google empfiehlt: Titel 50-60 Zeichen, Description 150-160 Zeichen
+        </p>
+      </div>
+
+      {/* Actual Previews */}
+      <h4 className="text-sm font-medium text-gray-700 mb-3">Ihre aktuelle Vorschau</h4>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Desktop Preview */}
         <GooglePreview
