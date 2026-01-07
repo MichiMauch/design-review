@@ -243,6 +243,17 @@ export async function GET(request) {
     analysis.fonts.total = fontLinks.length;
     analysis.fonts.preloaded = preloadedFonts.length;
 
+    // Extract formats from preloaded fonts
+    preloadedFonts.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href) {
+        const extension = href.split('.').pop()?.toLowerCase().split('?')[0];
+        if (extension && ['woff', 'woff2', 'ttf', 'otf', 'eot'].includes(extension)) {
+          analysis.fonts.formats[extension] = (analysis.fonts.formats[extension] || 0) + 1;
+        }
+      }
+    });
+
     fontLinks.forEach(link => {
       const href = link.getAttribute('href');
       if (href) {
