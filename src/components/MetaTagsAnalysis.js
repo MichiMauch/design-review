@@ -187,12 +187,60 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
     };
   };
 
+  // Define required tags for scoring
+  const requiredOpenGraphTags = ['title', 'description', 'type', 'url', 'image'];
+  const requiredTwitterTags = ['card', 'title', 'description', 'image'];
+
+  const renderRequiredTagsChecklist = (data, requiredTags, tagPrefix) => {
+    const missingTags = requiredTags.filter(tag => !data[tag] || data[tag] === '');
+    const presentTags = requiredTags.filter(tag => data[tag] && data[tag] !== '');
+
+    if (missingTags.length === 0) return null;
+
+    return (
+      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-yellow-800 mb-2">
+              Fehlende Tags für volle Punktzahl ({presentTags.length}/{requiredTags.length}):
+            </p>
+            <div className="space-y-1">
+              {requiredTags.map(tag => {
+                const exists = data[tag] && data[tag] !== '';
+                return (
+                  <div key={tag} className="flex items-center gap-2 text-sm">
+                    {exists ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-yellow-600" />
+                    )}
+                    <code className={`text-xs px-1.5 py-0.5 rounded ${exists ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {tagPrefix}:{tag}
+                    </code>
+                    {!exists && (
+                      <span className="text-yellow-700 text-xs">fehlt</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderMetaSection = (title, icon, data, emptyMessage = 'Keine Daten verfügbar', socialImageType = null, isBasicMeta = false) => {
     const hasData = Object.values(data).some(value => value && value !== '');
 
     // Find the corresponding social image
     const socialImage = socialImageType && analysis?.socialImages ?
       analysis.socialImages.find(img => img.type === socialImageType) : null;
+
+    // Determine if this is Open Graph or Twitter section
+    const isOpenGraph = title === 'Open Graph Tags';
+    const isTwitter = title === 'Twitter Card Tags';
 
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -220,7 +268,8 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
                 "og:title: Titel beim Teilen",
                 "og:description: Beschreibung beim Teilen",
                 "og:image: Vorschaubild (1200x630px empfohlen)",
-                "og:type: Art des Inhalts (website, article, etc.)"
+                "og:type: Art des Inhalts (website, article, etc.)",
+                "og:url: Kanonische URL der Seite"
               ]}
               className="ml-2"
             />
@@ -269,6 +318,30 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
                 );
               }
 
+              // Special handling for canonical URL - show as link with checkmark
+              if (key === 'canonical') {
+                return (
+                  <div key={key} className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-green-800">
+                          Canonical URL:
+                        </span>
+                        <a
+                          href={value}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-sm text-green-700 hover:text-green-900 hover:underline break-all mt-1"
+                        >
+                          {value}
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={key} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                   <span className="text-sm font-medium text-gray-600 min-w-[100px]">
@@ -282,6 +355,12 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
             })}
           </div>
         )}
+
+        {/* Show missing required tags checklist for Open Graph */}
+        {isOpenGraph && hasData && renderRequiredTagsChecklist(data, requiredOpenGraphTags, 'og')}
+
+        {/* Show missing required tags checklist for Twitter */}
+        {isTwitter && hasData && renderRequiredTagsChecklist(data, requiredTwitterTags, 'twitter')}
 
         {/* Render social image if available */}
         {socialImage && renderSocialImage(socialImage)}
@@ -345,13 +424,22 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
           />
         </div>
 
-        {!hasAnySeoTags && (
+        {/* Warning if canonical is missing - this costs 10 points */}
+        {!seoData.canonical && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <p className="text-sm text-yellow-800">
-                Keine SEO-Tags gefunden. Empfehlung: Fügen Sie mindestens einen Canonical-Tag hinzu.
-              </p>
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-yellow-800">
+                  Canonical URL fehlt (-10 Punkte)
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Der Canonical-Tag verhindert Duplicate Content und ist wichtig für SEO.
+                </p>
+                <code className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded mt-2 inline-block">
+                  &lt;link rel="canonical" href="https://ihre-domain.ch/" /&gt;
+                </code>
+              </div>
             </div>
           </div>
         )}
@@ -555,7 +643,10 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
             {renderMetaSection(
               'Basis Meta-Tags',
               <Globe className="h-5 w-5 text-green-600" />,
-              analysis.basic,
+              {
+                ...analysis.basic,
+                canonical: analysis.seo?.canonical || null
+              },
               'Keine Basis Meta-Tags gefunden',
               null,
               true  // isBasicMeta flag for character count
@@ -577,6 +668,9 @@ export default function MetaTagsAnalysis({ projectId, projectUrl, showHeader = t
               'twitter'
             )}
           </div>
+
+          {/* SEO Tags Section */}
+          {analysis.seo && renderSeoSection('SEO Tags', analysis.seo)}
         </>
       )}
     </div>
