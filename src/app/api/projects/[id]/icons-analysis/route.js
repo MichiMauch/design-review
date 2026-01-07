@@ -106,7 +106,9 @@ export async function GET(request, { params }) {
           },
         });
         if (!response.ok) return null;
-        return await response.json();
+        const manifest = await response.json();
+        // Return both manifest and its URL for proper icon URL resolution
+        return { manifest, url: absoluteUrl };
       } catch {
         return null;
       }
@@ -140,7 +142,8 @@ export async function GET(request, { params }) {
           if (type.includes('310x310')) tiles['310x310'] = src;
           if (type === 'tileimage') tiles['144x144'] = src;
         }
-        return tiles;
+        // Return both tiles and browserconfig URL for proper icon URL resolution
+        return { tiles, url: absoluteUrl };
       } catch {
         return null;
       }
@@ -218,14 +221,15 @@ export async function GET(request, { params }) {
       let exists = false;
 
       // Look for icon in web manifest
-      if (webManifest?.icons) {
-        const manifestIcon = webManifest.icons.find(i =>
+      if (webManifest?.manifest?.icons) {
+        const manifestIcon = webManifest.manifest.icons.find(i =>
           i.sizes === icon.manifestSize ||
           i.sizes?.includes(icon.manifestSize.split('x')[0])
         );
         if (manifestIcon) {
           found = true;
-          url = manifestIcon.src;
+          // Resolve icon URL relative to manifest URL, not page URL
+          url = new URL(manifestIcon.src, webManifest.url).href;
           exists = await checkImageExists(url);
         }
       }
@@ -259,11 +263,12 @@ export async function GET(request, { params }) {
       }
 
       // If not found in meta, check browserconfig.xml
-      if (!found && browserConfig && icon.browserConfigSize) {
-        const configUrl = browserConfig[icon.browserConfigSize];
+      if (!found && browserConfig?.tiles && icon.browserConfigSize) {
+        const configUrl = browserConfig.tiles[icon.browserConfigSize];
         if (configUrl) {
           found = true;
-          url = configUrl;
+          // Resolve icon URL relative to browserconfig URL, not page URL
+          url = new URL(configUrl, browserConfig.url).href;
           source = 'browserconfig';
         }
       }
