@@ -102,9 +102,56 @@ export async function GET(request) {
       recommendations: []
     };
 
+    // Helper function to extract image format from URL
+    const getImageFormat = (url) => {
+      if (!url) return null;
+
+      // Handle Next.js Image Optimization URLs (/_next/image?url=...)
+      if (url.includes('/_next/image')) {
+        try {
+          const urlObj = new URL(url, projectUrl);
+          const originalUrl = urlObj.searchParams.get('url');
+          if (originalUrl) {
+            // Decode and extract extension from original URL
+            const decodedUrl = decodeURIComponent(originalUrl);
+            const match = decodedUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+            if (match) return match[1].toLowerCase();
+          }
+        } catch {
+          // Fall through to default extraction
+        }
+      }
+
+      // Handle URLs with query parameters
+      try {
+        const urlObj = new URL(url, projectUrl);
+        const pathname = urlObj.pathname;
+        const match = pathname.match(/\.([a-zA-Z0-9]+)$/);
+        if (match) return match[1].toLowerCase();
+      } catch {
+        // Fall through to simple extraction
+      }
+
+      // Simple extraction for relative URLs
+      const cleanUrl = url.split('?')[0].split('#')[0];
+      const match = cleanUrl.match(/\.([a-zA-Z0-9]+)$/);
+      return match ? match[1].toLowerCase() : null;
+    };
+
     // Analyze Images
     const images = document.querySelectorAll('img');
     analysis.images.total = images.length;
+
+    // Also check for <picture> elements with WebP/AVIF sources
+    const pictureElements = document.querySelectorAll('picture');
+    pictureElements.forEach(picture => {
+      const sources = picture.querySelectorAll('source');
+      sources.forEach(source => {
+        const type = source.getAttribute('type');
+        if (type === 'image/webp') analysis.images.webp++;
+        if (type === 'image/avif') analysis.images.avif++;
+      });
+    });
 
     images.forEach(img => {
       const src = img.getAttribute('src');
@@ -112,9 +159,9 @@ export async function GET(request) {
       const loading = img.getAttribute('loading');
       const srcset = img.getAttribute('srcset');
 
-      // Format analysis
+      // Format analysis using improved extraction
       if (src) {
-        const extension = src.split('.').pop()?.toLowerCase().split('?')[0];
+        const extension = getImageFormat(src);
         if (extension) {
           analysis.images.formats[extension] = (analysis.images.formats[extension] || 0) + 1;
 
