@@ -11,14 +11,6 @@ export default function SeoScoreCard({ data, isLoading, error, lastUpdated, proj
   const metrics = [];
 
   if (data) {
-    // Meta Tags status
-    const metaStatus = data.meta?.title && data.meta?.description ? 'success' : 'warning';
-    metrics.push({
-      label: 'Meta Tags',
-      value: metaStatus === 'success' ? 'OK' : 'Fehlt',
-      status: metaStatus
-    });
-
     // Headings structure
     const h1Count = data.headings?.filter(h => h.level === 'h1').length || 0;
     const headingsStatus = h1Count === 1 ? 'success' : 'warning';
