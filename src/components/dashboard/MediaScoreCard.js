@@ -44,7 +44,7 @@ export default function MediaScoreCard({ data, isLoading, error, lastUpdated, pr
 
     // Fonts optimization
     if (data.fonts) {
-      const hasFontDisplay = data.fonts.fontDisplay > 0;
+      const hasFontDisplay = data.fonts.displaySwap > 0;
       const fontStatus = hasFontDisplay ? 'success' : 'warning';
 
       metrics.push({

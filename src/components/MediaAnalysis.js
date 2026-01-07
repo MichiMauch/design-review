@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, Image, Check, X, AlertTriangle, Video, Type, Star, Zap, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { RefreshCw, Image, Check, X, AlertTriangle, Video, Type, Star, Zap, Play, Pause, Volume2, VolumeX, CheckCircle } from 'lucide-react';
 
 export default function MediaAnalysis({ projectId, projectUrl, showHeader = true }) {
   const [analysis, setAnalysis] = useState(null);
@@ -283,6 +283,26 @@ export default function MediaAnalysis({ projectId, projectUrl, showHeader = true
               <div className="text-2xl font-bold text-purple-600">{analysis.fonts.external}</div>
               <div className="text-sm text-gray-600">Extern</div>
             </div>
+          </div>
+
+          {/* Font Display Status */}
+          <div className="mb-4">
+            <h4 className="font-medium text-gray-900 mb-2">Font Display Optimierung</h4>
+            {analysis.fonts.displaySwap > 0 ? (
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-green-800">
+                  <strong>Optimiert:</strong> {analysis.fonts.displaySwap} Font(s) mit font-display: swap
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <span className="text-yellow-800">
+                  <strong>Nicht optimiert:</strong> Kein font-display: swap gefunden. Dies kann zu unsichtbarem Text während des Font-Ladens führen.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Font Formats */}
