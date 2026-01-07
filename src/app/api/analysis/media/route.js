@@ -250,6 +250,11 @@ export async function GET(request) {
           analysis.fonts.external++;
         }
 
+        // Check for display=swap in Google Fonts URLs
+        if (href.includes('display=swap')) {
+          analysis.fonts.displaySwap++;
+        }
+
         const extension = href.split('.').pop()?.toLowerCase().split('?')[0];
         if (extension) {
           analysis.fonts.formats[extension] = (analysis.fonts.formats[extension] || 0) + 1;
@@ -257,13 +262,40 @@ export async function GET(request) {
       }
     });
 
-    // Check for font-display: swap
+    // Check for font-display: swap in inline styles
     fontFaces.forEach(style => {
       const content = style.textContent || '';
-      if (content.includes('font-display') && content.includes('swap')) {
-        analysis.fonts.displaySwap++;
+      const matches = content.match(/font-display\s*:\s*swap/gi);
+      if (matches) {
+        analysis.fonts.displaySwap += matches.length;
       }
     });
+
+    // Check external CSS files for font-display: swap
+    const stylesheets = document.querySelectorAll('link[rel="stylesheet"]');
+    for (const stylesheet of stylesheets) {
+      const href = stylesheet.getAttribute('href');
+      if (href) {
+        try {
+          const cssUrl = new URL(href, projectUrl).href;
+          const response = await fetch(cssUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; Media-Analyzer/1.0)',
+            },
+            timeout: 5000
+          });
+          if (response.ok) {
+            const cssContent = await response.text();
+            const matches = cssContent.match(/font-display\s*:\s*swap/gi);
+            if (matches) {
+              analysis.fonts.displaySwap += matches.length;
+            }
+          }
+        } catch {
+          // Skip if CSS can't be fetched
+        }
+      }
+    }
 
     // Analyze Icons
     const svgIcons = document.querySelectorAll('svg');
