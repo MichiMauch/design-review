@@ -242,10 +242,40 @@ export async function GET(request, { params }) {
       }
     };
 
+    // Check if Service Worker file exists
+    const checkServiceWorkerExists = async () => {
+      // First check if mentioned in HTML
+      if (html.includes('serviceWorker') || html.includes('sw.js') || html.includes('service-worker')) {
+        return true;
+      }
+
+      // Check common service worker file paths
+      const swPaths = ['/sw.js', '/service-worker.js', '/serviceworker.js'];
+      for (const swPath of swPaths) {
+        try {
+          const swUrl = new URL(swPath, projectUrl).href;
+          const response = await fetch(swUrl, {
+            method: 'HEAD',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; DesignReview/1.0)',
+            },
+          });
+          if (response.ok) {
+            return true;
+          }
+        } catch {
+          // Continue to next path
+        }
+      }
+      return false;
+    };
+
+    const hasServiceWorker = await checkServiceWorkerExists();
+
     // Basic performance metrics from HTML analysis
     const performanceMetrics = {
       responseTime,
-      hasServiceWorker: html.includes('serviceWorker') || html.includes('sw.js'),
+      hasServiceWorker,
       hasLazyLoading: Array.from(images).some(img => img.getAttribute('loading') === 'lazy'),
       hasAsyncScripts: Array.from(scripts).some(script => script.hasAttribute('async')),
       hasDeferredScripts: Array.from(scripts).some(script => script.hasAttribute('defer')),
