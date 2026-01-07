@@ -259,7 +259,7 @@ export default function MediaAnalysis({ projectId, projectUrl, showHeader = true
       )}
 
       {/* Fonts Analysis */}
-      {analysis.fonts && analysis.fonts.total > 0 && (
+      {analysis.fonts && (analysis.fonts.total > 0 || analysis.fonts.displaySwap > 0 || analysis.fonts.preloaded > 0) && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-center mb-4">
             <Type className="h-5 w-5 text-indigo-600 mr-2" />
