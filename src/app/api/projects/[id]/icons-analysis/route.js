@@ -90,6 +90,68 @@ export async function GET(request, { params }) {
       }
     }
 
+    // Helper function to fetch and parse Web App Manifest
+    async function parseWebManifest() {
+      const manifestLink = document.querySelector('link[rel="manifest"]');
+      if (!manifestLink) return null;
+
+      const manifestUrl = manifestLink.getAttribute('href');
+      if (!manifestUrl) return null;
+
+      try {
+        const absoluteUrl = new URL(manifestUrl, targetUrl).href;
+        const response = await fetch(absoluteUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; DesignReview/1.0)',
+          },
+        });
+        if (!response.ok) return null;
+        return await response.json();
+      } catch {
+        return null;
+      }
+    }
+
+    // Helper function to fetch and parse browserconfig.xml
+    async function parseBrowserConfig() {
+      // First check for meta tag pointing to browserconfig
+      const configMeta = document.querySelector('meta[name="msapplication-config"]');
+      const configUrl = configMeta?.getAttribute('content') || '/browserconfig.xml';
+
+      try {
+        const absoluteUrl = new URL(configUrl, targetUrl).href;
+        const response = await fetch(absoluteUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; DesignReview/1.0)',
+          },
+        });
+        if (!response.ok) return null;
+        const xmlText = await response.text();
+
+        // Parse XML to extract tile images
+        const tiles = {};
+        const tileMatches = xmlText.matchAll(/<(square\d+x\d+logo|wide\d+x\d+logo|TileImage)[^>]*src="([^"]+)"/gi);
+        for (const match of tileMatches) {
+          const type = match[1].toLowerCase();
+          const src = match[2];
+          if (type.includes('70x70')) tiles['70x70'] = src;
+          if (type.includes('150x150')) tiles['150x150'] = src;
+          if (type.includes('310x150')) tiles['310x150'] = src;
+          if (type.includes('310x310')) tiles['310x310'] = src;
+          if (type === 'tileimage') tiles['144x144'] = src;
+        }
+        return tiles;
+      } catch {
+        return null;
+      }
+    }
+
+    // Fetch manifest and browserconfig in parallel
+    const [webManifest, browserConfig] = await Promise.all([
+      parseWebManifest(),
+      parseBrowserConfig()
+    ]);
+
     // Icon definitions to check
     const iconChecks = {
       favicon: [
@@ -110,14 +172,15 @@ export async function GET(request, { params }) {
         { name: 'apple-touch-icon-180x180.png', selector: 'link[rel*="apple-touch-icon"][sizes="180x180"], link[rel*="apple-touch-icon"]:not([sizes])', type: 'Apple', sizes: '180x180' },
       ],
       android: [
-        { name: 'android-chrome-192x192.png', selector: 'link[rel="icon"][sizes="192x192"]', type: 'Android', sizes: '192x192' },
-        { name: 'android-chrome-512x512.png', selector: 'link[rel="icon"][sizes="512x512"]', type: 'Android', sizes: '512x512' },
+        { name: 'android-chrome-192x192.png', manifestSize: '192x192', type: 'Android', sizes: '192x192' },
+        { name: 'android-chrome-512x512.png', manifestSize: '512x512', type: 'Android', sizes: '512x512' },
       ],
       microsoft: [
-        { name: 'mstile-70x70.png', selector: 'meta[name="msapplication-square70x70logo"]', type: 'Microsoft', sizes: '70x70' },
-        { name: 'mstile-150x150.png', selector: 'meta[name="msapplication-square150x150logo"]', type: 'Microsoft', sizes: '150x150' },
-        { name: 'mstile-310x150.png', selector: 'meta[name="msapplication-wide310x150logo"]', type: 'Microsoft', sizes: '310x150' },
-        { name: 'mstile-310x310.png', selector: 'meta[name="msapplication-square310x310logo"]', type: 'Microsoft', sizes: '310x310' },
+        { name: 'mstile-70x70.png', selector: 'meta[name="msapplication-square70x70logo"]', browserConfigSize: '70x70', type: 'Microsoft', sizes: '70x70' },
+        { name: 'mstile-144x144.png', selector: 'meta[name="msapplication-TileImage"]', browserConfigSize: '144x144', type: 'Microsoft', sizes: '144x144' },
+        { name: 'mstile-150x150.png', selector: 'meta[name="msapplication-square150x150logo"]', browserConfigSize: '150x150', type: 'Microsoft', sizes: '150x150' },
+        { name: 'mstile-310x150.png', selector: 'meta[name="msapplication-wide310x150logo"]', browserConfigSize: '310x150', type: 'Microsoft', sizes: '310x150' },
+        { name: 'mstile-310x310.png', selector: 'meta[name="msapplication-square310x310logo"]', browserConfigSize: '310x310', type: 'Microsoft', sizes: '310x310' },
       ]
     };
 
@@ -129,8 +192,8 @@ export async function GET(request, { params }) {
       microsoft: []
     };
 
-    // Check standard icons (favicon, apple, android)
-    for (const category of ['favicon', 'apple', 'android']) {
+    // Check standard icons (favicon, apple)
+    for (const category of ['favicon', 'apple']) {
       for (const icon of iconChecks[category]) {
         const element = document.querySelector(icon.selector);
         const found = !!element;
@@ -148,20 +211,76 @@ export async function GET(request, { params }) {
       }
     }
 
-    // Check Microsoft tiles (different structure)
+    // Check Android icons from Web App Manifest
+    for (const icon of iconChecks.android) {
+      let found = false;
+      let url = null;
+      let exists = false;
+
+      // Look for icon in web manifest
+      if (webManifest?.icons) {
+        const manifestIcon = webManifest.icons.find(i =>
+          i.sizes === icon.manifestSize ||
+          i.sizes?.includes(icon.manifestSize.split('x')[0])
+        );
+        if (manifestIcon) {
+          found = true;
+          url = manifestIcon.src;
+          exists = await checkImageExists(url);
+        }
+      }
+
+      icons.android.push({
+        name: icon.name,
+        type: icon.type,
+        sizes: icon.sizes,
+        found,
+        url,
+        exists,
+        source: found ? 'manifest' : null
+      });
+    }
+
+    // Check Microsoft tiles from meta tags and browserconfig.xml
     for (const icon of iconChecks.microsoft) {
-      const element = document.querySelector(icon.selector);
-      const found = !!element;
-      const url = found ? element.getAttribute('content') : null;
-      const exists = found && url ? await checkImageExists(url) : false;
+      let found = false;
+      let url = null;
+      let exists = false;
+      let source = null;
+
+      // First check meta tags in HTML
+      if (icon.selector) {
+        const element = document.querySelector(icon.selector);
+        if (element) {
+          found = true;
+          url = element.getAttribute('content');
+          source = 'meta';
+        }
+      }
+
+      // If not found in meta, check browserconfig.xml
+      if (!found && browserConfig && icon.browserConfigSize) {
+        const configUrl = browserConfig[icon.browserConfigSize];
+        if (configUrl) {
+          found = true;
+          url = configUrl;
+          source = 'browserconfig';
+        }
+      }
+
+      // Verify the image exists
+      if (found && url) {
+        exists = await checkImageExists(url);
+      }
 
       icons.microsoft.push({
         name: icon.name,
         type: icon.type,
         sizes: icon.sizes,
         found,
-        url: url || null,
-        exists
+        url,
+        exists,
+        source
       });
     }
 
