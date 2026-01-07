@@ -373,30 +373,57 @@ export async function GET(request) {
       });
     }
 
-    // Calculate Media Score
+    // Calculate Media Score with detailed breakdown
     let score = 0;
     let maxScore = 0;
+    const scoreDetails = {
+      images: { total: 0, max: 40, items: [] },
+      videos: { total: 0, max: 20, items: [] },
+      fonts: { total: 0, max: 20, items: [] },
+      resourceHints: { total: 0, max: 20, items: [] }
+    };
 
     // Images (40 points)
     maxScore += 40;
     if (analysis.images.total > 0) {
       // Alt text coverage (15 points)
       const altCoverage = analysis.images.withAlt / analysis.images.total;
-      score += Math.round(altCoverage * 15);
+      const altScore = Math.round(altCoverage * 15);
+      score += altScore;
+      scoreDetails.images.items.push({ label: 'Alt-Texte', score: altScore, max: 15 });
 
       // Modern formats (10 points)
       const modernFormats = (analysis.images.webp + analysis.images.avif) / analysis.images.total;
-      score += Math.round(modernFormats * 10);
+      const modernScore = Math.round(modernFormats * 10);
+      score += modernScore;
+      scoreDetails.images.items.push({ label: 'Moderne Formate (WebP/AVIF)', score: modernScore, max: 10 });
 
       // Lazy loading (10 points)
-      const lazyLoading = analysis.images.lazy / analysis.images.total;
-      score += Math.round(lazyLoading * 10);
+      // Note: First image should NOT have lazy loading (above the fold)
+      const expectedLazy = Math.max(0, analysis.images.total - 1);
+      const lazyLoading = expectedLazy > 0
+        ? Math.min(1, analysis.images.lazy / expectedLazy)
+        : 1;
+      const lazyScore = Math.round(lazyLoading * 10);
+      score += lazyScore;
+      scoreDetails.images.items.push({
+        label: 'Lazy Loading',
+        score: lazyScore,
+        max: 10,
+        note: expectedLazy > 0 ? `${analysis.images.lazy}/${expectedLazy} (erstes Bild ausgenommen)` : 'Nur 1 Bild'
+      });
 
       // Responsive images (5 points)
       const responsiveImages = analysis.images.responsive / analysis.images.total;
-      score += Math.round(responsiveImages * 5);
+      const responsiveScore = Math.round(responsiveImages * 5);
+      score += responsiveScore;
+      scoreDetails.images.items.push({ label: 'Responsive (srcset)', score: responsiveScore, max: 5 });
+
+      scoreDetails.images.total = altScore + modernScore + lazyScore + responsiveScore;
     } else {
-      score += 40; // No images is not bad
+      score += 40;
+      scoreDetails.images.total = 40;
+      scoreDetails.images.items.push({ label: 'Keine Bilder', score: 40, max: 40, note: 'Kein Abzug' });
     }
 
     // Videos (20 points)
@@ -404,35 +431,55 @@ export async function GET(request) {
     if (analysis.videos.total > 0) {
       // Poster images (5 points)
       const posterCoverage = analysis.videos.withPoster / analysis.videos.total;
-      score += Math.round(posterCoverage * 5);
+      const posterScore = Math.round(posterCoverage * 5);
+      score += posterScore;
+      scoreDetails.videos.items.push({ label: 'Poster-Bilder', score: posterScore, max: 5 });
 
       // Proper autoplay (10 points)
       const properAutoplay = analysis.videos.autoplay === 0 ||
                             (analysis.videos.autoplay === analysis.videos.muted);
-      score += properAutoplay ? 10 : 0;
+      const autoplayScore = properAutoplay ? 10 : 0;
+      score += autoplayScore;
+      scoreDetails.videos.items.push({ label: 'Autoplay korrekt', score: autoplayScore, max: 10 });
 
       // Modern formats (5 points)
       const hasModernFormats = Object.keys(analysis.videos.formats).includes('mp4') ||
                               Object.keys(analysis.videos.formats).includes('webm');
-      score += hasModernFormats ? 5 : 0;
+      const videoFormatScore = hasModernFormats ? 5 : 0;
+      score += videoFormatScore;
+      scoreDetails.videos.items.push({ label: 'Moderne Formate', score: videoFormatScore, max: 5 });
+
+      scoreDetails.videos.total = posterScore + autoplayScore + videoFormatScore;
     } else {
-      score += 20; // No videos is not bad
+      score += 20;
+      scoreDetails.videos.total = 20;
+      scoreDetails.videos.items.push({ label: 'Keine Videos', score: 20, max: 20, note: 'Kein Abzug' });
     }
 
     // Fonts (20 points)
     maxScore += 20;
-    if (analysis.fonts.total > 0) {
+    if (analysis.fonts.total > 0 || analysis.fonts.displaySwap > 0 || analysis.fonts.preloaded > 0) {
       // Font display optimization (10 points)
-      score += analysis.fonts.displaySwap > 0 ? 10 : 0;
+      const fontDisplayScore = analysis.fonts.displaySwap > 0 ? 10 : 0;
+      score += fontDisplayScore;
+      scoreDetails.fonts.items.push({ label: 'font-display: swap', score: fontDisplayScore, max: 10 });
 
       // Preloading (5 points)
-      score += analysis.fonts.preloaded > 0 ? 5 : 0;
+      const preloadScore = analysis.fonts.preloaded > 0 ? 5 : 0;
+      score += preloadScore;
+      scoreDetails.fonts.items.push({ label: 'Preloading', score: preloadScore, max: 5 });
 
       // Modern formats (5 points)
       const hasWoff2 = Object.keys(analysis.fonts.formats).includes('woff2');
-      score += hasWoff2 ? 5 : 0;
+      const fontFormatScore = hasWoff2 ? 5 : 0;
+      score += fontFormatScore;
+      scoreDetails.fonts.items.push({ label: 'WOFF2 Format', score: fontFormatScore, max: 5 });
+
+      scoreDetails.fonts.total = fontDisplayScore + preloadScore + fontFormatScore;
     } else {
-      score += 20; // No external fonts is good
+      score += 20;
+      scoreDetails.fonts.total = 20;
+      scoreDetails.fonts.items.push({ label: 'Keine externen Fonts', score: 20, max: 20, note: 'Kein Abzug' });
     }
 
     // Resource hints (20 points)
@@ -441,8 +488,17 @@ export async function GET(request) {
                             analysis.resourceHints.prefetch > 0 ||
                             analysis.resourceHints.preconnect > 0 ||
                             analysis.resourceHints.dnsPrefetch > 0;
-    score += hasResourceHints ? 20 : 5; // Some credit for trying
+    const resourceScore = hasResourceHints ? 20 : 5;
+    score += resourceScore;
+    scoreDetails.resourceHints.total = resourceScore;
+    scoreDetails.resourceHints.items.push({
+      label: 'Resource Hints vorhanden',
+      score: resourceScore,
+      max: 20,
+      note: hasResourceHints ? 'preload, prefetch, preconnect oder dns-prefetch' : 'Keine gefunden (5 Basispunkte)'
+    });
 
+    analysis.scoreDetails = scoreDetails;
     analysis.score = Math.round((score / maxScore) * 100);
 
     // Generate summary

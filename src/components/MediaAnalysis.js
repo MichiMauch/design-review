@@ -135,6 +135,143 @@ export default function MediaAnalysis({ projectId, projectUrl, showHeader = true
         <p className="text-sm text-gray-600">{analysis.summary}</p>
       </div>
 
+      {/* Score Breakdown */}
+      {analysis.scoreDetails && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Score-Aufschlüsselung</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Images Score */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Image className="h-5 w-5 text-pink-600" />
+                  <span className="font-medium text-gray-900">Bilder</span>
+                </div>
+                <span className={`text-sm font-medium ${analysis.scoreDetails.images.total === analysis.scoreDetails.images.max ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {analysis.scoreDetails.images.total}/{analysis.scoreDetails.images.max} Punkte
+                </span>
+              </div>
+              <div className="space-y-2">
+                {analysis.scoreDetails.images.items.map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className={`font-medium ${item.score === item.max ? 'text-green-600' : item.score > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {item.score}/{item.max}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-300 ${item.score === item.max ? 'bg-green-500' : item.score > 0 ? 'bg-yellow-500' : 'bg-red-300'}`}
+                        style={{ width: `${item.max > 0 ? (item.score / item.max) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    {item.note && <p className="text-xs text-gray-500">{item.note}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Videos Score */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Video className="h-5 w-5 text-red-600" />
+                  <span className="font-medium text-gray-900">Videos</span>
+                </div>
+                <span className={`text-sm font-medium ${analysis.scoreDetails.videos.total === analysis.scoreDetails.videos.max ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {analysis.scoreDetails.videos.total}/{analysis.scoreDetails.videos.max} Punkte
+                </span>
+              </div>
+              <div className="space-y-2">
+                {analysis.scoreDetails.videos.items.map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className={`font-medium ${item.score === item.max ? 'text-green-600' : item.score > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {item.score}/{item.max}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-300 ${item.score === item.max ? 'bg-green-500' : item.score > 0 ? 'bg-yellow-500' : 'bg-red-300'}`}
+                        style={{ width: `${item.max > 0 ? (item.score / item.max) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    {item.note && <p className="text-xs text-gray-500">{item.note}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Fonts Score */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Type className="h-5 w-5 text-indigo-600" />
+                  <span className="font-medium text-gray-900">Fonts</span>
+                </div>
+                <span className={`text-sm font-medium ${analysis.scoreDetails.fonts.total === analysis.scoreDetails.fonts.max ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {analysis.scoreDetails.fonts.total}/{analysis.scoreDetails.fonts.max} Punkte
+                </span>
+              </div>
+              <div className="space-y-2">
+                {analysis.scoreDetails.fonts.items.map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className={`font-medium ${item.score === item.max ? 'text-green-600' : item.score > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {item.score}/{item.max}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-300 ${item.score === item.max ? 'bg-green-500' : item.score > 0 ? 'bg-yellow-500' : 'bg-red-300'}`}
+                        style={{ width: `${item.max > 0 ? (item.score / item.max) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    {item.note && <p className="text-xs text-gray-500">{item.note}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Resource Hints Score */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-600" />
+                  <span className="font-medium text-gray-900">Resource Hints</span>
+                </div>
+                <span className={`text-sm font-medium ${analysis.scoreDetails.resourceHints.total === analysis.scoreDetails.resourceHints.max ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {analysis.scoreDetails.resourceHints.total}/{analysis.scoreDetails.resourceHints.max} Punkte
+                </span>
+              </div>
+              <div className="space-y-2">
+                {analysis.scoreDetails.resourceHints.items.map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className={`font-medium ${item.score === item.max ? 'text-green-600' : item.score > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {item.score}/{item.max}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-300 ${item.score === item.max ? 'bg-green-500' : item.score > 0 ? 'bg-yellow-500' : 'bg-red-300'}`}
+                        style={{ width: `${item.max > 0 ? (item.score / item.max) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    {item.note && <p className="text-xs text-gray-500">{item.note}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Images Analysis */}
       {analysis.images && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
