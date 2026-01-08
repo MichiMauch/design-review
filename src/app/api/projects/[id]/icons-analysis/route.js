@@ -92,7 +92,11 @@ export async function GET(request, { params }) {
 
     // Helper function to fetch and parse Web App Manifest
     async function parseWebManifest() {
-      const manifestLink = document.querySelector('link[rel="manifest"]');
+      // Search entire document since some frameworks inject links in body
+      let manifestLink = document.head.querySelector('link[rel="manifest"]');
+      if (!manifestLink) {
+        manifestLink = document.querySelector('link[rel="manifest"]');
+      }
       if (!manifestLink) return null;
 
       const manifestUrl = manifestLink.getAttribute('href');
@@ -116,8 +120,11 @@ export async function GET(request, { params }) {
 
     // Helper function to fetch and parse browserconfig.xml
     async function parseBrowserConfig() {
-      // First check for meta tag pointing to browserconfig
-      const configMeta = document.querySelector('meta[name="msapplication-config"]');
+      // First check for meta tag pointing to browserconfig (check head first, then entire document)
+      let configMeta = document.head.querySelector('meta[name="msapplication-config"]');
+      if (!configMeta) {
+        configMeta = document.querySelector('meta[name="msapplication-config"]');
+      }
       const configUrl = configMeta?.getAttribute('content') || '/browserconfig.xml';
 
       try {
@@ -196,9 +203,15 @@ export async function GET(request, { params }) {
     };
 
     // Check standard icons (favicon, apple)
+    // Note: Some frameworks (like Next.js) inject icons in <body> and move them to <head> via JS
+    // Since JSDOM doesn't execute JS, we need to search the entire document
     for (const category of ['favicon', 'apple']) {
       for (const icon of iconChecks[category]) {
-        const element = document.querySelector(icon.selector);
+        // First try the head, then the entire document
+        let element = document.head.querySelector(icon.selector);
+        if (!element) {
+          element = document.querySelector(icon.selector);
+        }
         const found = !!element;
         const url = found ? (element.getAttribute('href') || element.getAttribute('content')) : null;
         const exists = found && url ? await checkImageExists(url) : false;
@@ -252,9 +265,12 @@ export async function GET(request, { params }) {
       let exists = false;
       let source = null;
 
-      // First check meta tags in HTML
+      // First check meta tags in HTML (check head first, then entire document)
       if (icon.selector) {
-        const element = document.querySelector(icon.selector);
+        let element = document.head.querySelector(icon.selector);
+        if (!element) {
+          element = document.querySelector(icon.selector);
+        }
         if (element) {
           found = true;
           url = element.getAttribute('content');
